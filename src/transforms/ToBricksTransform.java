@@ -424,14 +424,19 @@ public class ToBricksTransform implements InstructionsTransform {
 				int circleY = (int)(r.getCenterY() - diameter/2);
 				g2.fillOval(circleX, circleY, diameter, diameter);
 				
+				// Añadir contorno fino del mismo color que el texto
+				Color textColor = getContrastingTextColor(color.getRGB());
+				g2.setColor(textColor);
+				Stroke originalStroke = g2.getStroke();
+				g2.setStroke(new BasicStroke(1.0f)); // Stroke muy fino
+				g2.drawOval(circleX, circleY, diameter, diameter);
+				g2.setStroke(originalStroke); // Restaurar stroke original
+				
 				// Superponer el número del color
 				String id = cc.getShortIdentifier(color);
 				int width = g2.getFontMetrics().stringWidth(id);
 				int originX = (int)(r.getCenterX() - width/2);
 				int originY = (int)(r.getCenterY() + fontSize/2);
-				
-				// Usar color de texto que contraste según la luminosidad del fondo
-				Color textColor = getContrastingTextColor(color.getRGB());
 				g2.setColor(textColor);
 				g2.drawString(id, originX, originY);
 			}			
