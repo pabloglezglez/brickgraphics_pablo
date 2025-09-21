@@ -324,8 +324,8 @@ public class PrintController implements Printable, ModelHandler<BrickGraphicsSta
 			int circleY = yIndent;
 			g2.fillOval(circleX, circleY, diameter, diameter);
 			
-			// Añadir contorno blanco para todos los círculos
-			g2.setColor(Color.WHITE);
+			// Añadir contorno negro para círculos de cover page
+			g2.setColor(Color.BLACK);
 			Stroke originalStroke = g2.getStroke();
 			g2.setStroke(new BasicStroke(1.0f));
 			g2.drawOval(circleX, circleY, diameter, diameter);
@@ -712,8 +712,8 @@ public class PrintController implements Printable, ModelHandler<BrickGraphicsSta
 			int circleY = yIndent;
 			g2.fillOval(circleX, circleY, diameter, diameter);
 			
-			// Añadir contorno blanco para todos los círculos
-			g2.setColor(Color.WHITE);
+			// Añadir contorno negro para círculos de leyenda
+			g2.setColor(Color.BLACK);
 			Stroke originalStroke = g2.getStroke();
 			g2.setStroke(new BasicStroke(1.0f));
 			g2.drawOval(circleX, circleY, diameter, diameter);
