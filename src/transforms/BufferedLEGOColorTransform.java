@@ -138,6 +138,10 @@ public abstract class BufferedLEGOColorTransform implements LEGOColorTransform, 
 
 		LEGOColor.CountingLEGOColor[] m = new LEGOColor.CountingLEGOColor[LEGOColor.getMaxRebrickableId()+1];
 		int cnt = 0;
+		
+		// Dibujar fondo negro para toda la cuadrícula de instrucciones
+		g2.setColor(Color.BLACK);
+		g2.fillRect(0, 0, toSize.width, toSize.height);
 
 		for (int y = 0; y < h; y++) {
 			int yIndent = (int) Math.round(scaleH * y);
