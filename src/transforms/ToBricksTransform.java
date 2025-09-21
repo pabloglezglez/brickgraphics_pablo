@@ -415,9 +415,14 @@ public class ToBricksTransform implements InstructionsTransform {
 				int h = (int)(1+scaleH/n5);
 				Rectangle r = new Rectangle(xIndent, yIndent, w, h);
 
-				// Siempre mostrar color de fondo y número superpuesto (sin círculo)
+				// Siempre mostrar color de fondo como círculo inscrito y número superpuesto
 				g2.setColor(color.getRGB());
-				g2.fill(r);
+				
+				// Calcular círculo inscrito en el rectángulo
+				int diameter = Math.min(w, h);
+				int circleX = (int)(r.getCenterX() - diameter/2);
+				int circleY = (int)(r.getCenterY() - diameter/2);
+				g2.fillOval(circleX, circleY, diameter, diameter);
 				
 				// Superponer el número del color
 				String id = cc.getShortIdentifier(color);
