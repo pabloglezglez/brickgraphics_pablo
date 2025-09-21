@@ -245,7 +245,7 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 					g2.setColor(Color.BLACK);
 					ToBricksTransform tbTransform = magnifierController.getTBTransform();
 					Rectangle basicUnitRect = magnifierController.getCoreRect();
-					LEGOColor.CountingLEGOColor[] used = tbTransform.draw(g2, basicUnitRect, shownMagnifierSize, uiController.showColors(), true);
+					LEGOColor.CountingLEGOColor[] used = tbTransform.draw(g2, basicUnitRect, shownMagnifierSize, uiController.showColors(), true, false); // false = for viewport display
 					legend.setHighlightedColors(used);
 				}
 			};
