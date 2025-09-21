@@ -275,7 +275,7 @@ public class ToBricksTransform implements InstructionsTransform {
 		if(blockWidth != 10 || blockHeight != 10)
 			throw new IllegalArgumentException("Block 10x10");
 			
-		return drawSnot(g2, basicUnitRect, toSize, false, true);
+		return drawSnot(g2, basicUnitRect, toSize, true, true); // true = dibujar colores para instrucciones
 	}
 	
 	public LEGOColor.CountingLEGOColor[] drawAll(Graphics2D g2, Dimension toSize) {
@@ -362,6 +362,8 @@ public class ToBricksTransform implements InstructionsTransform {
 		} else {
 			// Para instrucciones: calcular tamaño de fuente apropiado para círculos más pequeños
 			fontHeight = (int)(Math.min(scaleW, scaleH) * 0.15); // Reducir tamaño para ajustarse a círculos
+			Font font = new Font("Arial", Font.BOLD, fontHeight);
+			g2.setFont(font); // Configurar la fuente para instrucciones
 		}
 		
 		if(showOutlines) {
