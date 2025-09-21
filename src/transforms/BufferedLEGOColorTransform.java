@@ -161,9 +161,14 @@ public abstract class BufferedLEGOColorTransform implements LEGOColorTransform, 
 					else
 						m[idx].cnt++;
 
-					// Dibujar color de fondo
+					// Dibujar color de fondo como círculo inscrito
 					g2.setColor(color.getRGB());
-					g2.fill(r);
+					
+					// Calcular círculo inscrito en el rectángulo
+					int diameter = Math.min((int)r.getWidth(), (int)r.getHeight());
+					int circleX = (int)(r.getCenterX() - diameter/2);
+					int circleY = (int)(r.getCenterY() - diameter/2);
+					g2.fillOval(circleX, circleY, diameter, diameter);
 
 					// Dibujar número superpuesto con color que contraste
 					String id = cc.getShortIdentifier(color);
