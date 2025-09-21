@@ -316,11 +316,23 @@ public class PrintController implements Printable, ModelHandler<BrickGraphicsSta
 			int xIndent = xMin + x*columnWidth;
 			int yIndent = yMin + y*rowHeight;
 			g2.fillRect(xIndent, yIndent, columnWidth, rowHeight);
-			g2.setColor(c.c.getRGB());
-			g2.fillRect(xIndent, yIndent, fontSizeIn1_72inches, fontSizeIn1_72inches);
-			g2.setColor(Color.BLACK);
-			g2.drawRect(xIndent, yIndent, fontSizeIn1_72inches, fontSizeIn1_72inches);
 			
+			// Dibujar círculo inscrito en lugar de cuadrado
+			g2.setColor(c.c.getRGB());
+			int diameter = fontSizeIn1_72inches;
+			int circleX = xIndent;
+			int circleY = yIndent;
+			g2.fillOval(circleX, circleY, diameter, diameter);
+			
+			// Añadir contorno blanco para todos los círculos
+			g2.setColor(Color.WHITE);
+			Stroke originalStroke = g2.getStroke();
+			g2.setStroke(new BasicStroke(1.0f));
+			g2.drawOval(circleX, circleY, diameter, diameter);
+			g2.setStroke(originalStroke);
+			
+			// Restaurar color negro para el texto
+			g2.setColor(Color.BLACK);
 			String identifier = colorController.getNormalIdentifier(c.c);
 			if(identifier == null)
 				identifier = "";
