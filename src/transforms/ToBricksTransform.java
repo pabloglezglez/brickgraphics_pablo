@@ -334,7 +334,14 @@ public class ToBricksTransform implements InstructionsTransform {
 			Dimension toSize, boolean drawColors, boolean showOutlines) {
 		if(normalColorsChoosen == null)
 			return new LEGOColor.CountingLEGOColor[]{};
-		if(!drawColors) {
+		
+		// Dibujar fondo negro para instrucciones o blanco para viewport
+		if(drawColors) {
+			// Para instrucciones: fondo negro
+			g2.setColor(Color.BLACK);
+			g2.fillRect(0, 0, toSize.width, toSize.height);
+		} else {
+			// Para viewport: fondo blanco
 			g2.setColor(Color.WHITE);
 			g2.fillRect(0, 0, toSize.width, toSize.height);			
 		}
