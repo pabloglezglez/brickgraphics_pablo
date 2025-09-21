@@ -17,6 +17,27 @@ public class ColorLegend extends JToolBar implements ChangeListener, PipelineMos
 	private UIController uc;
 	private JScrollPane scrollPane;
 	private JList<LEGOColor.CountingLEGOColor> list;
+	
+	/**
+	 * Determina si un color es oscuro basándose en su luminosidad.
+	 * Usa la fórmula de luminosidad perceptual: 0.299*R + 0.587*G + 0.114*B
+	 * @param color El color a evaluar
+	 * @return true si el color es oscuro (luminosidad < 128)
+	 */
+	private static boolean isDarkColor(Color color) {
+		// Calcular luminosidad perceptual
+		double luminance = 0.299 * color.getRed() + 0.587 * color.getGreen() + 0.114 * color.getBlue();
+		return luminance < 128; // Si la luminosidad es menor a 128, consideramos el color como oscuro
+	}
+	
+	/**
+	 * Obtiene el color de texto que mejor contrasta con el color de fondo.
+	 * @param backgroundColor El color de fondo
+	 * @return Color.WHITE para fondos oscuros, Color.BLACK para fondos claros
+	 */
+	private static Color getContrastingTextColor(Color backgroundColor) {
+		return isDarkColor(backgroundColor) ? Color.WHITE : Color.BLACK;
+	}
 
 	public ColorLegend(MainController mc, Pipeline pipeline) {
 		super("Legend");
@@ -67,10 +88,22 @@ public class ColorLegend extends JToolBar implements ChangeListener, PipelineMos
 
 				@Override
 				public void paintIcon(Component c, Graphics g, int x, int y) {
+					// Dibujar círculo inscrito en lugar de cuadrado
 					g.setColor(color.c.getRGB());
-					g.fillRect(x, y, getIconWidth(), getIconHeight());
-					g.setColor(Color.BLACK);
-					g.drawRect(x, y, getIconWidth(), getIconHeight());
+					int diameter = Math.min(getIconWidth(), getIconHeight());
+					int circleX = x + (getIconWidth() - diameter) / 2;
+					int circleY = y + (getIconHeight() - diameter) / 2;
+					g.fillOval(circleX, circleY, diameter, diameter);
+					
+					// Añadir contorno fino del mismo color que el texto (contraste inteligente)
+					Color textColor = getContrastingTextColor(color.c.getRGB());
+					g.setColor(textColor);
+					Graphics2D g2 = (Graphics2D) g.create();
+					Stroke originalStroke = g2.getStroke();
+					g2.setStroke(new BasicStroke(1.0f));
+					g2.drawOval(circleX, circleY, diameter, diameter);
+					g2.setStroke(originalStroke);
+					g2.dispose();
 				}
 
 			});

@@ -48,6 +48,27 @@ public class PrintController implements Printable, ModelHandler<BrickGraphicsSta
 	private Dimension magnifiersPerPage;
 	private PrinterJob printerJob;
 	private MainWindow mw;
+	
+	/**
+	 * Determina si un color es oscuro basándose en su luminosidad.
+	 * Usa la fórmula de luminosidad perceptual: 0.299*R + 0.587*G + 0.114*B
+	 * @param color El color a evaluar
+	 * @return true si el color es oscuro (luminosidad < 128)
+	 */
+	private static boolean isDarkColor(Color color) {
+		// Calcular luminosidad perceptual
+		double luminance = 0.299 * color.getRed() + 0.587 * color.getGreen() + 0.114 * color.getBlue();
+		return luminance < 128; // Si la luminosidad es menor a 128, consideramos el color como oscuro
+	}
+	
+	/**
+	 * Obtiene el color de texto que mejor contrasta con el color de fondo.
+	 * @param backgroundColor El color de fondo
+	 * @return Color.WHITE para fondos oscuros, Color.BLACK para fondos claros
+	 */
+	private static Color getContrastingTextColor(Color backgroundColor) {
+		return isDarkColor(backgroundColor) ? Color.WHITE : Color.BLACK;
+	}
 	private ProgressDialog.ProgressWorker printWorker;
 	
 	public PrintController(Model<BrickGraphicsState> model, MainController mc, Pipeline pipeline) {
@@ -671,10 +692,24 @@ public class PrintController implements Printable, ModelHandler<BrickGraphicsSta
 			int xIndent = xMin + x*columnWidth;
 			int yIndent = yMin + y*rowHeight;
 			g2.fillRect(xIndent, yIndent, columnWidth, rowHeight);
+			
+			// Dibujar círculo inscrito en lugar de cuadrado
 			g2.setColor(c.getRGB());
-			g2.fillRect(xIndent, yIndent, fontSizeIn1_72inches, fontSizeIn1_72inches);
+			int diameter = fontSizeIn1_72inches;
+			int circleX = xIndent;
+			int circleY = yIndent;
+			g2.fillOval(circleX, circleY, diameter, diameter);
+			
+			// Añadir contorno fino del mismo color que el texto (contraste inteligente)
+			Color textColor = getContrastingTextColor(c.getRGB());
+			g2.setColor(textColor);
+			Stroke originalStroke = g2.getStroke();
+			g2.setStroke(new BasicStroke(1.0f));
+			g2.drawOval(circleX, circleY, diameter, diameter);
+			g2.setStroke(originalStroke);
+			
+			// Restaurar color negro para el texto
 			g2.setColor(Color.BLACK);
-			g2.drawRect(xIndent, yIndent, fontSizeIn1_72inches, fontSizeIn1_72inches);
 			String id = colorController.getNormalIdentifier(c);
 			if(id != null)
 				g2.drawString(id, 
