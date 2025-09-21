@@ -179,3 +179,4 @@ Trans-Dark Pink = Rosa oscuro transparente
 Modulex Violet = Violeta Modulex
 Coral = Coral
 Pink = Rosa
+

@@ -6,7 +6,7 @@ import java.nio.file.*;
 
 import javax.imageio.ImageIO;
 
-import sun.misc.*;
+import java.util.Base64;
 
 public class DataFile {
 	private byte[] data;
@@ -16,7 +16,7 @@ public class DataFile {
 	}
 	
 	public DataFile(String base64) throws IOException {
-		data = new BASE64Decoder().decodeBuffer(base64);
+		data = Base64.getDecoder().decode(base64.replaceAll("^\"|\"$", ""));
 	}
 	
 	public DataFile(BufferedImage image) throws IOException {
@@ -36,8 +36,7 @@ public class DataFile {
 	public String toBase64() {
 		if(!isValid())
 			return "";
-		BASE64Encoder encoder = new BASE64Encoder();
-		String out = encoder.encode(data);
+		String out = Base64.getEncoder().encodeToString(data);
 		return '"'+out+'"';
 	}
 	
