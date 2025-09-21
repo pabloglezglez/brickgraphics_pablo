@@ -89,9 +89,8 @@ public abstract class BufferedLEGOColorTransform implements LEGOColorTransform, 
 	public LEGOColor.CountingLEGOColor[] drawLastInstructions(Graphics2D g2,
 			Rectangle unitBounds, int blockWidth, int blockHeight,
 			Dimension toSize) {
-		g2.setColor(Color.WHITE);
-		g2.fillRect(0, 0, toSize.width, toSize.height);
-
+		// No llenar de blanco el fondo, para permitir colores de celda
+		
 		int w = unitBounds.width / blockWidth;
 		int h = unitBounds.height / blockHeight;
 		double scaleW = toSize.width / (double) w;
@@ -105,14 +104,20 @@ public abstract class BufferedLEGOColorTransform implements LEGOColorTransform, 
 		LEGOColorGrid transformedColors = sets[lastIndex].colors;
 		Font font = LEGOColor.makeFont(g2, cellW - 4, cellH - 4, cc,
 				lastUsedColorCounts());
-		g2.setFont(font);
-		FontMetrics fm = g2.getFontMetrics(font);
+		
+		// Verificar si el Graphics2D soporta setFont antes de usarlo
+		try {
+			g2.setFont(font);
+		} catch (UnsupportedOperationException e) {
+			// GrayScaleGraphics2D no soporta setFont, usar fuente por defecto
+		}
+		
+		FontMetrics fm = g2.getFontMetrics();
 		int fontHeight = (fm.getDescent() + fm.getAscent()) / 2;
 
 		LEGOColor.CountingLEGOColor[] m = new LEGOColor.CountingLEGOColor[LEGOColor.getMaxRebrickableId()+1];
 		int cnt = 0;
 
-		g2.setColor(Color.BLACK);
 		for (int y = 0; y < h; y++) {
 			int yIndent = (int) Math.round(scaleH * y);
 			int iy = unitBounds.y / blockHeight + y;
@@ -123,7 +128,6 @@ public abstract class BufferedLEGOColorTransform implements LEGOColorTransform, 
 			for (int x = 0; x < w; x++) {
 				int xIndent = (int) Math.round(scaleW * x);
 				Rectangle r = new Rectangle(xIndent, yIndent, cellW, cellH);
-				g2.draw(r);
 
 				int ix = unitBounds.x / blockWidth + x;
 				if (ix < transformedColors.getWidth()) {
@@ -136,10 +140,18 @@ public abstract class BufferedLEGOColorTransform implements LEGOColorTransform, 
 					else
 						m[idx].cnt++;
 
+					// Dibujar color de fondo
+					g2.setColor(color.getRGB());
+					g2.fill(r);
+
+					// Dibujar número superpuesto con color que contraste
 					String id = cc.getShortIdentifier(color);
-					int originX = (int) (r.getCenterX() - g2.getFontMetrics(
-							font).stringWidth(id) / 2);
+					int originX = (int) (r.getCenterX() - g2.getFontMetrics().stringWidth(id) / 2);
 					int originY = (int) (r.getCenterY() + fontHeight / 2);
+					
+					// Usar color de texto que contraste
+					Color textColor = color.getRGB() == Color.BLACK ? Color.WHITE : Color.BLACK;
+					g2.setColor(textColor);
 					g2.drawString(id, originX, originY);
 				}
 			}
