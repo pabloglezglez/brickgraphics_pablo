@@ -33,7 +33,7 @@ public class PrintDialog extends JDialog implements ChangeListener {
 					   tfMagnifierSizeHeight, tfFontSize, tfMagnifierSizePercentage,
 					   tfRightCountDisplayText, tfDownCountDisplayText;
 	private JCheckBox cbCoverPageShow, cbCoverPageShowFileName, cbCoverPageShowLegend, 
-					  cbShowColors, cbShowLegend, cbShowPageNumber;
+					  cbShowLegend, cbShowPageNumber;
 	private JRadioButton[] rbCoverPagePictureType, rbShowPosition;
 	private JComboBox<ColorController.ShownID> cColorNumber;
 	private JComboBox<String> cColorName;
@@ -335,18 +335,6 @@ public class PrintDialog extends JDialog implements ChangeListener {
 			midBottomLeftPanel.add(pMagnifiersPerPage);			
 		}
 		
-		cbShowColors = new JCheckBox("Show colors");
-		cbShowColors.setAlignmentX(Component.LEFT_ALIGNMENT);
-		cbShowColors.addActionListener(new ActionListener() {			
-			@Override
-			public void actionPerformed(ActionEvent e) {
-				pc.setShowColors(cbShowColors.isSelected(), PrintDialog.this);
-			}
-		});
-		JPanel pShowColors = new JPanel(new FlowLayout(FlowLayout.LEFT));
-		pShowColors.add(cbShowColors);
-		midBottomLeftPanel.add(pShowColors);
-		
 		// Show legend:
 		cbShowLegend = new JCheckBox("Show parts callout for each page");
 		cbShowLegend.setAlignmentX(Component.LEFT_ALIGNMENT);
@@ -494,7 +482,6 @@ public class PrintDialog extends JDialog implements ChangeListener {
 			if(!tfMagnifierSizePercentage.getText().trim().equals(p))
 				tfMagnifierSizePercentage.setText(p);
 		}		
-		cbShowColors.setSelected(pc.getShowColors());
 		cbShowLegend.setSelected(pc.getShowLegend());
 		cbShowPageNumber.setSelected(pc.getShowPageNumber());
 		rbShowPosition[pc.getShowPosition().ordinal()].setSelected(true);

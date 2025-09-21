@@ -271,18 +271,12 @@ public class ToBricksTransform implements InstructionsTransform {
 		int basicUnitWidth = getToBricksType().getUnitWidth();
 		int basicUnitHeight = getToBricksType().getUnitHeight();
 		if(getToBricksType() == ToBricksType.SNOT_IN_2_BY_2) {
-			if(showColors)
-				return drawLastColors(g2, basicUnitRect, basicUnitWidth, basicUnitHeight, toSize, 0, 0, showOutlines);
-			else
-				return drawLastInstructions(g2, basicUnitRect, basicUnitWidth, basicUnitHeight, toSize);
+			// Siempre usar la lógica de instrucciones personalizada (color + número)
+			return drawLastInstructions(g2, basicUnitRect, basicUnitWidth, basicUnitHeight, toSize);
 		}
 		else {
-			if(showColors) {
-				ToBricksType tbt = getToBricksType();
-				return getMainTransform().drawLastColors(g2, basicUnitRect, basicUnitWidth, basicUnitHeight, toSize, tbt.getStudsShownWide(), tbt.getStudsShownTall(), showOutlines);
-			}
-			else
-				return getMainTransform().drawLastInstructions(g2, basicUnitRect, basicUnitWidth, basicUnitHeight, toSize);
+			// Para tipos no-SNOT, también usar instrucciones personalizadas
+			return getMainTransform().drawLastInstructions(g2, basicUnitRect, basicUnitWidth, basicUnitHeight, toSize);
 		}
 	}
 
@@ -382,22 +376,20 @@ public class ToBricksTransform implements InstructionsTransform {
 				int h = (int)(1+scaleH/n5);
 				Rectangle r = new Rectangle(xIndent, yIndent, w, h);
 
-				if(drawColors) {
-					g2.setColor(color.getRGB());
-					g2.fill(r);
-					if(showOutlines) {
-						g2.setColor(color.getRGB() == Color.BLACK ? Color.WHITE : Color.BLACK);
-						g2.draw(r);						
-					}
-				}
-				else {
-					String id = cc.getShortIdentifier(color); // ix + "x" + iy;//
-					int width = g2.getFontMetrics().stringWidth(id);
-					int originX = (int)(r.getCenterX() - width/2);
-					int originY = (int)(r.getCenterY() + fontSize/2);
-					g2.drawString(id, originX, originY);											
-					g2.draw(r);					
-				}
+				// Siempre mostrar color de fondo y número superpuesto (sin círculo)
+				g2.setColor(color.getRGB());
+				g2.fill(r);
+				
+				// Superponer el número del color
+				String id = cc.getShortIdentifier(color);
+				int width = g2.getFontMetrics().stringWidth(id);
+				int originX = (int)(r.getCenterX() - width/2);
+				int originY = (int)(r.getCenterY() + fontSize/2);
+				
+				// Usar color de texto que contraste con el fondo
+				Color textColor = color.getRGB() == Color.BLACK ? Color.WHITE : Color.BLACK;
+				g2.setColor(textColor);
+				g2.drawString(id, originX, originY);
 			}			
 		}
 		return ret;
