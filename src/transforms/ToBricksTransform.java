@@ -426,19 +426,18 @@ public class ToBricksTransform implements InstructionsTransform {
 				int h = (int)(1+scaleH/n5);
 				Rectangle r = new Rectangle(xIndent, yIndent, w, h);
 
-				// Siempre mostrar color de fondo como círculo reducido y número superpuesto
+				// Siempre mostrar color de fondo como círculo un poco más grande y número superpuesto
 				g2.setColor(color.getRGB());
 				
-				// Calcular círculo reducido (85% del tamaño para evitar solapamiento)
+				// Calcular círculo un poco más grande (90% del tamaño)
 				int maxDiameter = Math.min(w, h);
-				int diameter = (int)(maxDiameter * 0.85); // Reducir a 85% para evitar solapamiento
+				int diameter = (int)(maxDiameter * 0.90); // Aumentar a 90%
 				int circleX = (int)(r.getCenterX() - diameter/2);
 				int circleY = (int)(r.getCenterY() - diameter/2);
 				g2.fillOval(circleX, circleY, diameter, diameter);
 				
-				// Añadir contorno fino del mismo color que el texto
-				Color textColor = getContrastingTextColor(color.getRGB());
-				g2.setColor(textColor);
+				// Añadir contorno blanco para todos los círculos
+				g2.setColor(Color.WHITE);
 				Stroke originalStroke = g2.getStroke();
 				g2.setStroke(new BasicStroke(1.0f)); // Stroke muy fino
 				g2.drawOval(circleX, circleY, diameter, diameter);
@@ -449,6 +448,9 @@ public class ToBricksTransform implements InstructionsTransform {
 				int width = g2.getFontMetrics().stringWidth(id);
 				int originX = (int)(r.getCenterX() - width/2);
 				int originY = (int)(r.getCenterY() + fontSize/2);
+				
+				// Usar color de texto que contraste según la luminosidad del fondo
+				Color textColor = getContrastingTextColor(color.getRGB());
 				g2.setColor(textColor);
 				g2.drawString(id, originX, originY);
 			}			

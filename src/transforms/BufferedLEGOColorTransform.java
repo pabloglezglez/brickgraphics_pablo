@@ -166,19 +166,18 @@ public abstract class BufferedLEGOColorTransform implements LEGOColorTransform, 
 					else
 						m[idx].cnt++;
 
-					// Dibujar color de fondo como círculo reducido para evitar solapamiento
+					// Dibujar color de fondo como círculo un poco más grande
 					g2.setColor(color.getRGB());
 					
-					// Calcular círculo reducido (85% del tamaño para evitar solapamiento)
+					// Calcular círculo un poco más grande (90% del tamaño)
 					int maxDiameter = Math.min((int)r.getWidth(), (int)r.getHeight());
-					int diameter = (int)(maxDiameter * 0.85); // Reducir a 85% para evitar solapamiento
+					int diameter = (int)(maxDiameter * 0.90); // Aumentar a 90%
 					int circleX = (int)(r.getCenterX() - diameter/2);
 					int circleY = (int)(r.getCenterY() - diameter/2);
 					g2.fillOval(circleX, circleY, diameter, diameter);
 					
-					// Añadir contorno fino del mismo color que el texto
-					Color textColor = getContrastingTextColor(color.getRGB());
-					g2.setColor(textColor);
+					// Añadir contorno blanco para todos los círculos
+					g2.setColor(Color.WHITE);
 					Stroke originalStroke = g2.getStroke();
 					g2.setStroke(new BasicStroke(1.0f)); // Stroke muy fino
 					g2.drawOval(circleX, circleY, diameter, diameter);
@@ -188,6 +187,9 @@ public abstract class BufferedLEGOColorTransform implements LEGOColorTransform, 
 					String id = cc.getShortIdentifier(color);
 					int originX = (int) (r.getCenterX() - g2.getFontMetrics().stringWidth(id) / 2);
 					int originY = (int) (r.getCenterY() + fontHeight / 2);
+					
+					// Usar color de texto que contraste según la luminosidad del fondo
+					Color textColor = getContrastingTextColor(color.getRGB());
 					g2.setColor(textColor);
 					g2.drawString(id, originX, originY);
 				}
