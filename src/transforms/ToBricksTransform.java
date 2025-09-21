@@ -354,10 +354,14 @@ public class ToBricksTransform implements InstructionsTransform {
 
 		int fontHeight = 0;
 		if(!drawColors) {
+			// Para viewport: usar fuente pequeña
 			Font font = LEGOColor.makeFont(g2, (int)(scaleW/5), (int)(scaleH/5), cc, lastUsedColorCounts());
 			g2.setFont(font);
 			FontMetrics fm = g2.getFontMetrics(font);
 			fontHeight = (fm.getDescent()+fm.getAscent())/2;			
+		} else {
+			// Para instrucciones: calcular tamaño de fuente apropiado para círculos más pequeños
+			fontHeight = (int)(Math.min(scaleW, scaleH) * 0.15); // Reducir tamaño para ajustarse a círculos
 		}
 		
 		if(showOutlines) {
@@ -422,11 +426,12 @@ public class ToBricksTransform implements InstructionsTransform {
 				int h = (int)(1+scaleH/n5);
 				Rectangle r = new Rectangle(xIndent, yIndent, w, h);
 
-				// Siempre mostrar color de fondo como círculo inscrito y número superpuesto
+				// Siempre mostrar color de fondo como círculo reducido y número superpuesto
 				g2.setColor(color.getRGB());
 				
-				// Calcular círculo inscrito en el rectángulo
-				int diameter = Math.min(w, h);
+				// Calcular círculo reducido (85% del tamaño para evitar solapamiento)
+				int maxDiameter = Math.min(w, h);
+				int diameter = (int)(maxDiameter * 0.85); // Reducir a 85% para evitar solapamiento
 				int circleX = (int)(r.getCenterX() - diameter/2);
 				int circleY = (int)(r.getCenterY() - diameter/2);
 				g2.fillOval(circleX, circleY, diameter, diameter);
