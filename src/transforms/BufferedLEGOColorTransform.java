@@ -123,7 +123,8 @@ public abstract class BufferedLEGOColorTransform implements LEGOColorTransform, 
 			return new LEGOColor.CountingLEGOColor[]{};
 		
 		LEGOColorGrid transformedColors = sets[lastIndex].colors;
-		Font font = LEGOColor.makeFont(g2, cellW - 4, cellH - 4, cc,
+		// Reducir el tamaño de la fuente para ajustarse mejor a los círculos
+		Font font = LEGOColor.makeFont(g2, (int)((cellW - 4) * 0.7), (int)((cellH - 4) * 0.7), cc,
 				lastUsedColorCounts());
 		
 		// Verificar si el Graphics2D soporta setFont antes de usarlo
@@ -165,11 +166,12 @@ public abstract class BufferedLEGOColorTransform implements LEGOColorTransform, 
 					else
 						m[idx].cnt++;
 
-					// Dibujar color de fondo como círculo inscrito
+					// Dibujar color de fondo como círculo reducido para evitar solapamiento
 					g2.setColor(color.getRGB());
 					
-					// Calcular círculo inscrito en el rectángulo
-					int diameter = Math.min((int)r.getWidth(), (int)r.getHeight());
+					// Calcular círculo reducido (85% del tamaño para evitar solapamiento)
+					int maxDiameter = Math.min((int)r.getWidth(), (int)r.getHeight());
+					int diameter = (int)(maxDiameter * 0.85); // Reducir a 85% para evitar solapamiento
 					int circleX = (int)(r.getCenterX() - diameter/2);
 					int circleY = (int)(r.getCenterY() - diameter/2);
 					g2.fillOval(circleX, circleY, diameter, diameter);
