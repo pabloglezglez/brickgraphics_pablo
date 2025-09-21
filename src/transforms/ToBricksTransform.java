@@ -268,16 +268,34 @@ public class ToBricksTransform implements InstructionsTransform {
 	}
 	
 	public LEGOColor.CountingLEGOColor[] draw(Graphics2D g2, Rectangle basicUnitRect, Dimension toSize, boolean showColors, boolean showOutlines) {
+		return draw(g2, basicUnitRect, toSize, showColors, showOutlines, false);
+	}
+	
+	public LEGOColor.CountingLEGOColor[] draw(Graphics2D g2, Rectangle basicUnitRect, Dimension toSize, boolean showColors, boolean showOutlines, boolean forPrintInstructions) {
 		int basicUnitWidth = getToBricksType().getUnitWidth();
 		int basicUnitHeight = getToBricksType().getUnitHeight();
 		if(getToBricksType() == ToBricksType.SNOT_IN_2_BY_2) {
-			// Siempre usar la lógica de instrucciones personalizada (color + número)
-			return drawLastInstructions(g2, basicUnitRect, basicUnitWidth, basicUnitHeight, toSize);
+			if(forPrintInstructions) {
+				// Para instrucciones de impresión: usar color + número
+				return drawLastInstructions(g2, basicUnitRect, basicUnitWidth, basicUnitHeight, toSize);
+			} else {
+				// Para viewport: usar solo colores
+				return snot(g2, basicUnitRect, toSize, showColors, showOutlines);
+			}
 		}
 		else {
-			// Para tipos no-SNOT, también usar instrucciones personalizadas
-			return getMainTransform().drawLastInstructions(g2, basicUnitRect, basicUnitWidth, basicUnitHeight, toSize);
+			if(forPrintInstructions) {
+				// Para instrucciones de impresión: usar color + número  
+				return getMainTransform().drawLastInstructions(g2, basicUnitRect, basicUnitWidth, basicUnitHeight, toSize);
+			} else {
+				// Para viewport: usar solo colores
+				return getMainTransform().drawLastColors(g2, basicUnitRect, basicUnitWidth, basicUnitHeight, toSize, basicUnitRect.width, basicUnitRect.height, showOutlines);
+			}
 		}
+	}
+	
+	public LEGOColor.CountingLEGOColor[] snot(Graphics2D g2, Rectangle basicUnitRect, Dimension toSize, boolean showColors, boolean showOutlines) {
+		return drawSnot(g2, basicUnitRect, toSize, showColors, showOutlines);
 	}
 
 	/*

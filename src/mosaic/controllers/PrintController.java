@@ -610,7 +610,7 @@ public class PrintController implements Printable, ModelHandler<BrickGraphicsSta
 				basicUnitRect.y = (/*numPagesHeight-1-*/ (page / numPagesWidth) * magnifiersPerPage.height + y)*basicUnitRect.height; // Add numPagesHeight-1- in first parenthesis to start from bottom.
 
 				g2.translate(xIndent, 0);
-				LEGOColor.CountingLEGOColor[] m = tbTransform.draw(g2, basicUnitRect, smallMagnifierSize, uiController.showColors(), used != null); // TODO set last parameter false for an overview on each magnifier
+				LEGOColor.CountingLEGOColor[] m = tbTransform.draw(g2, basicUnitRect, smallMagnifierSize, uiController.showColors(), used != null, true); // true = for print instructions
 				
 				
 				
