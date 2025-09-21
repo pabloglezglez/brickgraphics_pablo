@@ -169,14 +169,19 @@ public abstract class BufferedLEGOColorTransform implements LEGOColorTransform, 
 					int circleX = (int)(r.getCenterX() - diameter/2);
 					int circleY = (int)(r.getCenterY() - diameter/2);
 					g2.fillOval(circleX, circleY, diameter, diameter);
+					
+					// Añadir contorno fino del mismo color que el texto
+					Color textColor = getContrastingTextColor(color.getRGB());
+					g2.setColor(textColor);
+					Stroke originalStroke = g2.getStroke();
+					g2.setStroke(new BasicStroke(1.0f)); // Stroke muy fino
+					g2.drawOval(circleX, circleY, diameter, diameter);
+					g2.setStroke(originalStroke); // Restaurar stroke original
 
 					// Dibujar número superpuesto con color que contraste
 					String id = cc.getShortIdentifier(color);
 					int originX = (int) (r.getCenterX() - g2.getFontMetrics().stringWidth(id) / 2);
 					int originY = (int) (r.getCenterY() + fontHeight / 2);
-					
-					// Usar color de texto que contraste según la luminosidad del fondo
-					Color textColor = getContrastingTextColor(color.getRGB());
 					g2.setColor(textColor);
 					g2.drawString(id, originX, originY);
 				}
