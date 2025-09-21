@@ -95,9 +95,8 @@ public class ColorLegend extends JToolBar implements ChangeListener, PipelineMos
 					int circleY = y + (getIconHeight() - diameter) / 2;
 					g.fillOval(circleX, circleY, diameter, diameter);
 					
-					// Añadir contorno fino del mismo color que el texto (contraste inteligente)
-					Color textColor = getContrastingTextColor(color.c.getRGB());
-					g.setColor(textColor);
+					// Añadir contorno blanco para todos los círculos
+					g.setColor(Color.WHITE);
 					Graphics2D g2 = (Graphics2D) g.create();
 					Stroke originalStroke = g2.getStroke();
 					g2.setStroke(new BasicStroke(1.0f));

@@ -700,9 +700,8 @@ public class PrintController implements Printable, ModelHandler<BrickGraphicsSta
 			int circleY = yIndent;
 			g2.fillOval(circleX, circleY, diameter, diameter);
 			
-			// Añadir contorno fino del mismo color que el texto (contraste inteligente)
-			Color textColor = getContrastingTextColor(c.getRGB());
-			g2.setColor(textColor);
+			// Añadir contorno blanco para todos los círculos
+			g2.setColor(Color.WHITE);
 			Stroke originalStroke = g2.getStroke();
 			g2.setStroke(new BasicStroke(1.0f));
 			g2.drawOval(circleX, circleY, diameter, diameter);
