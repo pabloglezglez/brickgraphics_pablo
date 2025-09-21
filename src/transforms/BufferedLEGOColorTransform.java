@@ -17,6 +17,27 @@ public abstract class BufferedLEGOColorTransform implements LEGOColorTransform, 
 		lastIndex = -1;
 		pairIndex = 0;
 	}
+	
+	/**
+	 * Determina si un color es oscuro basándose en su luminosidad.
+	 * Usa la fórmula de luminosidad perceptual: 0.299*R + 0.587*G + 0.114*B
+	 * @param color El color a evaluar
+	 * @return true si el color es oscuro (luminosidad < 128)
+	 */
+	private static boolean isDarkColor(Color color) {
+		// Calcular luminosidad perceptual
+		double luminance = 0.299 * color.getRed() + 0.587 * color.getGreen() + 0.114 * color.getBlue();
+		return luminance < 128; // Si la luminosidad es menor a 128, consideramos el color como oscuro
+	}
+	
+	/**
+	 * Obtiene el color de texto que mejor contrasta con el color de fondo.
+	 * @param backgroundColor El color de fondo
+	 * @return Color.WHITE para fondos oscuros, Color.BLACK para fondos claros
+	 */
+	private static Color getContrastingTextColor(Color backgroundColor) {
+		return isDarkColor(backgroundColor) ? Color.WHITE : Color.BLACK;
+	}
 
 	public BufferedLEGOColorTransform(ColorController cc) {
 		this(1, cc);
@@ -149,8 +170,8 @@ public abstract class BufferedLEGOColorTransform implements LEGOColorTransform, 
 					int originX = (int) (r.getCenterX() - g2.getFontMetrics().stringWidth(id) / 2);
 					int originY = (int) (r.getCenterY() + fontHeight / 2);
 					
-					// Usar color de texto que contraste
-					Color textColor = color.getRGB() == Color.BLACK ? Color.WHITE : Color.BLACK;
+					// Usar color de texto que contraste según la luminosidad del fondo
+					Color textColor = getContrastingTextColor(color.getRGB());
 					g2.setColor(textColor);
 					g2.drawString(id, originX, originY);
 				}
@@ -206,7 +227,7 @@ public abstract class BufferedLEGOColorTransform implements LEGOColorTransform, 
 				g2.fill(r);
 
 				if (numStudsWide > 0 && drawOutlines) {
-					g2.setColor(color.getRGB().equals(Color.BLACK) ? Color.WHITE : Color.BLACK);
+					g2.setColor(getContrastingTextColor(color.getRGB()));
 					// Draw studs:
 					final int cell = (int)Math.round(scaleW / numStudsWide);
 					final int stud = (int)Math.round(scaleW * 2 / 3 / numStudsWide);
@@ -238,7 +259,7 @@ public abstract class BufferedLEGOColorTransform implements LEGOColorTransform, 
 					break;
 					
 				LEGOColor color = row[ix];
-				g2.setColor(color.getRGB().equals(Color.BLACK) ? Color.WHITE : Color.BLACK);
+				g2.setColor(getContrastingTextColor(color.getRGB()));
 				Rectangle2D.Double r = new Rectangle2D.Double(xIndent, yIndent, scaleW, scaleH);
 				g2.draw(r);
 			}
