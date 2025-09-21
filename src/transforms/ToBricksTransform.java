@@ -28,6 +28,27 @@ public class ToBricksTransform implements InstructionsTransform {
 	private boolean[][] normalColorsChoosen;
 	private ColorController cc;
 	
+	/**
+	 * Determina si un color es oscuro basándose en su luminosidad.
+	 * Usa la fórmula de luminosidad perceptual: 0.299*R + 0.587*G + 0.114*B
+	 * @param color El color a evaluar
+	 * @return true si el color es oscuro (luminosidad < 128)
+	 */
+	private static boolean isDarkColor(Color color) {
+		// Calcular luminosidad perceptual
+		double luminance = 0.299 * color.getRed() + 0.587 * color.getGreen() + 0.114 * color.getBlue();
+		return luminance < 128; // Si la luminosidad es menor a 128, consideramos el color como oscuro
+	}
+	
+	/**
+	 * Obtiene el color de texto que mejor contrasta con el color de fondo.
+	 * @param backgroundColor El color de fondo
+	 * @return Color.WHITE para fondos oscuros, Color.BLACK para fondos claros
+	 */
+	private static Color getContrastingTextColor(Color backgroundColor) {
+		return isDarkColor(backgroundColor) ? Color.WHITE : Color.BLACK;
+	}
+	
 	public ToBricksTransform(LEGOColor[] colors, ToBricksType toBricksType, int propagationPercentage, int width, int height, ColorController cc) {
 		this.cc = cc;
 		brickFromTopTransform = new ScaleTransform("Construct from top",  false, ScaleQuality.RetainColors);
@@ -404,8 +425,8 @@ public class ToBricksTransform implements InstructionsTransform {
 				int originX = (int)(r.getCenterX() - width/2);
 				int originY = (int)(r.getCenterY() + fontSize/2);
 				
-				// Usar color de texto que contraste con el fondo
-				Color textColor = color.getRGB() == Color.BLACK ? Color.WHITE : Color.BLACK;
+				// Usar color de texto que contraste según la luminosidad del fondo
+				Color textColor = getContrastingTextColor(color.getRGB());
 				g2.setColor(textColor);
 				g2.drawString(id, originX, originY);
 			}			
