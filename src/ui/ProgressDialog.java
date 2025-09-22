@@ -80,10 +80,17 @@ public class ProgressDialog extends JDialog {
 		
 		@Override
 		protected void done() {
-			synchronized(doneLock) {
-				done = true;
-			}
-			setVisible(false);
+			// Ensure dialog cleanup happens on EDT
+			SwingUtilities.invokeLater(new Runnable() {
+				@Override
+				public void run() {
+					synchronized(doneLock) {
+						done = true;
+					}
+					setVisible(false);
+					ProgressDialog.this.dispose(); // Properly dispose of the dialog to release resources
+				}
+			});
 		}	
 		
 		@Override

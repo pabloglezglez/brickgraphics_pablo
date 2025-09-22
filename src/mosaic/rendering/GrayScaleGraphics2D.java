@@ -333,7 +333,10 @@ public class GrayScaleGraphics2D extends Graphics2D {
 
 	@Override
 	public void fillRect(int x, int y, int width, int height) {
-		throw new UnsupportedOperationException();
+		// Delegate to the real Graphics2D for SNOT rendering
+		if(delegate != null) {
+			delegate.fillRect(x, y, width, height);
+		}
 	}
 
 	@Override
