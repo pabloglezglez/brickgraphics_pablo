@@ -44,8 +44,20 @@ public class MagnifierController implements ChangeListener, IChangeMonitor, KeyL
 		return sizeInMosaicBlocks;
 	}
 	public Dimension getSizeInUnits() {
-		return new Dimension(sizeInMosaicBlocks.width * tbTransform.getToBricksType().getUnitWidth(),
-						     sizeInMosaicBlocks.height * tbTransform.getToBricksType().getUnitHeight());
+		if(tbTransform == null || sizeInMosaicBlocks == null) {
+			return new Dimension(1, 1); // Return default size if not initialized
+		}
+		
+		// Para SNOT, interpretamos el tamaño en términos de unidades LEGO individuales
+		// en lugar de bloques del mosaico
+		if(tbTransform.getToBricksType() == bricks.ToBricksType.SNOT_IN_2_BY_2) {
+			// Para SNOT: el usuario quiere controlar unidades LEGO directamente
+			return new Dimension(sizeInMosaicBlocks.width, sizeInMosaicBlocks.height);
+		} else {
+			// Para otros tipos: usar el comportamiento original
+			return new Dimension(sizeInMosaicBlocks.width * tbTransform.getToBricksType().getUnitWidth(),
+							     sizeInMosaicBlocks.height * tbTransform.getToBricksType().getUnitHeight());
+		}
 	}
 
 	@Override

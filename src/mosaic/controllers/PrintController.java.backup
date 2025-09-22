@@ -4,8 +4,6 @@ import io.*;
 
 import java.awt.*;
 import java.awt.print.*;
-import javax.print.PrintService;
-import javax.print.PrintServiceLookup;
 import java.awt.event.*;
 import java.awt.geom.*;
 import java.awt.image.BufferedImage;
@@ -32,7 +30,64 @@ import icon.*;
  * @author LD
  */
 public class PrintController implements Printable, ModelHandler<BrickGraphicsState>, PipelineImageListener, PipelineMosaicListener {
-	private MainController mc;
+	private MainCont	@Override
+	public void mosaicChanged(Dimension mosaicSize) {
+		lastMosaicSize = mosaicSize;
+	}
+	
+	/**
+	 * Restart the application to overcome Java print dialog limitations on macOS
+	 */
+	private void restartApplication() {
+		try {
+			Log.log("Attempting to restart application...");
+			
+			// Get the current Java command
+			String javaPath = System.getProperty("java.home") + "/bin/java";
+			String classpath = System.getProperty("java.class.path");
+			String mainClass = "program.JWrapper";
+			
+			// Build restart command
+			ProcessBuilder pb = new ProcessBuilder(
+				javaPath,
+				"-cp", classpath,
+				mainClass
+			);
+			
+			// Set working directory to current directory
+			pb.directory(new java.io.File(System.getProperty("user.dir")));
+			
+			// Show restart confirmation
+			int confirm = JOptionPane.showConfirmDialog(mw,
+				"The application will restart now to restore print functionality.\n\n" +
+				"Click OK to restart, or Cancel to continue without printing.",
+				"Restarting Application",
+				JOptionPane.OK_CANCEL_OPTION,
+				JOptionPane.INFORMATION_MESSAGE);
+			
+			if(confirm == JOptionPane.OK_OPTION) {
+				Log.log("User confirmed restart. Starting new process...");
+				
+				// Start new process
+				pb.start();
+				
+				// Exit current application
+				Log.log("Exiting current application instance.");
+				System.exit(0);
+			} else {
+				Log.log("User cancelled restart.");
+			}
+			
+		} catch(Exception e) {
+			Log.log("Error restarting application: " + e.getMessage());
+			JOptionPane.showMessageDialog(mw,
+				"Could not restart automatically.\n\n" +
+				"Please manually restart the application to restore print functionality.",
+				"Restart Failed",
+				JOptionPane.WARNING_MESSAGE);
+		}
+	}
+}r mc;
 	private List<ChangeListener> listeners;
 	private PageFormat pageFormat;
 	private MagnifierController magnifierController;
@@ -50,11 +105,6 @@ public class PrintController implements Printable, ModelHandler<BrickGraphicsSta
 	private Dimension magnifiersPerPage;
 	private PrinterJob printerJob;
 	private MainWindow mw;
-	
-	// Store successful print configuration for reuse
-	private boolean hasSuccessfulPrintConfig = false;
-	private PrintService lastUsedPrintService;
-	private PageFormat savedPageFormat;
 	
 	/**
 	 * Determina si un color es oscuro basándose en su luminosidad.
@@ -76,6 +126,7 @@ public class PrintController implements Printable, ModelHandler<BrickGraphicsSta
 	private static Color getContrastingTextColor(Color backgroundColor) {
 		return isDarkColor(backgroundColor) ? Color.WHITE : Color.BLACK;
 	}
+	private ProgressDialog.ProgressWorker printWorker;
 	
 	public PrintController(Model<BrickGraphicsState> model, MainController mc, Pipeline pipeline) {
 		this.mc = mc;
@@ -103,156 +154,44 @@ public class PrintController implements Printable, ModelHandler<BrickGraphicsSta
 	}
 	
 	public void print() {
-		Log.log("About to show print dialog.");
-		
 		if(mw == null)
 			throw new IllegalStateException();
+		
+		// Ensure we're on the EDT for print dialog
+		if(!SwingUtilities.isEventDispatchThread()) {
+			SwingUtilities.invokeLater(() -> print());
+			return;
+		}
+		
+		Log.log("About to show print dialog.");
+		
+		// Try to show printer selection dialog, if it fails, offer workaround
+		boolean dialogResult = false;
+		final PrinterJob currentPrinterJob;
+		
+		try {
+			// Create a completely fresh PrinterJob
+			currentPrinterJob = PrinterJob.getPrinterJob();
 			
-		// Create a fresh PrinterJob each time
-		printerJob = PrinterJob.getPrinterJob();
-		pageFormat = printerJob.defaultPage();
-        printerJob.setPrintable(PrintController.this, pageFormat);
-        
-        boolean dialogResult = false;
-        
-        // If we have a successful print configuration, offer options to user
-        if(hasSuccessfulPrintConfig && lastUsedPrintService != null) {
-        	Log.log("Previous print configuration found, asking user for preference.");
-        	
-        	String[] options = {
-        		"Usar Configuración Anterior", 
-        		"Configurar Nueva Impresión", 
-        		"Mostrar Diálogo Completo",
-        		"Cancelar"
-        	};
-        	
-        	int choice = JOptionPane.showOptionDialog(mw,
-        		"¿Cómo quieres imprimir?\n\n" +
-        		"• Usar Configuración Anterior: " + lastUsedPrintService.getName() + "\n" +
-        		"• Configurar Nueva Impresión: Elegir impresora o PDF desde cero\n" +
-        		"• Mostrar Diálogo Completo: Ver todas las opciones",
-        		"Opciones de Impresión",
-        		JOptionPane.YES_NO_CANCEL_OPTION,
-        		JOptionPane.QUESTION_MESSAGE,
-        		null,
-        		options,
-        		options[0]);
-        		
-        	switch(choice) {
-        		case 0: // Usar configuración anterior
-        			try {
-        				printerJob.setPrintService(lastUsedPrintService);
-        				pageFormat = savedPageFormat;
-        				printerJob.setPrintable(PrintController.this, pageFormat);
-        				dialogResult = true;
-        				Log.log("Using previous print configuration: " + lastUsedPrintService.getName());
-        			} catch(Exception e) {
-        				Log.log("Failed to reuse print config: " + e.getMessage());
-        				dialogResult = printerJob.printDialog();
-        			}
-        			break;
-        			
-        		case 1: // Configurar Nueva Impresión
-        			// Clear saved configuration and restart print system cleanly
-        			Log.log("User requested fresh print configuration.");
-        			hasSuccessfulPrintConfig = false;
-        			lastUsedPrintService = null;
-        			savedPageFormat = null;
-        			
-        			// Create completely fresh PrinterJob
-        			try {
-        				// Force garbage collection to clear macOS print state
-        				System.gc();
-        				Thread.sleep(100);
-        				
-        				// Create brand new PrinterJob
-        				printerJob = PrinterJob.getPrinterJob();
-        				pageFormat = printerJob.defaultPage();
-        				printerJob.setPrintable(PrintController.this, pageFormat);
-        				
-        				// Show dialog with fresh state
-        				dialogResult = printerJob.printDialog();
-        				Log.log("Fresh print dialog shown, result: " + dialogResult);
-        				
-        				// If first attempt fails (common in macOS), try once more
-        				if(!dialogResult) {
-        					Log.log("First attempt failed, trying second attempt after brief pause...");
-        					Thread.sleep(200);
-        					dialogResult = printerJob.printDialog();
-        					Log.log("Second attempt result: " + dialogResult);
-        				}
-        			} catch(Exception e) {
-        				Log.log("Error creating fresh print configuration: " + e.getMessage());
-        				JOptionPane.showMessageDialog(mw,
-        					"Error al configurar nueva impresión.\n\n" +
-        					"Intenta reiniciar la aplicación.",
-        					"Error",
-        					JOptionPane.WARNING_MESSAGE);
-        				return;
-        			}
-        			break;
-        			
-        		case 2: // Mostrar diálogo completo
-        			dialogResult = printerJob.printDialog();
-        			break;
-        			
-        		default: // Cancelar
-        			Log.log("User cancelled printing.");
-        			return;
-        	}
-        } else {
-        	// First time or no saved config, show dialog
-        	dialogResult = printerJob.printDialog();
-        }
-        
-        Log.log("Print dialog result: " + dialogResult);
-        
-		if(dialogResult) {
-			// Save successful print configuration for future use
-			if(!hasSuccessfulPrintConfig) {
-				try {
-					lastUsedPrintService = printerJob.getPrintService();
-					savedPageFormat = pageFormat;
-					hasSuccessfulPrintConfig = true;
-					Log.log("Print configuration saved for future reuse.");
-				} catch(Exception e) {
-					Log.log("Could not save print configuration: " + e.getMessage());
-				}
-			}
+			// Reset any previous state by getting a new default page format
+			PageFormat currentPageFormat = currentPrinterJob.defaultPage();
+			currentPrinterJob.setPrintable(PrintController.this, currentPageFormat);
 			
-			Log.log("Print dialog confirmed, starting print job directly.");
+			// Force a small delay to ensure previous print job is fully released
+			Thread.sleep(100);
 			
-			// Use SwingWorker for background printing without ProgressDialog to avoid blocking
-			SwingWorker<Void, Void> printWorker = new SwingWorker<Void, Void>() {
-				@Override
-				protected Void doInBackground() throws Exception {
-			    	try {
-			    		Log.log("Initiating printing.");
-				    	printerJob.print();
-				    	Log.log("Printing completed successfully.");
-			    	}
-				    catch(PrinterAbortException e1) {
-				    	Log.log("Printing aborted.");
-				    }
-				    catch (PrinterException e2) {
-						String message = "An error ocurred while printing: " + e2.getMessage();
-						SwingUtilities.invokeLater(() -> {
-							JOptionPane.showMessageDialog(mw, message, "Error when printing", JOptionPane.ERROR_MESSAGE);
-						});
-						Log.log(e2);
-				    }
-			    	return null;
-				}
-				
-				@Override
-				protected void done() {
-					Log.log("Print worker finished, cleaning up.");
-				}
-			};
-			Log.log("Executing print worker.");
-			printWorker.execute();
-		} else {
-			// If dialog failed, offer manual export options
+			// Try to show the print dialog
+			dialogResult = currentPrinterJob.printDialog();
+			Log.log("Print dialog result: " + dialogResult);
+			
+		} catch (Exception e) {
+			Log.log("Exception in printDialog(): " + e.getMessage());
+			e.printStackTrace();
+			return; // Exit if we can't create PrinterJob
+		}
+		
+		// If dialog failed, offer manual export options
+		if(!dialogResult) {
 			Log.log("Print dialog failed, offering export alternatives.");
 			
 			// Ensure we're on top and visible
@@ -262,17 +201,15 @@ public class PrintController implements Printable, ModelHandler<BrickGraphicsSta
 				mw.requestFocus();
 			}
 			
-			String[] options = {"Reiniciar Impresión", "Instrucciones PDF", "Reintentar", "Cancelar"};
+			String[] options = {"Restart Application", "Export to PDF", "Try Print Dialog Again", "Cancel"};
 			int choice = JOptionPane.showOptionDialog(mw,
-				"El diálogo de impresión no funciona por limitaciones de Java en macOS.\n\n" +
-				"Después de la primera impresión, el diálogo del sistema no aparece.\n" +
-				"Es una limitación conocida de Java en macOS.\n\n" +
-				"Elige una opción para continuar:\n\n" +
-				"• Reiniciar Impresión: Resetea solo el sistema de impresión (mantiene configuraciones)\n" +
-				"• Instrucciones PDF: Obtén pasos detallados para crear un PDF manualmente\n" +
-				"• Reintentar: Intenta el diálogo de impresión una vez más\n" +
-				"• Cancelar: Volver a la aplicación",
-				"Limitación del Sistema de Impresión - macOS",
+				"Java print dialog system on macOS has limitations and only works once per session.\n\n" +
+				"Choose an option to continue:\n\n" +
+				"• Restart Application: Automatically restart to enable printing again\n" +
+				"• Export to PDF: Get instructions for manual PDF export\n" +
+				"• Try Print Dialog Again: Attempt print dialog once more\n" +
+				"• Cancel: Close this dialog and return to the application",
+				"Print System Limitation - macOS Java",
 				JOptionPane.YES_NO_CANCEL_OPTION,
 				JOptionPane.WARNING_MESSAGE,
 				null,
@@ -284,15 +221,15 @@ public class PrintController implements Printable, ModelHandler<BrickGraphicsSta
 				mw.setAlwaysOnTop(false);
 			}
 			
-			if(choice == 0) { // Reiniciar Impresión
-				Log.log("User chose to restart print system only.");
-				restartPrintSystem();
+			if(choice == 0) { // Restart Application
+				Log.log("User chose to restart application.");
+				restartApplication();
 				return;
-			} else if(choice == 1) { // Instrucciones PDF
-				Log.log("User chose PDF export instructions.");
+			} else if(choice == 1) { // Export to PDF
+				Log.log("User chose PDF export.");
 				exportToPDF();
 				return;
-			} else if(choice == 2) { // Reintentar
+			} else if(choice == 2) { // Try again
 				Log.log("User chose to try print dialog again.");
 				// Recursive call to try again
 				print();
@@ -302,6 +239,64 @@ public class PrintController implements Printable, ModelHandler<BrickGraphicsSta
 				return;
 			}
 		}
+		
+		if(dialogResult) {
+			Log.log("Print dialog confirmed, starting print job directly.");
+			// Execute print job directly without progress dialog to avoid blocking
+			SwingWorker<Void, Void> printWorker = new SwingWorker<Void, Void>() {
+				@Override
+				protected Void doInBackground() throws Exception {
+					try {
+						Log.log("Initiating printing.");
+						currentPrinterJob.print();
+						Log.log("Printing completed successfully.");
+					} catch(PrinterAbortException e1) {
+						Log.log("Printing aborted.");
+					} catch (PrinterException e2) {
+						String message = "An error occurred while printing: " + e2.getMessage();
+						SwingUtilities.invokeLater(() -> {
+							JOptionPane.showMessageDialog(mw, message, "Error when printing", JOptionPane.ERROR_MESSAGE);
+						});
+						Log.log(e2);
+					} catch (Exception e3) {
+						String message = "Unexpected error while printing: " + e3.getMessage();
+						SwingUtilities.invokeLater(() -> {
+							JOptionPane.showMessageDialog(mw, message, "Unexpected Error", JOptionPane.ERROR_MESSAGE);
+						});
+						Log.log(e3);
+					}
+					return null;
+				}
+				
+				@Override
+				protected void done() {
+					Log.log("Print worker finished, cleaning up.");
+				}
+			};
+			Log.log("Executing print worker.");
+			printWorker.execute();
+		}
+	}
+	
+	private void exportToPDF() {
+		Log.log("PDF export requested - showing user instructions.");
+		
+		// For now, provide clear instructions to the user
+		String message = "PDF Export Instructions:\n\n" +
+			"1. The Java print dialog system on macOS has limitations\n" +
+			"2. To export to PDF, please:\n\n" +
+			"   • Restart the application\n" +
+			"   • Try the print function again\n" +
+			"   • In the print dialog, select 'Save as PDF'\n\n" +
+			"This will allow you to choose where to save your PDF file.\n\n" +
+			"We apologize for this limitation and are working on a better solution.";
+		
+		JOptionPane.showMessageDialog(mw, 
+			message, 
+			"PDF Export Instructions", 
+			JOptionPane.INFORMATION_MESSAGE);
+			
+		Log.log("PDF export instructions shown to user.");
 	}
 	
 	@Override
@@ -895,14 +890,10 @@ public class PrintController implements Printable, ModelHandler<BrickGraphicsSta
 			// Restaurar color negro para el texto
 			g2.setColor(Color.BLACK);
 			String id = colorController.getNormalIdentifier(c);
-			String colorName = colorController.getShownName(c);
-			if(colorName != null) {
-				// Mostrar número + nombre del color + cantidad con símbolo X
-				String textWithCount = (id != null ? id + " " : "") + colorName + " (X" + cc.cnt + ")";
-				g2.drawString(textWithCount, 
+			if(id != null)
+				g2.drawString(id, 
 					xMin + x*columnWidth + rowHeight, 
 					yMin + y*rowHeight + fontSizeIn1_72inches*9/10 - (fontSizeIn1_72inches - textHeight)/2);
-			}
 			++i;
 		}
 	}
@@ -940,8 +931,13 @@ public class PrintController implements Printable, ModelHandler<BrickGraphicsSta
 		final int numPagesHeight = (coreImageInCoreUnitsH+pageSizeInCoreUnitsH-1) / pageSizeInCoreUnitsH;		
 		final int numberOfPages = numPagesWidth*numPagesHeight; 
 		
-		// Log progress for debugging
-		Log.log("Rendering page " + page + " of " + (numberOfPages + (coverPageShow ? 1 : 0)) + ".");
+		if(printWorker != null) {
+			int numPages = getNumberOfPages() + (getCoverPageShow() ? 1 : 0);
+			String text = "Rendering page " + page + " of " + (numberOfPages + (coverPageShow ? 1 : 0)) + ".";
+			if(numPages == page)
+				text = "Saving file. Please wait...";
+			printWorker.setProgressAndText(page*100/numPages, text);
+		}
 		
 		// Special case: Cover page:
 		if(page == 0 && coverPageShow) {
@@ -1024,92 +1020,5 @@ public class PrintController implements Printable, ModelHandler<BrickGraphicsSta
 	@Override
 	public void mosaicChanged(Dimension mosaicImageSize) {
 		lastMosaicSize = mosaicImageSize;
-	}
-	
-	/**
-	 * Show detailed instructions for PDF export
-	 */
-	private void exportToPDF() {
-		Log.log("PDF export requested - showing user instructions.");
-		
-		String instructions = "Para crear un PDF con las instrucciones detalladas del mosaico:\n\n" +
-				"MÉTODO DIRECTO (Recomendado):\n" +
-				"1. Usar Print Screen en Windows o Cmd+Shift+3 en macOS\n" +
-				"2. Abrir el diálogo de impresión una sola vez más\n" +
-				"3. En el diálogo de impresión, buscar la opción 'PDF'\n" +
-				"4. Seleccionar 'Save as PDF' o 'Guardar como PDF'\n\n" +
-				"MÉTODO ALTERNATIVO:\n" +
-				"1. Cerrar completamente la aplicación\n" +
-				"2. Volver a abrirla (esto resetea el sistema de impresión)\n" +
-				"3. Cargar tu proyecto de nuevo\n" +
-				"4. Usar Print → Save as PDF\n\n" +
-				"MÉTODO DE EXPORT MANUAL:\n" +
-				"1. Usar File → Export para guardar cada página por separado\n" +
-				"2. Combinar las imágenes en un documento PDF usando:\n" +
-				"   • Preview (macOS): File → Create PDF from images\n" +
-				"   • Adobe Reader\n" +
-				"   • Herramientas online como SmallPDF\n\n" +
-				"¿Prefieres que añada un botón para reiniciar solo el sistema de impresión?";
-		
-		JTextArea textArea = new JTextArea(instructions);
-		textArea.setEditable(false);
-		textArea.setWrapStyleWord(true);
-		textArea.setLineWrap(true);
-		textArea.setCaretPosition(0);
-		textArea.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 12));
-		
-		JScrollPane scrollPane = new JScrollPane(textArea);
-		scrollPane.setPreferredSize(new Dimension(550, 450));
-		
-		String[] options = {"Reiniciar Solo Impresión", "Cerrar"};
-		int choice = JOptionPane.showOptionDialog(mw, scrollPane, 
-			"Instrucciones para PDF", 
-			JOptionPane.YES_NO_OPTION,
-			JOptionPane.INFORMATION_MESSAGE,
-			null,
-			options,
-			options[0]);
-		
-		if(choice == 0) {
-			// Reiniciar solo el sistema de impresión
-			restartPrintSystem();
-		}
-			
-		Log.log("PDF export instructions shown to user.");
-	}
-	
-	/**
-	 * Restart only the print system without losing application state
-	 */
-	private void restartPrintSystem() {
-		try {
-			Log.log("Restarting print system only...");
-			
-			// Clear saved print configuration to force fresh dialog
-			hasSuccessfulPrintConfig = false;
-			lastUsedPrintService = null;
-			savedPageFormat = null;
-			
-			// Force garbage collection to clear any print dialog state
-			System.gc();
-			Thread.sleep(200);
-			
-			JOptionPane.showMessageDialog(mw,
-				"Sistema de impresión reiniciado.\n\n" +
-				"La próxima impresión mostrará el diálogo de configuración.\n" +
-				"Tus configuraciones de colores y ajustes se han mantenido.",
-				"Sistema Reiniciado",
-				JOptionPane.INFORMATION_MESSAGE);
-			
-			Log.log("Print system restarted successfully.");
-			
-		} catch(Exception e) {
-			Log.log("Error restarting print system: " + e.getMessage());
-			JOptionPane.showMessageDialog(mw,
-				"No se pudo reiniciar el sistema de impresión.\n\n" +
-				"Intenta cerrar y volver a abrir la aplicación.",
-				"Error",
-				JOptionPane.WARNING_MESSAGE);
-		}
 	}
 }
