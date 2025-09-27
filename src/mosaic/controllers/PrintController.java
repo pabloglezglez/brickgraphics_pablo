@@ -892,17 +892,50 @@ public class PrintController implements Printable, ModelHandler<BrickGraphicsSta
 			g2.drawOval(circleX, circleY, diameter, diameter);
 			g2.setStroke(originalStroke);
 			
+			// Añadir número identificador centrado dentro del círculo con color inteligente
+			Font originalFont = g2.getFont();
+			Font numberFont = new Font("Monospaced", Font.BOLD, diameter * 2 / 3);
+			g2.setFont(numberFont);
+			
+			// Obtener el número identificador del color
+			String colorId = colorController.getNormalIdentifier(c);
+			String numberSymbol = "?";
+			if (colorId != null) {
+				// Extraer solo la parte antes de la coma (el número)
+				int commaIndex = colorId.indexOf(",");
+				if (commaIndex != -1) {
+					numberSymbol = colorId.substring(0, commaIndex).trim();
+				} else {
+					numberSymbol = colorId.trim();
+				}
+			}
+			
+			// Calcular posición centrada para el número
+			FontMetrics fm = g2.getFontMetrics();
+			int textWidth = fm.stringWidth(numberSymbol);
+			int numberHeight = fm.getAscent();
+			int textX = circleX + (diameter - textWidth) / 2;
+			int textY = circleY + diameter / 2 + numberHeight / 2 - fm.getDescent() / 2;
+			
+			// Usar color inteligente que contraste con el fondo del círculo
+			Color bgColor = c.getRGB();
+			int brightness = (bgColor.getRed() + bgColor.getGreen() + bgColor.getBlue()) / 3;
+			Color textColor = brightness < 128 ? Color.WHITE : Color.BLACK;
+			
+			g2.setColor(textColor);
+			g2.drawString(numberSymbol, textX, textY);
+			
+			// Restaurar fuente original
+			g2.setFont(originalFont);
+			
 			// Restaurar color negro para el texto
 			g2.setColor(Color.BLACK);
-			String id = colorController.getNormalIdentifier(c);
+			// Mostrar nombre del color y cantidad con símbolo X
 			String colorName = colorController.getShownName(c);
-			if(colorName != null) {
-				// Mostrar número + nombre del color + cantidad con símbolo X
-				String textWithCount = (id != null ? id + " " : "") + colorName + " (X" + cc.cnt + ")";
-				g2.drawString(textWithCount, 
-					xMin + x*columnWidth + rowHeight, 
-					yMin + y*rowHeight + fontSizeIn1_72inches*9/10 - (fontSizeIn1_72inches - textHeight)/2);
-			}
+			String textWithCount = (colorName != null ? colorName + " " : "") + "(X" + cc.cnt + ")";
+			g2.drawString(textWithCount, 
+				xMin + x*columnWidth + rowHeight, 
+				yMin + y*rowHeight + fontSizeIn1_72inches*9/10 - (fontSizeIn1_72inches - textHeight)/2);
 			++i;
 		}
 	}
