@@ -506,7 +506,16 @@ public class PrintController implements Printable, ModelHandler<BrickGraphicsSta
 			
 			// Restaurar color negro para el texto
 			g2.setColor(Color.BLACK);
-			String identifier = colorController.getNormalIdentifier(c.c);
+			
+			// Priorizar números personalizados si existen (igual que en drawLegend)
+			String identifier = null;
+			Integer customNumber = colorController.getCustomColorID(c.c);
+			if (customNumber != null) {
+				identifier = customNumber.toString();
+			} else {
+				identifier = colorController.getNormalIdentifier(c.c);
+			}
+			
 			if(identifier == null)
 				identifier = "";
 			else
@@ -898,15 +907,21 @@ public class PrintController implements Printable, ModelHandler<BrickGraphicsSta
 			g2.setFont(numberFont);
 			
 			// Obtener el número identificador del color
-			String colorId = colorController.getNormalIdentifier(c);
+			// Priorizar números personalizados si existen
 			String numberSymbol = "?";
-			if (colorId != null) {
-				// Extraer solo la parte antes de la coma (el número)
-				int commaIndex = colorId.indexOf(",");
-				if (commaIndex != -1) {
-					numberSymbol = colorId.substring(0, commaIndex).trim();
-				} else {
-					numberSymbol = colorId.trim();
+			Integer customNumber = colorController.getCustomColorID(c);
+			if (customNumber != null) {
+				numberSymbol = customNumber.toString();
+			} else {
+				String colorId = colorController.getNormalIdentifier(c);
+				if (colorId != null) {
+					// Extraer solo la parte antes de la coma (el número)
+					int commaIndex = colorId.indexOf(",");
+					if (commaIndex != -1) {
+						numberSymbol = colorId.substring(0, commaIndex).trim();
+					} else {
+						numberSymbol = colorId.trim();
+					}
 				}
 			}
 			

@@ -17,6 +17,7 @@ public class ColorController implements ModelHandler<BrickGraphicsState> {
 	
 	private List<ChangeListener> listeners;	
 	private Map<LEGOColor, Integer> incrementalIDs;
+	private Map<LEGOColor, Integer> customColorIDs; // Para números personalizados
 	private Map<String, Map<LEGOColor, String> > allLocalizedColors;
 	private Map<LEGOColor, String> localizedColors;
 	private List<LEGOColor> colorsFromDisk, filteredColors;
@@ -35,6 +36,7 @@ public class ColorController implements ModelHandler<BrickGraphicsState> {
 	public ColorController(Model<BrickGraphicsState> model) {
 		listeners = new LinkedList<ChangeListener>();
 		incrementalIDs = new TreeMap<LEGOColor, Integer>();
+		customColorIDs = new TreeMap<LEGOColor, Integer>();
 		allLocalizedColors = new TreeMap<String, Map<LEGOColor, String> >(); // other two localization attributes null is ok.
 		filteredColors = new ArrayList<LEGOColor>(150);
 		model.addModelHandler(this);
@@ -376,6 +378,11 @@ public class ColorController implements ModelHandler<BrickGraphicsState> {
 				return "";
 			return ""+c.getBrickOwl()[0].getID();
 		case INCREMENTAL:
+			// Usar número personalizado si existe, sino usar el incremental automático
+			Integer customID = customColorIDs.get(c);
+			if (customID != null) {
+				return customID+"";
+			}
 			return incrementalIDs.get(c)+"";
 		case LEGO:
 			return ""+c.getIDLEGO();
@@ -502,6 +509,59 @@ public class ColorController implements ModelHandler<BrickGraphicsState> {
 		return colors;
 	}
 		
+	// Métodos para manejar números personalizados de colores
+	public void setCustomColorID(LEGOColor color, int customID) {
+		// Verificar si ya existe un color con ese número personalizado
+		LEGOColor existingColor = null;
+		for (Map.Entry<LEGOColor, Integer> entry : customColorIDs.entrySet()) {
+			if (entry.getValue().equals(customID) && !entry.getKey().equals(color)) {
+				existingColor = entry.getKey();
+				break;
+			}
+		}
+		
+		// Si hay conflicto, encontrar el próximo número disponible para el color existente
+		if (existingColor != null) {
+			int nextAvailable = findNextAvailableNumber();
+			customColorIDs.put(existingColor, nextAvailable);
+		}
+		
+		// Asignar el número solicitado al nuevo color
+		customColorIDs.put(color, customID);
+		notifyListeners(null);
+	}
+	
+	// Encuentra el próximo número disponible que no esté en uso
+	private int findNextAvailableNumber() {
+		Set<Integer> usedNumbers = new HashSet<>(customColorIDs.values());
+		
+		// También incluir números incrementales automáticos en uso
+		for (Integer incrementalNum : incrementalIDs.values()) {
+			usedNumbers.add(incrementalNum);
+		}
+		
+		// Encontrar el primer número disponible empezando desde 1
+		int candidate = 1;
+		while (usedNumbers.contains(candidate)) {
+			candidate++;
+		}
+		return candidate;
+	}
+	
+	public Integer getCustomColorID(LEGOColor color) {
+		return customColorIDs.get(color);
+	}
+	
+	public void removeCustomColorID(LEGOColor color) {
+		customColorIDs.remove(color);
+		notifyListeners(null);
+	}
+	
+	public void clearAllCustomColorIDs() {
+		customColorIDs.clear();
+		notifyListeners(null);
+	}
+
 	public void addChangeListener(ChangeListener listener) {
 		listeners.add(listener);
 	}
