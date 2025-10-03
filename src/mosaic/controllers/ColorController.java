@@ -209,9 +209,24 @@ public class ColorController implements ModelHandler<BrickGraphicsState> {
 	}
 	private void updateIncrementalIDs() {
 		incrementalIDs.clear();
-		int i = 1;
+		
+		// Obtener números ya reservados por números personalizados
+		Set<Integer> reservedNumbers = new HashSet<>(customColorIDs.values());
+		
+		int nextNumber = 1;
 		for(LEGOColor c : colorChooserSelectedColors) {
-			incrementalIDs.put(c, i++);
+			// Si este color ya tiene un número personalizado, usarlo
+			if (customColorIDs.containsKey(c)) {
+				incrementalIDs.put(c, customColorIDs.get(c));
+			} else {
+				// Encontrar el próximo número disponible que no esté reservado
+				while (reservedNumbers.contains(nextNumber)) {
+					nextNumber++;
+				}
+				incrementalIDs.put(c, nextNumber);
+				reservedNumbers.add(nextNumber); // Marcar como usado
+				nextNumber++;
+			}
 		}		
 	}
 	private void updateColorListsAndFilters(Object source, boolean propagateEvent) {
@@ -528,6 +543,10 @@ public class ColorController implements ModelHandler<BrickGraphicsState> {
 		
 		// Asignar el número solicitado al nuevo color
 		customColorIDs.put(color, customID);
+		
+		// Actualizar IDs incrementales para evitar conflictos
+		updateIncrementalIDs();
+		
 		notifyListeners(null);
 	}
 	
@@ -554,11 +573,19 @@ public class ColorController implements ModelHandler<BrickGraphicsState> {
 	
 	public void removeCustomColorID(LEGOColor color) {
 		customColorIDs.remove(color);
+		
+		// Actualizar IDs incrementales para reasignar números
+		updateIncrementalIDs();
+		
 		notifyListeners(null);
 	}
 	
 	public void clearAllCustomColorIDs() {
 		customColorIDs.clear();
+		
+		// Actualizar IDs incrementales para reasignar números
+		updateIncrementalIDs();
+		
 		notifyListeners(null);
 	}
 
