@@ -6,6 +6,7 @@ import icon.Icons;
 import io.*;
 import java.awt.*;
 import java.awt.event.*;
+import java.util.Arrays;
 import javax.swing.*;
 import javax.swing.event.*;
 import colors.*;
@@ -86,10 +87,33 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 	public LEGOColor.CountingLEGOColor[] getLegendColors() {
 		if(toBricksTransform == null)
 			throw new IllegalStateException();
+		
+		LEGOColor.CountingLEGOColor[] colors;
 		if(toBricksTransform.getToBricksType() == ToBricksType.SNOT_IN_2_BY_2)
-			return toBricksTransform.lastUsedColorCounts();				
+			colors = toBricksTransform.lastUsedColorCounts();				
 		else
-			return toBricksTransform.getMainTransform().lastUsedColorCounts();								
+			colors = toBricksTransform.getMainTransform().lastUsedColorCounts();
+			
+		// Sort colors by their effective number (custom IDs first, then automatic)
+		Arrays.sort(colors, (a, b) -> {
+			try {
+				String idA = colorController.getShownID(a.c);
+				String idB = colorController.getShownID(b.c);
+				
+				// Parse numbers, handling potential non-numeric IDs
+				int numA = Integer.parseInt(idA);
+				int numB = Integer.parseInt(idB);
+				
+				return Integer.compare(numA, numB);
+			} catch (NumberFormatException e) {
+				// Fallback to string comparison if parsing fails
+				String idA = colorController.getShownID(a.c);
+				String idB = colorController.getShownID(b.c);
+				return idA.compareTo(idB);
+			}
+		});
+		
+		return colors;								
 	}
 	
 	private void updateTransform(ToBricksController t) {
