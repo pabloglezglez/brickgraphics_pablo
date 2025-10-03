@@ -504,12 +504,49 @@ public class PrintController implements Printable, ModelHandler<BrickGraphicsSta
 			g2.drawOval(circleX, circleY, diameter, diameter);
 			g2.setStroke(originalStroke);
 			
-			// Restaurar color negro para el texto
+			// Añadir número identificador centrado dentro del círculo (igual que en drawLegend)
+			Font originalFont = g2.getFont();
+			Font numberFont = new Font("Monospaced", Font.BOLD, diameter * 2 / 3);
+			g2.setFont(numberFont);
+			
+			// Priorizar números personalizados si existen
+			String numberSymbol = "?";
+			Integer customNumber = colorController.getCustomColorID(c.c);
+			if (customNumber != null) {
+				numberSymbol = customNumber.toString();
+			} else {
+				String colorId = colorController.getNormalIdentifier(c.c);
+				if (colorId != null) {
+					// Extraer solo la parte antes de la coma (el número)
+					int commaIndex = colorId.indexOf(",");
+					if (commaIndex != -1) {
+						numberSymbol = colorId.substring(0, commaIndex).trim();
+					} else {
+						numberSymbol = colorId.trim();
+					}
+				}
+			}
+			
+			// Calcular posición centrada para el número dentro del círculo
+			FontMetrics fm = g2.getFontMetrics();
+			int textWidth = fm.stringWidth(numberSymbol);
+			int numberHeight = fm.getAscent();
+			int textX = circleX + (diameter - textWidth) / 2;
+			int textY = circleY + diameter / 2 + numberHeight / 2 - fm.getDescent() / 2;
+			
+			// Usar color inteligente que contraste con el fondo del círculo
+			Color bgColor = c.c.getRGB();
+			double brightness = (0.299 * bgColor.getRed() + 0.587 * bgColor.getGreen() + 0.114 * bgColor.getBlue()) / 255.0;
+			Color textColor = brightness > 0.5 ? Color.BLACK : Color.WHITE;
+			g2.setColor(textColor);
+			g2.drawString(numberSymbol, textX, textY);
+			
+			// Restaurar font y color negro para el texto de cantidad
+			g2.setFont(originalFont);
 			g2.setColor(Color.BLACK);
 			
-			// Priorizar números personalizados si existen (igual que en drawLegend)
+			// Construir el identificador para mostrar junto al círculo
 			String identifier = null;
-			Integer customNumber = colorController.getCustomColorID(c.c);
 			if (customNumber != null) {
 				identifier = customNumber.toString();
 			} else {
