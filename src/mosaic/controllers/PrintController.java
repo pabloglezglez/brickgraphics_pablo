@@ -548,7 +548,12 @@ public class PrintController implements Printable, ModelHandler<BrickGraphicsSta
 			// Construir el identificador para mostrar junto al círculo
 			String identifier = null;
 			if (customNumber != null) {
+				// Para números personalizados, mostrar: número + nombre del color
+				String colorName = colorController.getShownName(c.c);
 				identifier = customNumber.toString();
+				if (colorName != null && !colorName.trim().isEmpty()) {
+					identifier += ", " + colorName;
+				}
 			} else {
 				identifier = colorController.getNormalIdentifier(c.c);
 			}

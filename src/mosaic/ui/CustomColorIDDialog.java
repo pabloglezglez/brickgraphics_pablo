@@ -6,6 +6,7 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
 import java.util.List;
+import java.util.ArrayList;
 
 /**
  * Ventana de diálogo para gestionar números personalizados de colores.
@@ -151,6 +152,9 @@ public class CustomColorIDDialog extends JDialog {
         
         List<LEGOColor> filteredColors = colorController.getFilteredColors();
         if (filteredColors != null) {
+            // Crear lista temporal para ordenar
+            List<ColorEntry> entries = new ArrayList<>();
+            
             for (LEGOColor color : filteredColors) {
                 String currentID = colorController.getShownID(color);
                 String colorName = colorController.getShownName(color);
@@ -164,13 +168,40 @@ public class CustomColorIDDialog extends JDialog {
                         displayID = currentID.substring(0, commaIndex).trim();
                     }
                     
-                    listModel.addElement(new ColorEntry(color, colorName, displayID, customID));
+                    entries.add(new ColorEntry(color, colorName, displayID, customID));
                 }
+            }
+            
+            // Ordenar por número efectivo (personalizado o automático)
+            entries.sort((a, b) -> {
+                int numA = getEffectiveNumber(a);
+                int numB = getEffectiveNumber(b);
+                return Integer.compare(numA, numB);
+            });
+            
+            // Añadir entradas ordenadas al modelo
+            for (ColorEntry entry : entries) {
+                listModel.addElement(entry);
             }
         }
         
         if (listModel.isEmpty()) {
             listModel.addElement(new ColorEntry(null, "No hay colores disponibles", "", null));
+        }
+    }
+    
+    // Obtiene el número efectivo de una entrada (personalizado tiene prioridad)
+    private int getEffectiveNumber(ColorEntry entry) {
+        if (entry.customID != null) {
+            return entry.customID;
+        }
+        
+        // Intentar parsear el displayID como número
+        try {
+            return Integer.parseInt(entry.currentID);
+        } catch (NumberFormatException e) {
+            // Si no es número, usar un valor alto para ponerlo al final
+            return Integer.MAX_VALUE;
         }
     }
     
