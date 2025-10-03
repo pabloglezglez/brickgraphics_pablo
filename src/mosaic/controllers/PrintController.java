@@ -545,24 +545,33 @@ public class PrintController implements Printable, ModelHandler<BrickGraphicsSta
 			g2.setFont(originalFont);
 			g2.setColor(Color.BLACK);
 			
-			// Construir el identificador para mostrar junto al círculo
-			String identifier = null;
+			// Construir el texto para mostrar junto al círculo: Nombre del color x Cantidad
+			String displayText = "";
 			if (customNumber != null) {
-				// Para números personalizados, mostrar: número + nombre del color
+				// Para números personalizados, mostrar: nombre del color x cantidad
 				String colorName = colorController.getShownName(c.c);
-				identifier = customNumber.toString();
 				if (colorName != null && !colorName.trim().isEmpty()) {
-					identifier += ", " + colorName;
+					displayText = colorName + " x " + c.cnt;
+				} else {
+					displayText = "x " + c.cnt;
 				}
 			} else {
-				identifier = colorController.getNormalIdentifier(c.c);
+				// Para números automáticos, usar el identificador normal sin el número
+				String identifier = colorController.getNormalIdentifier(c.c);
+				if (identifier != null) {
+					// Extraer solo el nombre del color, omitiendo el número al inicio
+					String colorName = identifier;
+					int commaIndex = identifier.indexOf(",");
+					if (commaIndex != -1) {
+						colorName = identifier.substring(commaIndex + 1).trim();
+					}
+					displayText = colorName + " x " + c.cnt;
+				} else {
+					displayText = "x " + c.cnt;
+				}
 			}
 			
-			if(identifier == null)
-				identifier = "";
-			else
-				identifier = "x " + identifier;
-			g2.drawString(c.cnt + identifier, 
+			g2.drawString(displayText, 
 					xMin + x*columnWidth + rowHeight, 
 					yMin + y*rowHeight + fontSizeIn1_72inches*9/10 - (fontSizeIn1_72inches - textHeight)/2);
 
