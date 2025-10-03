@@ -1,0 +1,56 @@
+/**
+ * GUÍA PARA USAR NÚMEROS PERSONALIZADOS DE COLORES
+ * ================================================
+ * 
+ * Esta funcionalidad te permite asignar números específicos a los colores
+ * en lugar de usar la numeración automática correlativa.
+ * 
+ * CÓMO USAR:
+ * 
+ * 1. EJECUTAR LA APLICACIÓN:
+ *    - Abre tu imagen y configura los colores como siempre
+ *    - Los números se asignarán automáticamente (1, 2, 3, 4...)
+ * 
+ * 2. PERSONALIZAR NÚMEROS:
+ *    - Abre la consola de Java/terminal donde ejecutaste la aplicación
+ *    - Usa los métodos del CustomColorIDManager
+ * 
+ * 3. EJEMPLOS DE COMANDOS:
+ * 
+ *    // Para ver los colores actuales y sus números:
+ *    customManager.printCurrentColorAssignments();
+ * 
+ *    // Para asignar un número específico a un color:
+ *    customManager.setCustomNumberByColorName("Turrón", 15);
+ *    customManager.setCustomNumberByColorName("Rojo", 3);
+ *    customManager.setCustomNumberByColorName("Azul", 7);
+ * 
+ *    // Para eliminar un número personalizado:
+ *    customManager.removeCustomNumberByColorName("Turrón");
+ * 
+ *    // Para eliminar todos los números personalizados:
+ *    customManager.clearAllCustomNumbers();
+ * 
+ *    // Para usar números de ejemplo predefinidos:
+ *    customManager.setExampleCustomNumbers();
+ * 
+ * 4. RESULTADO:
+ *    - Los círculos en la leyenda mostrarán tus números personalizados
+ *    - Los números se mantendrán hasta que los cambies o reinicies la app
+ * 
+ * NOTA IMPORTANTE:
+ * - Los nombres de colores deben coincidir exactamente (no importan mayúsculas)
+ * - Si asignas el mismo número a dos colores, se usará el último asignado
+ * - Los números personalizados tienen prioridad sobre los automáticos
+ * 
+ * EJEMPLO DE USO TÍPICO:
+ * 
+ * 1. Cargar imagen y configurar colores
+ * 2. Ver qué colores tienes: printCurrentColorAssignments()
+ * 3. Asignar números importantes:
+ *    - setCustomNumberByColorName("Blanco", 1)
+ *    - setCustomNumberByColorName("Negro", 2)  
+ *    - setCustomNumberByColorName("Turrón", 15)
+ * 4. Generar instrucciones de impresión
+ * 5. ¡Los círculos mostrarán tus números personalizados!
+ */

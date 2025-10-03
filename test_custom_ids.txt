@@ -1,0 +1,16 @@
+PRUEBA RÁPIDA - Pasos para verificar:
+
+1. Abre BrickGraphics (ya está abierto)
+2. Carga una imagen y configura colores
+3. Ve al menú Colors → Números Personalizados...
+4. Asigna un número personalizado a un color (ej: Turrón → 15)
+5. Cierra la ventana 
+6. Genera instrucciones de impresión
+7. Verifica si aparece el número 15 en el círculo
+
+Si NO aparece, el problema puede ser:
+- El modo de ID no está en INCREMENTAL
+- Mi código no se está ejecutando correctamente
+- Hay otro camino de código que no he modificado
+
+Para verificar, necesito depurar el flujo...

@@ -63,6 +63,10 @@ public class ColorMenu extends JMenu implements ChangeListener {
 		colorTextMenu.setDisplayedMnemonicIndex(1);
 		add(colorTextMenu);
 		
+		// Añadir opción para números personalizados
+		addSeparator();
+		add(new CustomColorIDAction(cc));
+		
 		updateColorTextMenu(true);
 		updateSelectedItems();
 	}
