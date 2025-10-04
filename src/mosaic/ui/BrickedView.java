@@ -183,9 +183,17 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 		int mosaicY = (int) (clickY / scaleY);
 		
 		// Convertir a coordenadas del grid (cada stud puede representar múltiples píxeles)
-		// Necesitamos obtener el tamaño de stud del toBricksTransform
-		int gridX = mosaicX; // Simplificado por ahora
-		int gridY = mosaicY;
+		// Cada stud cubre varios píxeles del mosaico
+		int studPixelWidth = mosaicImageSize.width / colorGrid.getWidth();
+		int studPixelHeight = mosaicImageSize.height / colorGrid.getHeight();
+		
+		int gridX = mosaicX / studPixelWidth;
+		int gridY = mosaicY / studPixelHeight;
+		
+		// Verificar límites
+		if (gridX < 0 || gridX >= colorGrid.getWidth() || gridY < 0 || gridY >= colorGrid.getHeight()) {
+			return;
+		}
 		
 		// Aplicar la herramienta
 		boolean changed = studEditController.applyToolAt(colorGrid, gridX, gridY);
@@ -215,6 +223,61 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 		return null;
 	}
 	
+	// Variables para el cursor visual
+	private int hoveredX = -1; // Coordenadas del stud bajo el cursor
+	private int hoveredY = -1;
+	private boolean showHoverCursor = false;
+	
+	/**
+	 * Actualiza la posición del cursor visual sobre el mosaico.
+	 */
+	private void updateHoverCursor(int mouseX, int mouseY) {
+		if (studEditController.getActiveTool() == EditTool.DEFAULT) {
+			if (showHoverCursor) {
+				showHoverCursor = false;
+				repaint();
+			}
+			return;
+		}
+		
+		// Calcular coordenadas del stud
+		LEGOColorGrid colorGrid = getColorGrid();
+		if (colorGrid == null || shownImageSize == null || mosaicImageSize == null) {
+			return;
+		}
+		
+		// Convertir coordenadas del mouse a coordenadas del grid
+		double scaleX = (double) shownImageSize.width / mosaicImageSize.width;
+		double scaleY = (double) shownImageSize.height / mosaicImageSize.height;
+		
+		int mosaicX = (int) (mouseX / scaleX);
+		int mosaicY = (int) (mouseY / scaleY);
+		
+		// Calcular coordenadas del grid basándose en el tamaño de los studs
+		int studPixelWidth = mosaicImageSize.width / colorGrid.getWidth();
+		int studPixelHeight = mosaicImageSize.height / colorGrid.getHeight();
+		
+		int newHoveredX = mosaicX / studPixelWidth;
+		int newHoveredY = mosaicY / studPixelHeight;
+		
+		// Verificar que esté dentro del rango válido
+		if (newHoveredX >= 0 && newHoveredX < colorGrid.getWidth() && 
+			newHoveredY >= 0 && newHoveredY < colorGrid.getHeight()) {
+			
+			if (newHoveredX != hoveredX || newHoveredY != hoveredY) {
+				hoveredX = newHoveredX;
+				hoveredY = newHoveredY;
+				showHoverCursor = true;
+				repaint();
+			}
+		} else {
+			if (showHoverCursor) {
+				showHoverCursor = false;
+				repaint();
+			}
+		}
+	}
+
 	// Used by CAD exports
 	public Dimension getBrickedSize() {
 		return mosaicImageSize;
@@ -233,6 +296,14 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 				@Override
 				public void mouseClicked(MouseEvent e) {
 					handleMosaicClick(e.getX(), e.getY());
+				}
+			});
+			
+			// Agregar mouse motion listener para cursor visual
+			addMouseMotionListener(new MouseMotionAdapter() {
+				@Override
+				public void mouseMoved(MouseEvent e) {
+					updateHoverCursor(e.getX(), e.getY());
 				}
 			});
 		}
@@ -254,6 +325,58 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 
 			// Perform actual drawing:
 			toBricksTransform.drawAll(g2, shownImageSize);
+			
+			// Dibujar cursor de edición si está activo
+			drawEditCursor(g2);
+		}
+		
+		/**
+		 * Dibuja el cursor de edición sobre el stud seleccionado.
+		 */
+		private void drawEditCursor(Graphics2D g2) {
+			if (!showHoverCursor || studEditController.getActiveTool() == EditTool.DEFAULT) {
+				return;
+			}
+			
+			LEGOColorGrid colorGrid = getColorGrid();
+			if (colorGrid == null || hoveredX < 0 || hoveredY < 0) {
+				return;
+			}
+			
+			// Calcular posición en píxeles del stud
+			int studPixelWidth = mosaicImageSize.width / colorGrid.getWidth();
+			int studPixelHeight = mosaicImageSize.height / colorGrid.getHeight();
+			
+			// Aplicar escala de visualización
+			double scaleX = (double) shownImageSize.width / mosaicImageSize.width;
+			double scaleY = (double) shownImageSize.height / mosaicImageSize.height;
+			
+			int pixelX = (int) (hoveredX * studPixelWidth * scaleX);
+			int pixelY = (int) (hoveredY * studPixelHeight * scaleY);
+			int pixelW = (int) (studPixelWidth * scaleX);
+			int pixelH = (int) (studPixelHeight * scaleY);
+			
+			// Configurar el cursor según la herramienta activa
+			g2.setStroke(new BasicStroke(2));
+			
+			switch (studEditController.getActiveTool()) {
+				case BRUSH:
+					// Cuadrado verde para el pincel
+					g2.setColor(Color.GREEN);
+					g2.drawRect(pixelX, pixelY, pixelW, pixelH);
+					break;
+				case EYEDROPPER:
+					// Círculo azul para el eyedropper
+					g2.setColor(Color.BLUE);
+					g2.drawOval(pixelX, pixelY, pixelW, pixelH);
+					break;
+				case RESET:
+					// Cruz roja para reset
+					g2.setColor(Color.RED);
+					g2.drawLine(pixelX, pixelY, pixelX + pixelW, pixelY + pixelH);
+					g2.drawLine(pixelX + pixelW, pixelY, pixelX, pixelY + pixelH);
+					break;
+			}
 		}
 	}
 	
