@@ -31,6 +31,7 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 	private ColorLegend legend;
 	private PrintController printController;
 	private StudEditController studEditController;
+	private MosaicZoomController mosaicZoomController;
 	private Dimension shownImageSize;
 	
 	// UI:
@@ -48,6 +49,7 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 		toBricksController = mc.getToBricksController();
 		printController = mc.getPrintController();
 		studEditController = mc.getStudEditController();
+		mosaicZoomController = mc.getMosaicZoomController();
 		toBricksController.addChangeListener(magnifierController);
 		magnifierController.addChangeListener(this);
 		legend = mc.getLegend();		
@@ -373,6 +375,83 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 	public Dimension getBrickedSize() {
 		return mosaicImageSize;
 	}
+	
+	// ===== MÉTODOS PÚBLICOS DE ZOOM =====
+	
+	/**
+	 * Obtiene el controlador de zoom del mosaico.
+	 */
+	public MosaicZoomController getMosaicZoomController() {
+		return mosaicZoomController;
+	}
+	
+	/**
+	 * Activa/desactiva el modo de zoom para selección.
+	 */
+	public void toggleZoomMode() {
+		MosaicCanvas canvas = getMosaicCanvas();
+		if (canvas != null) {
+			canvas.toggleZoomMode();
+		}
+	}
+	
+	/**
+	 * Establece el modo de zoom.
+	 */
+	public void setZoomMode(boolean enabled) {
+		MosaicCanvas canvas = getMosaicCanvas();
+		if (canvas != null) {
+			canvas.setZoomMode(enabled);
+		}
+	}
+	
+	/**
+	 * Obtiene el canvas del mosaico.
+	 */
+	private MosaicCanvas getMosaicCanvas() {
+		// Buscar el MosaicCanvas en los componentes
+		for (Component comp : getComponents()) {
+			if (comp instanceof MosaicCanvas) {
+				return (MosaicCanvas) comp;
+			}
+		}
+		return null;
+	}
+	
+	/**
+	 * Zoom in centrado en el centro actual.
+	 */
+	public void zoomIn() {
+		mosaicZoomController.zoomIn();
+	}
+	
+	/**
+	 * Zoom out centrado en el centro actual.
+	 */
+	public void zoomOut() {
+		mosaicZoomController.zoomOut();
+	}
+	
+	/**
+	 * Zoom para ajustar el mosaico completo en la ventana.
+	 */
+	public void zoomToFit() {
+		mosaicZoomController.zoomToFit();
+	}
+	
+	/**
+	 * Zoom al tamaño actual (100%).
+	 */
+	public void zoomToActualSize() {
+		mosaicZoomController.zoomToActualSize();
+	}
+	
+	/**
+	 * Obtiene el porcentaje de zoom actual como string.
+	 */
+	public String getCurrentZoomPercentage() {
+		return mosaicZoomController.getCurrentZoomPercentage();
+	}
 
 	@Override
 	public void mosaicChanged(Dimension mosaicImageSize) {
@@ -380,37 +459,68 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 		repaint();
 	}
 	
-	private class MosaicCanvas extends JPanel {
+	private class MosaicCanvas extends JPanel implements MosaicZoomController.MosaicZoomListener {
+		private boolean isZoomMode = false;
+		private Point zoomSelectionStart = null;
+		
 		public MosaicCanvas() {
-			// Agregar mouse listener para herramientas de edición
+			// Configurar zoom controller listener
+			mosaicZoomController.addZoomListener(this);
+			
+			// Agregar mouse listener para herramientas de edición y zoom
 			addMouseListener(new MouseAdapter() {
 				@Override
 				public void mouseClicked(MouseEvent e) {
-					handleMosaicClick(e.getX(), e.getY());
+					if (SwingUtilities.isRightMouseButton(e)) {
+						// Click derecho para zoom in
+						Point mosaicPoint = screenToMosaic(new Point(e.getX(), e.getY()));
+						mosaicZoomController.centerViewportOn(mosaicPoint);
+						mosaicZoomController.zoomIn();
+					} else if (SwingUtilities.isMiddleMouseButton(e)) {
+						// Click medio para zoom out
+						mosaicZoomController.zoomOut();
+					} else {
+						// Click izquierdo normal para herramientas de edición
+						handleMosaicClick(e.getX(), e.getY());
+					}
 				}
 				
 				@Override
 				public void mousePressed(MouseEvent e) {
-					// Iniciar arrastre si es herramienta de pincel
-					if (studEditController.getActiveTool() == EditTool.BRUSH) {
+					if (SwingUtilities.isLeftMouseButton(e) && (e.isControlDown() || isZoomMode)) {
+						// Ctrl+Click izquierdo o modo zoom: iniciar selección
+						zoomSelectionStart = new Point(e.getX(), e.getY());
+						mosaicZoomController.startSelection(zoomSelectionStart);
+					} else if (studEditController.getActiveTool() == EditTool.BRUSH) {
+						// Herramienta de pincel normal
 						isDragging = true;
-						lastDraggedX = -1; // Resetear posición previa
+						lastDraggedX = -1;
 						lastDraggedY = -1;
-						// Pintar el stud inicial
 						handleMosaicClick(e.getX(), e.getY());
 					}
 				}
 				
 				@Override
 				public void mouseReleased(MouseEvent e) {
-					// Terminar arrastre
-					isDragging = false;
-					lastDraggedX = -1;
-					lastDraggedY = -1;
+					if (zoomSelectionStart != null) {
+						// Terminar selección de zoom
+						mosaicZoomController.endSelection();
+						Rectangle selection = mosaicZoomController.getSelectionArea();
+						if (!selection.isEmpty() && (selection.width > 10 || selection.height > 10)) {
+							// Zoom a la selección si es suficientemente grande
+							zoomToSelection(selection);
+						}
+						zoomSelectionStart = null;
+					} else {
+						// Terminar arrastre normal
+						isDragging = false;
+						lastDraggedX = -1;
+						lastDraggedY = -1;
+					}
 				}
 			});
 			
-			// Agregar mouse motion listener para cursor visual y arrastre
+			// Agregar mouse motion listener para cursor visual, arrastre y zoom
 			addMouseMotionListener(new MouseMotionAdapter() {
 				@Override
 				public void mouseMoved(MouseEvent e) {
@@ -419,10 +529,33 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 				
 				@Override
 				public void mouseDragged(MouseEvent e) {
-					// Actualizar cursor visual también durante arrastre
-					updateHoverCursor(e.getX(), e.getY());
-					// Manejar pintura continua durante arrastre
-					handleMosaicDrag(e.getX(), e.getY());
+					if (zoomSelectionStart != null) {
+						// Actualizar selección de zoom
+						mosaicZoomController.updateSelection(new Point(e.getX(), e.getY()));
+					} else {
+						// Arrastre normal para herramientas
+						updateHoverCursor(e.getX(), e.getY());
+						handleMosaicDrag(e.getX(), e.getY());
+					}
+				}
+			});
+			
+			// Agregar mouse wheel listener para zoom
+			addMouseWheelListener(new MouseWheelListener() {
+				@Override
+				public void mouseWheelMoved(MouseWheelEvent e) {
+					if (e.isControlDown()) {
+						// Ctrl+Rueda: zoom centrado en cursor
+						Point cursorPos = screenToMosaic(new Point(e.getX(), e.getY()));
+						mosaicZoomController.centerViewportOn(cursorPos);
+						
+						if (e.getWheelRotation() < 0) {
+							mosaicZoomController.zoomIn();
+						} else {
+							mosaicZoomController.zoomOut();
+						}
+						e.consume();
+					}
 				}
 			});
 		}
@@ -447,6 +580,9 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 			
 			// Dibujar cursor de edición si está activo
 			drawEditCursor(g2);
+			
+			// Dibujar selección de zoom si está activa
+			drawZoomSelection(g2);
 		}
 		
 		/**
@@ -505,6 +641,122 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 					g2.drawLine(pixelX + pixelW, pixelY, pixelX, pixelY + pixelH);
 					break;
 			}
+		}
+		
+		/**
+		 * Dibuja la selección de zoom cuando está activa.
+		 */
+		private void drawZoomSelection(Graphics2D g2) {
+			if (!mosaicZoomController.isSelecting()) {
+				return;
+			}
+			
+			Rectangle selection = mosaicZoomController.getSelectionArea();
+			if (selection.isEmpty()) {
+				return;
+			}
+			
+			// Convertir coordenadas del mosaico a pantalla
+			Point screenStart = mosaicToScreen(new Point(selection.x, selection.y));
+			Point screenEnd = mosaicToScreen(new Point(selection.x + selection.width, 
+													   selection.y + selection.height));
+			
+			// Dibujar rectángulo de selección
+			g2.setColor(new Color(100, 150, 255, 100)); // Azul semi-transparente
+			g2.fillRect(screenStart.x, screenStart.y, 
+					   screenEnd.x - screenStart.x, screenEnd.y - screenStart.y);
+					   
+			g2.setStroke(new BasicStroke(2));
+			g2.setColor(new Color(50, 100, 200)); // Borde azul sólido
+			g2.drawRect(screenStart.x, screenStart.y, 
+					   screenEnd.x - screenStart.x, screenEnd.y - screenStart.y);
+		}
+		
+		/**
+		 * Convierte coordenadas de pantalla a coordenadas del mosaico.
+		 */
+		private Point screenToMosaic(Point screenPoint) {
+			if (mosaicImageSize == null || shownImageSize == null) {
+				return new Point(0, 0);
+			}
+			
+			double scaleX = (double) mosaicImageSize.width / shownImageSize.width;
+			double scaleY = (double) mosaicImageSize.height / shownImageSize.height;
+			
+			return new Point((int) (screenPoint.x * scaleX), (int) (screenPoint.y * scaleY));
+		}
+		
+		/**
+		 * Convierte coordenadas del mosaico a coordenadas de pantalla.
+		 */
+		private Point mosaicToScreen(Point mosaicPoint) {
+			if (mosaicImageSize == null || shownImageSize == null) {
+				return new Point(0, 0);
+			}
+			
+			double scaleX = (double) shownImageSize.width / mosaicImageSize.width;
+			double scaleY = (double) shownImageSize.height / mosaicImageSize.height;
+			
+			return new Point((int) (mosaicPoint.x * scaleX), (int) (mosaicPoint.y * scaleY));
+		}
+		
+		/**
+		 * Realiza zoom a la selección especificada.
+		 */
+		private void zoomToSelection(Rectangle selection) {
+			// Por ahora, simplemente centramos en la selección y hacemos zoom in
+			Point center = new Point(selection.x + selection.width/2, selection.y + selection.height/2);
+			mosaicZoomController.centerViewportOn(center);
+			mosaicZoomController.zoomIn();
+		}
+		
+		// Implementación de MosaicZoomListener
+		@Override
+		public void zoomChanged(double zoomFactor, int zoomIndex) {
+			// Actualizar tamaños cuando cambia el zoom
+			updateZoomDisplay();
+			repaint();
+		}
+		
+		@Override
+		public void viewportChanged(Rectangle viewport) {
+			// El viewport cambió, repintar
+			repaint();
+		}
+		
+		@Override
+		public void selectionChanged(Rectangle selection, boolean isSelecting) {
+			// La selección cambió, repintar para mostrar/ocultar selección
+			repaint();
+		}
+		
+		/**
+		 * Actualiza la visualización según el nivel de zoom actual.
+		 */
+		private void updateZoomDisplay() {
+			if (mosaicImageSize != null) {
+				mosaicZoomController.setMosaicSize(mosaicImageSize);
+				mosaicZoomController.setViewportSize(getSize());
+			}
+		}
+		
+		/**
+		 * Alterna el modo de zoom.
+		 */
+		public void toggleZoomMode() {
+			isZoomMode = !isZoomMode;
+			// Cambiar cursor o indicador visual del modo
+			setCursor(isZoomMode ? Cursor.getPredefinedCursor(Cursor.CROSSHAIR_CURSOR) 
+								 : Cursor.getDefaultCursor());
+		}
+		
+		/**
+		 * Establece el modo de zoom.
+		 */
+		public void setZoomMode(boolean enabled) {
+			isZoomMode = enabled;
+			setCursor(enabled ? Cursor.getPredefinedCursor(Cursor.CROSSHAIR_CURSOR) 
+							  : Cursor.getDefaultCursor());
 		}
 	}
 	

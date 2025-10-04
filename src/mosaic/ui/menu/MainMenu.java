@@ -59,6 +59,7 @@ public class MainMenu extends JMenuBar {
 		add(fileMenu);
 		add(editMenu);
 		add(viewMenu);
+		add(new ZoomMenu(mc.getMosaicZoomController()));
 		add(new ColorMenu(csd, mc.getColorController()));
 		add(new MagnifierMenu(mc.getMagnifierController(), mc.getUIController()));
 		add(helpMenu);
