@@ -209,9 +209,7 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 		// Obtener el grid de colores del transform principal
 		BufferedLEGOColorTransform mainTransform = toBricksTransform.getMainTransform();
 		if (mainTransform != null) {
-			// Necesitamos acceso al LEGOColorGrid interno
-			// Esto puede requerir modificaciones en BufferedLEGOColorTransform
-			return null; // Por ahora devolver null
+			return mainTransform.getCurrentColorGrid();
 		}
 		
 		return null;

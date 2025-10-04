@@ -40,6 +40,13 @@ public class Ribbon extends JToolBar {
 		// Add ToBricks buttons:
 		mc.getToBricksController().addComponents(this, mc);
 		
+		// Add Edit Tools:
+		addSeparator();
+		final StudEditController studEditController = mc.getStudEditController();
+		add(new JButton(new BrushToolAction(studEditController)));
+		add(new JButton(new EyedropperToolAction(studEditController)));
+		add(new JButton(new ResetToolAction(studEditController)));
+		
 		// Add magnifier buttons:
 		final MagnifierController magnifierController = mc.getMagnifierController();
 		IHideButton hideWhenMagnifierDisabled = new IHideButton() {			
