@@ -40,7 +40,8 @@ public class MainController implements ModelHandler<BrickGraphicsState> {
 	private ColorController colorController;
 	private PrintController printController;
 	private ToBricksController toBricksController;
-	private OptionsController optionsController;	
+	private OptionsController optionsController;
+	private StudEditController studEditController;	
 	
 	private MainWindow mw;
 	private SaveDialog saveDialog;
@@ -77,7 +78,8 @@ public class MainController implements ModelHandler<BrickGraphicsState> {
 		uiController = new UIController(model);
 		magnifierController = new MagnifierController(model, uiController);
 		toBricksController = new ToBricksController(this, model);
-		printController = new PrintController(model, this, pipeline);		
+		printController = new PrintController(model, this, pipeline);
+		studEditController = new StudEditController(colorController);		
 		Log.log("Created controllers after " + (System.currentTimeMillis()-startTime) + "ms.");
 
 		// Set up UI:
@@ -211,6 +213,10 @@ public class MainController implements ModelHandler<BrickGraphicsState> {
 
 	public ToBricksController getToBricksController() {
 		return toBricksController;
+	}
+	
+	public StudEditController getStudEditController() {
+		return studEditController;
 	}
 
 	public ColorLegend getLegend() {
