@@ -3,8 +3,10 @@ package mosaic.ui.menu;
 import javax.swing.*;
 import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
+import java.awt.*;
 
 import ui.*;
+import colors.LEGOColor;
 import mosaic.controllers.*;
 import mosaic.io.MosaicIO;
 import mosaic.ui.*;
@@ -44,6 +46,10 @@ public class Ribbon extends JToolBar {
 		addSeparator();
 		final StudEditController studEditController = mc.getStudEditController();
 		add(new JButton(new BrushToolAction(studEditController)));
+		
+		// Add color preview panel
+		add(createColorPreviewPanel(studEditController));
+		
 		add(new JButton(new EyedropperToolAction(studEditController)));
 		add(new JButton(new ResetToolAction(studEditController)));
 		
@@ -65,6 +71,42 @@ public class Ribbon extends JToolBar {
 	
 	public static interface IHideButton {
 		boolean hide();
+	}
+
+	/**
+	 * Crea un panel de previsualización de color para el pincel.
+	 */
+	private JPanel createColorPreviewPanel(StudEditController studEditController) {
+		JPanel panel = new JPanel();
+		panel.setPreferredSize(new Dimension(40, 32));
+		panel.setBorder(BorderFactory.createLoweredBevelBorder());
+		panel.setToolTipText("Color seleccionado para pincel");
+		
+		// Agregar listener para cambios de color
+		studEditController.addChangeListener(new ChangeListener() {
+			@Override
+			public void stateChanged(ChangeEvent e) {
+				LEGOColor selectedColor = studEditController.getSelectedColor();
+				if (selectedColor != null) {
+					// Obtener el color RGB del color LEGO
+					Color rgb = selectedColor.getRGB();
+					panel.setBackground(rgb);
+				} else {
+					panel.setBackground(Color.LIGHT_GRAY);
+				}
+				panel.repaint();
+			}
+		});
+		
+		// Configurar color inicial
+		LEGOColor initialColor = studEditController.getSelectedColor();
+		if (initialColor != null) {
+			panel.setBackground(initialColor.getRGB());
+		} else {
+			panel.setBackground(Color.LIGHT_GRAY);
+		}
+		
+		return panel;
 	}
 
 	public static JButton createHidingButton(Action action, final IHideButton hideButton, IChangeMonitor monitor) {
