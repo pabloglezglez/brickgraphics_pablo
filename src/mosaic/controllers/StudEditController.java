@@ -76,7 +76,7 @@ public class StudEditController {
             case EYEDROPPER:
                 return applyEyedropper(grid, x, y);
             case RESET:
-                return applyReset(grid);
+                return applyReset(grid, x, y);
             default:
                 return false;
         }
@@ -119,11 +119,13 @@ public class StudEditController {
     /**
      * Aplica la herramienta reset.
      */
-    private boolean applyReset(LEGOColorGrid grid) {
-        grid.reset();
-        hasChanges = false;
-        fireStateChanged();
-        return true;
+    private boolean applyReset(LEGOColorGrid grid, int x, int y) {
+        boolean success = grid.resetAt(x, y);
+        if (success) {
+            hasChanges = true; // Sigue habiendo cambios, solo restauramos un stud
+            fireStateChanged();
+        }
+        return success;
     }
     
     /**
