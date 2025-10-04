@@ -64,6 +64,20 @@ public class LEGOColorGrid {
 	}
 	
 	/**
+	 * Restaura un stud individual a su color original.
+	 * @param x coordenada x (columna)
+	 * @param y coordenada y (fila)
+	 * @return true si se restauró correctamente, false si las coordenadas están fuera de rango
+	 */
+	public boolean resetAt(int x, int y) {
+		if (x < 0 || x >= getWidth() || y < 0 || y >= getHeight()) {
+			return false;
+		}
+		grid[y][x] = originalGrid[y][x];
+		return true;
+	}
+	
+	/**
 	 * Obtiene el grid interno (para compatibilidad con código existente).
 	 * @return el array 2D de colores
 	 */

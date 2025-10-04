@@ -239,8 +239,7 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 		boolean changed = studEditController.applyToolAt(colorGrid, gridX, gridY);
 		
 		if (changed) {
-			// Forzar actualización de la vista y leyenda
-			pipeline.invalidate();
+			// Solo actualizar la vista, NO regenerar el pipeline (mantiene ediciones)
 			repaint();
 		}
 	}
