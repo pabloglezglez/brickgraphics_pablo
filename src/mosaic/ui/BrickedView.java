@@ -28,6 +28,7 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 	private ScaleTransform scaler; // Used for size calculations
 	private ColorLegend legend;
 	private PrintController printController;
+	private StudEditController studEditController;
 	private Dimension shownImageSize;
 	
 	// UI:
@@ -44,6 +45,7 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 		uiController = mc.getUIController();
 		toBricksController = mc.getToBricksController();
 		printController = mc.getPrintController();
+		studEditController = mc.getStudEditController();
 		toBricksController.addChangeListener(magnifierController);
 		magnifierController.addChangeListener(this);
 		legend = mc.getLegend();		
@@ -151,6 +153,70 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 		return toBricksTransform;
 	}
 	
+	/**
+	 * Maneja clicks del mouse en el mosaico para herramientas de edición.
+	 * @param clickX coordenada X del click
+	 * @param clickY coordenada Y del click
+	 */
+	private void handleMosaicClick(int clickX, int clickY) {
+		if (studEditController.getActiveTool() == EditTool.DEFAULT) {
+			return; // No hacer nada si está en modo navegación
+		}
+		
+		// Convertir coordenadas del click a coordenadas del grid del mosaico
+		LEGOColorGrid colorGrid = getColorGrid();
+		if (colorGrid == null) {
+			return;
+		}
+		
+		// Calcular las coordenadas del stud basándose en la escala y posición
+		if (shownImageSize == null || mosaicImageSize == null) {
+			return;
+		}
+		
+		// Calcular la escala de transformación
+		double scaleX = (double) shownImageSize.width / mosaicImageSize.width;
+		double scaleY = (double) shownImageSize.height / mosaicImageSize.height;
+		
+		// Convertir coordenadas del click a coordenadas del mosaico original
+		int mosaicX = (int) (clickX / scaleX);
+		int mosaicY = (int) (clickY / scaleY);
+		
+		// Convertir a coordenadas del grid (cada stud puede representar múltiples píxeles)
+		// Necesitamos obtener el tamaño de stud del toBricksTransform
+		int gridX = mosaicX; // Simplificado por ahora
+		int gridY = mosaicY;
+		
+		// Aplicar la herramienta
+		boolean changed = studEditController.applyToolAt(colorGrid, gridX, gridY);
+		
+		if (changed) {
+			// Forzar actualización de la vista y leyenda
+			pipeline.invalidate();
+			repaint();
+		}
+	}
+	
+	/**
+	 * Obtiene el grid de colores del mosaico actual.
+	 * @return el LEGOColorGrid o null si no está disponible
+	 */
+	private LEGOColorGrid getColorGrid() {
+		if (toBricksTransform == null) {
+			return null;
+		}
+		
+		// Obtener el grid de colores del transform principal
+		BufferedLEGOColorTransform mainTransform = toBricksTransform.getMainTransform();
+		if (mainTransform != null) {
+			// Necesitamos acceso al LEGOColorGrid interno
+			// Esto puede requerir modificaciones en BufferedLEGOColorTransform
+			return null; // Por ahora devolver null
+		}
+		
+		return null;
+	}
+	
 	// Used by CAD exports
 	public Dimension getBrickedSize() {
 		return mosaicImageSize;
@@ -163,6 +229,16 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 	}
 	
 	private class MosaicCanvas extends JPanel {
+		public MosaicCanvas() {
+			// Agregar mouse listener para herramientas de edición
+			addMouseListener(new MouseAdapter() {
+				@Override
+				public void mouseClicked(MouseEvent e) {
+					handleMosaicClick(e.getX(), e.getY());
+				}
+			});
+		}
+		
 		@Override 
 		public void paintComponent(Graphics g) {				
 			super.paintComponent(g);
