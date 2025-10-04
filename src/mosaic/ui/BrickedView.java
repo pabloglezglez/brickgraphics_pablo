@@ -7,6 +7,8 @@ import io.*;
 import java.awt.*;
 import java.awt.event.*;
 import java.util.Arrays;
+import java.util.Map;
+import java.util.HashMap;
 import javax.swing.*;
 import javax.swing.event.*;
 import colors.*;
@@ -91,10 +93,19 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 			throw new IllegalStateException();
 		
 		LEGOColor.CountingLEGOColor[] colors;
-		if(toBricksTransform.getToBricksType() == ToBricksType.SNOT_IN_2_BY_2)
-			colors = toBricksTransform.lastUsedColorCounts();				
-		else
-			colors = toBricksTransform.getMainTransform().lastUsedColorCounts();
+		
+		// Obtener colores del mosaico actual (incluyendo modificaciones de edición)
+		LEGOColorGrid currentGrid = getColorGrid();
+		if (currentGrid != null && studEditController.hasUnsavedChanges()) {
+			// Si hay cambios sin guardar, contar colores del grid modificado
+			colors = countColorsFromGrid(currentGrid);
+		} else {
+			// Si no hay modificaciones, usar los colores originales
+			if(toBricksTransform.getToBricksType() == ToBricksType.SNOT_IN_2_BY_2)
+				colors = toBricksTransform.lastUsedColorCounts();				
+			else
+				colors = toBricksTransform.getMainTransform().lastUsedColorCounts();
+		}
 			
 		// Sort colors by their effective number (custom IDs first, then automatic)
 		Arrays.sort(colors, (a, b) -> {
@@ -116,6 +127,35 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 		});
 		
 		return colors;								
+	}
+	
+	/**
+	 * Cuenta los colores utilizados en el grid actual.
+	 * @param grid el grid de colores modificado
+	 * @return array de colores con conteo
+	 */
+	private LEGOColor.CountingLEGOColor[] countColorsFromGrid(LEGOColorGrid grid) {
+		Map<LEGOColor, Integer> colorCounts = new HashMap<>();
+		
+		// Contar cada color en el grid
+		for (int x = 0; x < grid.getWidth(); x++) {
+			for (int y = 0; y < grid.getHeight(); y++) {
+				LEGOColor color = grid.getColorAt(x, y);
+				if (color != null) {
+					colorCounts.put(color, colorCounts.getOrDefault(color, 0) + 1);
+				}
+			}
+		}
+		
+		// Convertir a array de CountingLEGOColor
+		LEGOColor.CountingLEGOColor[] result = new LEGOColor.CountingLEGOColor[colorCounts.size()];
+		int i = 0;
+		for (Map.Entry<LEGOColor, Integer> entry : colorCounts.entrySet()) {
+			result[i] = new LEGOColor.CountingLEGOColor(entry.getKey(), entry.getValue());
+			i++;
+		}
+		
+		return result;
 	}
 	
 	private void updateTransform(ToBricksController t) {
@@ -228,6 +268,11 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 	private int hoveredY = -1;
 	private boolean showHoverCursor = false;
 	
+	// Variables para el arrastre continuo
+	private boolean isDragging = false;
+	private int lastDraggedX = -1; // Último stud pintado durante arrastre
+	private int lastDraggedY = -1;
+	
 	/**
 	 * Actualiza la posición del cursor visual sobre el mosaico.
 	 */
@@ -277,6 +322,53 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 			}
 		}
 	}
+	
+	/**
+	 * Maneja el arrastre continuo para pintar múltiples studs.
+	 * @param mouseX coordenada X del mouse
+	 * @param mouseY coordenada Y del mouse
+	 */
+	private void handleMosaicDrag(int mouseX, int mouseY) {
+		if (!isDragging || studEditController.getActiveTool() != EditTool.BRUSH) {
+			return; // Solo el pincel permite arrastre continuo
+		}
+		
+		// Calcular coordenadas del stud actual
+		LEGOColorGrid colorGrid = getColorGrid();
+		if (colorGrid == null || shownImageSize == null || mosaicImageSize == null) {
+			return;
+		}
+		
+		// Convertir coordenadas del mouse a coordenadas del grid
+		double scaleX = (double) shownImageSize.width / mosaicImageSize.width;
+		double scaleY = (double) shownImageSize.height / mosaicImageSize.height;
+		
+		int mosaicX = (int) (mouseX / scaleX);
+		int mosaicY = (int) (mouseY / scaleY);
+		
+		int studPixelWidth = mosaicImageSize.width / colorGrid.getWidth();
+		int studPixelHeight = mosaicImageSize.height / colorGrid.getHeight();
+		
+		int gridX = mosaicX / studPixelWidth;
+		int gridY = mosaicY / studPixelHeight;
+		
+		// Verificar límites
+		if (gridX < 0 || gridX >= colorGrid.getWidth() || gridY < 0 || gridY >= colorGrid.getHeight()) {
+			return;
+		}
+		
+		// Solo pintar si nos movimos a un stud diferente
+		if (gridX != lastDraggedX || gridY != lastDraggedY) {
+			boolean changed = studEditController.applyToolAt(colorGrid, gridX, gridY);
+			
+			if (changed) {
+				pipeline.invalidate();
+				repaint();
+				lastDraggedX = gridX;
+				lastDraggedY = gridY;
+			}
+		}
+	}
 
 	// Used by CAD exports
 	public Dimension getBrickedSize() {
@@ -297,13 +389,41 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 				public void mouseClicked(MouseEvent e) {
 					handleMosaicClick(e.getX(), e.getY());
 				}
+				
+				@Override
+				public void mousePressed(MouseEvent e) {
+					// Iniciar arrastre si es herramienta de pincel
+					if (studEditController.getActiveTool() == EditTool.BRUSH) {
+						isDragging = true;
+						lastDraggedX = -1; // Resetear posición previa
+						lastDraggedY = -1;
+						// Pintar el stud inicial
+						handleMosaicClick(e.getX(), e.getY());
+					}
+				}
+				
+				@Override
+				public void mouseReleased(MouseEvent e) {
+					// Terminar arrastre
+					isDragging = false;
+					lastDraggedX = -1;
+					lastDraggedY = -1;
+				}
 			});
 			
-			// Agregar mouse motion listener para cursor visual
+			// Agregar mouse motion listener para cursor visual y arrastre
 			addMouseMotionListener(new MouseMotionAdapter() {
 				@Override
 				public void mouseMoved(MouseEvent e) {
 					updateHoverCursor(e.getX(), e.getY());
+				}
+				
+				@Override
+				public void mouseDragged(MouseEvent e) {
+					// Actualizar cursor visual también durante arrastre
+					updateHoverCursor(e.getX(), e.getY());
+					// Manejar pintura continua durante arrastre
+					handleMosaicDrag(e.getX(), e.getY());
 				}
 			});
 		}
@@ -356,13 +476,22 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 			int pixelW = (int) (studPixelWidth * scaleX);
 			int pixelH = (int) (studPixelHeight * scaleY);
 			
-			// Configurar el cursor según la herramienta activa
-			g2.setStroke(new BasicStroke(2));
+			// Configurar el cursor según la herramienta activa y estado de arrastre
+			if (isDragging) {
+				g2.setStroke(new BasicStroke(3)); // Línea más gruesa durante arrastre
+			} else {
+				g2.setStroke(new BasicStroke(2));
+			}
 			
 			switch (studEditController.getActiveTool()) {
 				case BRUSH:
-					// Cuadrado verde para el pincel
-					g2.setColor(Color.GREEN);
+					// Cuadrado verde para el pincel, más intenso si está arrastrando
+					if (isDragging) {
+						g2.setColor(new Color(0, 200, 0)); // Verde más intenso
+						g2.fillRect(pixelX + 2, pixelY + 2, pixelW - 4, pixelH - 4); // Relleno parcial
+					} else {
+						g2.setColor(Color.GREEN);
+					}
 					g2.drawRect(pixelX, pixelY, pixelW, pixelH);
 					break;
 				case EYEDROPPER:
