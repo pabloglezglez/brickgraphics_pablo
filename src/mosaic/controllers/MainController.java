@@ -41,7 +41,8 @@ public class MainController implements ModelHandler<BrickGraphicsState> {
 	private PrintController printController;
 	private ToBricksController toBricksController;
 	private OptionsController optionsController;
-	private StudEditController studEditController;	
+	private StudEditController studEditController;
+	private MosaicZoomController mosaicZoomController;	
 	
 	private MainWindow mw;
 	private SaveDialog saveDialog;
@@ -79,7 +80,8 @@ public class MainController implements ModelHandler<BrickGraphicsState> {
 		magnifierController = new MagnifierController(model, uiController);
 		toBricksController = new ToBricksController(this, model);
 		printController = new PrintController(model, this, pipeline);
-		studEditController = new StudEditController(colorController);		
+		studEditController = new StudEditController(colorController);
+		mosaicZoomController = new MosaicZoomController(model);		
 		Log.log("Created controllers after " + (System.currentTimeMillis()-startTime) + "ms.");
 
 		// Set up UI:
@@ -217,6 +219,10 @@ public class MainController implements ModelHandler<BrickGraphicsState> {
 	
 	public StudEditController getStudEditController() {
 		return studEditController;
+	}
+	
+	public MosaicZoomController getMosaicZoomController() {
+		return mosaicZoomController;
 	}
 
 	public ColorLegend getLegend() {

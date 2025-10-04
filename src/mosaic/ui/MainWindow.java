@@ -29,6 +29,7 @@ public class MainWindow extends JFrame implements ChangeListener, ModelHandler<B
 	private MainController mc;
 	private Pipeline pipeline;
 	private Rectangle lastNormalPlacement;
+	private MosaicZoomPanel zoomPanel;
 
 	public MainWindow(final MainController mc, final Model<BrickGraphicsState> model, 
 			final Pipeline pipeline, RenderingProgressBar renderingProgressBar) {
@@ -44,6 +45,7 @@ public class MainWindow extends JFrame implements ChangeListener, ModelHandler<B
 		Log.log("Created left view after " + (System.currentTimeMillis()-startTime) + "ms.");
 
 		brickedView = new BrickedView(mc, model, pipeline);
+		zoomPanel = new MosaicZoomPanel(mc.getMosaicZoomController(), brickedView);
 		Log.log("Created right view after " + (System.currentTimeMillis()-startTime) + "ms.");
 
 		addWindowListener(new WindowAdapter() {
@@ -76,8 +78,13 @@ public class MainWindow extends JFrame implements ChangeListener, ModelHandler<B
 			}
 		});
 
+		// Crear panel derecho que contenga el mosaico y controles de zoom
+		JPanel rightPanel = new JPanel(new BorderLayout());
+		rightPanel.add(zoomPanel, BorderLayout.NORTH);
+		rightPanel.add(brickedView, BorderLayout.CENTER);
+		
 		// in split pane:
-		splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, imagePreparingView, brickedView);
+		splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, imagePreparingView, rightPanel);
 		splitPane.setOneTouchExpandable(true);
 		splitPane.setDividerSize(16);
 		splitPane.addPropertyChangeListener(JSplitPane.DIVIDER_LOCATION_PROPERTY, new PropertyChangeListener() {			
@@ -196,6 +203,12 @@ public class MainWindow extends JFrame implements ChangeListener, ModelHandler<B
 		if(imagePreparingView == null)
 			throw new IllegalStateException();
 		return imagePreparingView;
+	}
+	
+	public MosaicZoomPanel getZoomPanel() {
+		if(zoomPanel == null)
+			throw new IllegalStateException();
+		return zoomPanel;
 	}
 
 	public JSplitPane getSplitPane() {
