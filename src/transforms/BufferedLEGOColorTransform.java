@@ -47,6 +47,17 @@ public abstract class BufferedLEGOColorTransform implements LEGOColorTransform, 
 		int size = sets.length;
 		sets = new TransformationSet[size];
 	}
+	
+	/**
+	 * Obtiene el LEGOColorGrid de la última transformación realizada.
+	 * @return el LEGOColorGrid actual o null si no hay transformación
+	 */
+	public LEGOColorGrid getCurrentColorGrid() {
+		if (lastIndex >= 0 && lastIndex < sets.length && sets[lastIndex] != null) {
+			return sets[lastIndex].colors;
+		}
+		return null;
+	}
 
 	@Override
 	public LEGOColorGrid lcTransform(BufferedImage in) {
