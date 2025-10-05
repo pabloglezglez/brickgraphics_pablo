@@ -235,6 +235,80 @@ public class MosaicZoomController implements ChangeListener {
     public boolean canZoomIn() { return currentZoomIndex < ZOOM_LEVELS.length - 1; }
     public boolean canZoomOut() { return currentZoomIndex > 0; }
     
+    // ===== PANEO (PANNING) =====
+    
+    /**
+     * Desplaza el viewport por un delta específico en coordenadas de pantalla.
+     * @param deltaX desplazamiento horizontal en pixels de pantalla
+     * @param deltaY desplazamiento vertical en pixels de pantalla
+     */
+    public void panViewport(int deltaX, int deltaY) {
+        if (viewportSize == null || mosaicSize == null) return;
+        
+        // Convertir el desplazamiento de pantalla a coordenadas de mosaico
+        int mosaicDeltaX = (int) (deltaX / currentZoomFactor);
+        int mosaicDeltaY = (int) (deltaY / currentZoomFactor);
+        
+        // Aplicar el desplazamiento
+        int newX = viewportBounds.x - mosaicDeltaX; // Invertir para paneo natural
+        int newY = viewportBounds.y - mosaicDeltaY;
+        
+        // Limitar a los bordes del mosaico
+        int maxX = mosaicSize.width - viewportBounds.width;
+        int maxY = mosaicSize.height - viewportBounds.height;
+        
+        newX = Math.max(0, Math.min(newX, maxX));
+        newY = Math.max(0, Math.min(newY, maxY));
+        
+        // Aplicar solo si hay cambio
+        if (newX != viewportBounds.x || newY != viewportBounds.y) {
+            viewportBounds.setLocation(newX, newY);
+            notifyViewportChanged();
+        }
+    }
+    
+    /**
+     * Desplaza el viewport a una posición específica en coordenadas de mosaico.
+     * @param mosaicX nueva posición X en coordenadas de mosaico
+     * @param mosaicY nueva posición Y en coordenadas de mosaico
+     */
+    public void setViewportPosition(int mosaicX, int mosaicY) {
+        if (viewportSize == null || mosaicSize == null) return;
+        
+        // Limitar a los bordes del mosaico
+        int maxX = mosaicSize.width - viewportBounds.width;
+        int maxY = mosaicSize.height - viewportBounds.height;
+        
+        mosaicX = Math.max(0, Math.min(mosaicX, maxX));
+        mosaicY = Math.max(0, Math.min(mosaicY, maxY));
+        
+        viewportBounds.setLocation(mosaicX, mosaicY);
+        notifyViewportChanged();
+    }
+    
+    /**
+     * Verifica si el paneo está disponible (hay contenido fuera del viewport actual).
+     */
+    public boolean isPanningAvailable() {
+        if (viewportSize == null || mosaicSize == null) return false;
+        return currentZoomFactor > 1.0 && 
+               (viewportBounds.width < mosaicSize.width || 
+                viewportBounds.height < mosaicSize.height);
+    }
+    
+    /**
+     * Obtiene los límites de paneo disponibles.
+     * @return Rectangle con los límites máximos de paneo en coordenadas de mosaico
+     */
+    public Rectangle getPanningBounds() {
+        if (viewportSize == null || mosaicSize == null) {
+            return new Rectangle();
+        }
+        return new Rectangle(0, 0, 
+                           mosaicSize.width - viewportBounds.width, 
+                           mosaicSize.height - viewportBounds.height);
+    }
+    
     // ===== LISTENERS =====
     
     public void addZoomListener(MosaicZoomListener listener) {

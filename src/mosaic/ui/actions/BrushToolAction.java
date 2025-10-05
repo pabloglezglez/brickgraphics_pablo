@@ -12,9 +12,9 @@ public class BrushToolAction extends AbstractAction {
     private StudEditController studEditController;
     
     public BrushToolAction(StudEditController studEditController) {
-        super("Pincel");
+        super("Brush");
         this.studEditController = studEditController;
-        putValue(SHORT_DESCRIPTION, "Pincel - Cambiar color de studs individuales");
+        putValue(SHORT_DESCRIPTION, "Brush - Paint individual studs");
     }
     
     @Override

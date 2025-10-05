@@ -6,19 +6,19 @@ import java.awt.event.ActionEvent;
 import javax.swing.AbstractAction;
 
 /**
- * Acción para activar la herramienta cuentagotas.
+ * Acción para activar la herramienta restaurar.
  */
-public class EyedropperToolAction extends AbstractAction {
+public class RestoreToolAction extends AbstractAction {
     private StudEditController studEditController;
     
-    public EyedropperToolAction(StudEditController studEditController) {
-        super("Eyedropper");
+    public RestoreToolAction(StudEditController studEditController) {
+        super("Restore");
         this.studEditController = studEditController;
-        putValue(SHORT_DESCRIPTION, "Eyedropper - Pick color from mosaic");
+        putValue(SHORT_DESCRIPTION, "Restore - Restore area to original state");
     }
     
     @Override
     public void actionPerformed(ActionEvent e) {
-        studEditController.setActiveTool(EditTool.EYEDROPPER);
+        studEditController.setActiveTool(EditTool.RESTORE);
     }
 }

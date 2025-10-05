@@ -40,6 +40,19 @@ public class LEGOColorGrid {
 	}
 	
 	/**
+	 * Obtiene el color original en las coordenadas especificadas.
+	 * @param x coordenada x (columna)
+	 * @param y coordenada y (fila)
+	 * @return el color original en esas coordenadas, o null si están fuera de rango
+	 */
+	public LEGOColor getOriginalColorAt(int x, int y) {
+		if (x < 0 || x >= getWidth() || y < 0 || y >= getHeight()) {
+			return null;
+		}
+		return originalGrid[y][x];
+	}
+	
+	/**
 	 * Establece el color en las coordenadas especificadas.
 	 * @param x coordenada x (columna)
 	 * @param y coordenada y (fila)
