@@ -301,7 +301,8 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 		
 		// Si no hay zoom activo, usar conversión simple 
 		double zoomFactor = mosaicZoomController.getCurrentZoomFactor();
-		if (Math.abs(zoomFactor - 1.0) < 0.0001) {
+		// CORREGIDO: Comparar directamente con 1.0 O usar precision más amplia para capturar zoom inicial
+		if (zoomFactor == 1.0 || Math.abs(zoomFactor - 1.0) < 0.001) {
 			// PRECISION FIX: Usar el tamaño exacto como en paintComponent sin zoom
 			double scaleX = (double) mosaicImageSize.width / shownImageSize.width;
 			double scaleY = (double) mosaicImageSize.height / shownImageSize.height;
@@ -975,7 +976,8 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 			
 			// Si no hay zoom activo, usar conversión simple
 			double zoomFactor = mosaicZoomController.getCurrentZoomFactor();
-			if (Math.abs(zoomFactor - 1.0) < 0.0001) {
+			// CORREGIDO: Comparar directamente con 1.0 O usar precision más amplia para capturar zoom inicial
+			if (zoomFactor == 1.0 || Math.abs(zoomFactor - 1.0) < 0.001) {
 				// PRECISION FIX: Usar el tamaño exacto como en paintComponent sin zoom
 				double scaleX = (double) mosaicImageSize.width / shownImageSize.width;
 				double scaleY = (double) mosaicImageSize.height / shownImageSize.height;
@@ -1012,7 +1014,8 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 			
 			// Si no hay zoom activo, usar conversión simple
 			double zoomFactor = mosaicZoomController.getCurrentZoomFactor();
-			if (Math.abs(zoomFactor - 1.0) < 0.0001) {
+			// CORREGIDO: Comparar directamente con 1.0 O usar precision más amplia para capturar zoom inicial
+			if (zoomFactor == 1.0 || Math.abs(zoomFactor - 1.0) < 0.001) {
 				// PRECISION FIX: Mayor precisión para zoom 100%
 				double scaleX = (double) shownImageSize.width / mosaicImageSize.width;
 				double scaleY = (double) shownImageSize.height / mosaicImageSize.height;
