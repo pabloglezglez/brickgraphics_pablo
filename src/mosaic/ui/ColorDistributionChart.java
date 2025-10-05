@@ -12,8 +12,11 @@ import mosaic.controllers.MainController;
 import mosaic.controllers.UIController;
 import mosaic.rendering.Pipeline;
 import mosaic.rendering.PipelineMosaicListener;
+import javax.swing.event.ChangeEvent;
+import javax.swing.event.ChangeListener;
+import mosaic.controllers.StudEditController;
 
-public class ColorDistributionChart extends JPanel implements PipelineMosaicListener {
+public class ColorDistributionChart extends JPanel implements PipelineMosaicListener, ChangeListener {
 	public static final int PREFERRED_SIZE = 128;
 	
 	private BrickedView bw;
@@ -23,8 +26,10 @@ public class ColorDistributionChart extends JPanel implements PipelineMosaicList
 	public ColorDistributionChart(MainController mc, MainWindow mw, Pipeline pipeline) {
 		uiController = mc.getUIController();
 		bw = mw.getBrickedView();
+		StudEditController studEditController = mc.getStudEditController();
 		
 		pipeline.addMosaicListener(this);
+		studEditController.addChangeListener(this); // Escuchar cambios de edición
 	}
 	
 	@Override
@@ -66,5 +71,14 @@ public class ColorDistributionChart extends JPanel implements PipelineMosaicList
 			return;
 		colors = bw.getLegendColors();
 		repaint();
+	}
+	
+	@Override
+	public void stateChanged(ChangeEvent e) {
+		// Cuando hay cambios de edición, actualizar el gráfico
+		if (uiController.showColorDistributionChart()) {
+			colors = bw.getLegendColors();
+			repaint();
+		}
 	}
 }

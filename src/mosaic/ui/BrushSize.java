@@ -6,9 +6,11 @@ package mosaic.ui;
  */
 public enum BrushSize {
     SMALL(1, "1x1", "Small brush - single stud"),
+    SMALL_2X2(2, "2x2", "Small 2x2 brush - 4 studs"),
     MEDIUM(3, "3x3", "Medium brush - 3x3 studs"),
     LARGE(5, "5x5", "Large brush - 5x5 studs"),
-    EXTRA_LARGE(7, "7x7", "Extra large brush - 7x7 studs");
+    EXTRA_LARGE(7, "7x7", "Extra large brush - 7x7 studs"),
+    HUGE(8, "8x8", "Huge brush - 8x8 studs");
     
     private final int size;
     private final String displayName;
