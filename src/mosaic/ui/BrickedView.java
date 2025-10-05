@@ -299,12 +299,13 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 			return new Point(0, 0);
 		}
 		
-		// Si no hay zoom activo, usar conversión simple
+		// Si no hay zoom activo, usar conversión simple 
 		double zoomFactor = mosaicZoomController.getCurrentZoomFactor();
-		if (Math.abs(zoomFactor - 1.0) < 0.001) {
+		if (Math.abs(zoomFactor - 1.0) < 0.0001) {
+			// PRECISION FIX: Usar el tamaño exacto como en paintComponent sin zoom
 			double scaleX = (double) mosaicImageSize.width / shownImageSize.width;
 			double scaleY = (double) mosaicImageSize.height / shownImageSize.height;
-			return new Point((int) (screenPoint.x * scaleX), (int) (screenPoint.y * scaleY));
+			return new Point((int) Math.round(screenPoint.x * scaleX), (int) Math.round(screenPoint.y * scaleY));
 		}
 		
 		// Con zoom: aplicar transformación inversa exacta a la del paintComponent
@@ -974,10 +975,11 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 			
 			// Si no hay zoom activo, usar conversión simple
 			double zoomFactor = mosaicZoomController.getCurrentZoomFactor();
-			if (Math.abs(zoomFactor - 1.0) < 0.001) {
+			if (Math.abs(zoomFactor - 1.0) < 0.0001) {
+				// PRECISION FIX: Usar el tamaño exacto como en paintComponent sin zoom
 				double scaleX = (double) mosaicImageSize.width / shownImageSize.width;
 				double scaleY = (double) mosaicImageSize.height / shownImageSize.height;
-				return new Point((int) (screenPoint.x * scaleX), (int) (screenPoint.y * scaleY));
+				return new Point((int) Math.round(screenPoint.x * scaleX), (int) Math.round(screenPoint.y * scaleY));
 			}
 			
 			// Con zoom: aplicar transformación inversa exacta a la del paintComponent
