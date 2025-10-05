@@ -18,12 +18,14 @@ public class StudEditController {
     private List<ChangeListener> listeners;
     private ColorController colorController;
     private boolean hasChanges; // Bandera para saber si hay cambios no guardados
+    private ModificationManager modificationManager; // Gestor de modificaciones manuales
     
     public StudEditController(ColorController colorController) {
         this.activeTool = EditTool.DEFAULT;
         this.colorController = colorController;
         this.listeners = new ArrayList<>();
         this.hasChanges = false;
+        this.modificationManager = new ModificationManager();
     }
     
     /**
@@ -94,6 +96,8 @@ public class StudEditController {
         if (currentColor != selectedColor) {
             boolean success = grid.setColorAt(x, y, selectedColor);
             if (success) {
+                // Registrar la modificación en el ModificationManager
+                modificationManager.recordModification(x, y, selectedColor, currentColor);
                 hasChanges = true;
                 fireStateChanged();
             }
@@ -120,8 +124,12 @@ public class StudEditController {
      * Aplica la herramienta reset.
      */
     private boolean applyReset(LEGOColorGrid grid, int x, int y) {
+        LEGOColor currentColor = grid.getColorAt(x, y);
         boolean success = grid.resetAt(x, y);
         if (success) {
+            LEGOColor originalColor = grid.getColorAt(x, y); // Color después del reset
+            // Registrar que se volvió al color original (elimina la modificación)
+            modificationManager.recordModification(x, y, originalColor, originalColor);
             hasChanges = true; // Sigue habiendo cambios, solo restauramos un stud
             fireStateChanged();
         }
@@ -141,6 +149,13 @@ public class StudEditController {
      */
     public void markChangesSaved() {
         hasChanges = false;
+    }
+    
+    /**
+     * Obtiene el gestor de modificaciones.
+     */
+    public ModificationManager getModificationManager() {
+        return modificationManager;
     }
     
     /**

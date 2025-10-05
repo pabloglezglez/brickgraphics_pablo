@@ -82,6 +82,7 @@ public class MainController implements ModelHandler<BrickGraphicsState> {
 		printController = new PrintController(model, this, pipeline);
 		studEditController = new StudEditController(colorController);
 		mosaicZoomController = new MosaicZoomController(model);		
+		System.out.println("MosaicZoomController creado: " + (mosaicZoomController != null));
 		Log.log("Created controllers after " + (System.currentTimeMillis()-startTime) + "ms.");
 
 		// Set up UI:

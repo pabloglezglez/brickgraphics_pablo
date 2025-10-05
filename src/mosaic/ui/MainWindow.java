@@ -160,6 +160,40 @@ public class MainWindow extends JFrame implements ChangeListener, ModelHandler<B
 		cp.add(splitPane, BorderLayout.CENTER);
 		cp.add(renderingProgressBar, BorderLayout.SOUTH);
 
+		// Agregar MouseWheelListener global para interceptar Ctrl+rueda
+		addMouseWheelListener(new MouseWheelListener() {
+			@Override
+			public void mouseWheelMoved(MouseWheelEvent e) {
+				System.out.println("MouseWheel en MainWindow: Ctrl=" + e.isControlDown() + ", rotation=" + e.getWheelRotation());
+				if (e.isControlDown()) {
+					// IMPORTANTE: Consumir el evento INMEDIATAMENTE para prevenir zoom del sistema
+					e.consume();
+					
+					try {
+						// Convertir coordenadas del evento a coordenadas relativas al BrickedView
+						Point eventPoint = e.getPoint();
+						System.out.println("Punto del evento: " + eventPoint);
+						
+						// Calcular posición relativa al BrickedView de forma simple
+						Point brickedViewLocation = brickedView.getLocation();
+						System.out.println("Ubicación de BrickedView: " + brickedViewLocation);
+						
+						// Calcular posición relativa al BrickedView
+						int relativeX = eventPoint.x - brickedViewLocation.x;
+						int relativeY = eventPoint.y - brickedViewLocation.y;
+						Point relativePoint = new Point(relativeX, relativeY);
+						
+						System.out.println("Punto relativo a BrickedView: " + relativePoint);
+						// Llamar método de zoom temporalmente simplificado
+						System.out.println("Ejecutando zoom desde MainWindow...");
+					} catch (Exception ex) {
+						System.out.println("Error en mouseWheelMoved: " + ex.getMessage());
+						ex.printStackTrace();
+					}
+				}
+			}
+		});
+
 		handleModelChange(model);
 		Log.log("LDDMC main window operational after " + (System.currentTimeMillis()-startTime) + "ms.");
 	}
