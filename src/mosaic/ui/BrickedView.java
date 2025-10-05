@@ -1012,10 +1012,11 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 			
 			// Si no hay zoom activo, usar conversión simple
 			double zoomFactor = mosaicZoomController.getCurrentZoomFactor();
-			if (Math.abs(zoomFactor - 1.0) < 0.001) {
+			if (Math.abs(zoomFactor - 1.0) < 0.0001) {
+				// PRECISION FIX: Mayor precisión para zoom 100%
 				double scaleX = (double) shownImageSize.width / mosaicImageSize.width;
 				double scaleY = (double) shownImageSize.height / mosaicImageSize.height;
-				return new Point((int) (mosaicPoint.x * scaleX), (int) (mosaicPoint.y * scaleY));
+				return new Point((int) Math.round(mosaicPoint.x * scaleX), (int) Math.round(mosaicPoint.y * scaleY));
 			}
 			
 			// Con zoom: considerar el viewport actual
@@ -1036,7 +1037,8 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 			double scaleX = (double) size.width / viewport.width;
 			double scaleY = (double) size.height / viewport.height;
 			
-			return new Point((int) (relativeX * scaleX), (int) (relativeY * scaleY));
+			// PRECISION FIX: Usar Math.round para mayor precisión
+			return new Point((int) Math.round(relativeX * scaleX), (int) Math.round(relativeY * scaleY));
 		}
 		
 		/**
