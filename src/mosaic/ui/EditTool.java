@@ -20,19 +20,9 @@ public enum EditTool {
     EYEDROPPER("Eyedropper", "Eyedropper - Pick color from mosaic"),
     
     /**
-     * Herramienta borrador - restaura studs individuales al color original
+     * Herramienta reset - borra studs con tamaño seleccionable
      */
-    ERASER("Eraser", "Eraser - Restore individual studs to original"),
-    
-    /**
-     * Herramienta restaurar - restaura una zona al estado original
-     */
-    RESTORE("Restore", "Restore - Restore area to original state"),
-    
-    /**
-     * Herramienta reset - borra un stud individual (lo hace transparente)
-     */
-    RESET("Reset Single", "Reset Single - Clear individual stud");
+    RESET("Reset Single", "Reset Single - Clear studs with selectable size");
     
     private final String id;
     private final String description;

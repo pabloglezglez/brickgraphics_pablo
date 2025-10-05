@@ -1,6 +1,7 @@
 package mosaic.controllers;
 
 import mosaic.ui.EditTool;
+import mosaic.ui.BrushSize;
 import colors.LEGOColor;
 import colors.LEGOColorGrid;
 import java.util.ArrayList;
@@ -19,7 +20,7 @@ public class StudEditController {
     private ColorController colorController;
     private boolean hasChanges; // Bandera para saber si hay cambios no guardados
     private ModificationManager modificationManager; // Gestor de modificaciones manuales
-    private int brushSize = 1; // Tamaño del pincel (1x1, 2x2, 3x3, etc.)
+    private BrushSize brushSize = BrushSize.SMALL; // Tamaño del pincel
     
     public StudEditController(ColorController colorController) {
         this.activeTool = EditTool.DEFAULT;
@@ -50,10 +51,10 @@ public class StudEditController {
     
     /**
      * Establece el tamaño del pincel.
-     * @param size el nuevo tamaño (1, 2, 3, etc.)
+     * @param size el nuevo tamaño del pincel
      */
-    public void setBrushSize(int size) {
-        if (size >= 1 && size <= 5) { // Limitar a tamaños razonables
+    public void setBrushSize(BrushSize size) {
+        if (size != null && this.brushSize != size) {
             this.brushSize = size;
             fireStateChanged();
         }
@@ -63,7 +64,7 @@ public class StudEditController {
      * Obtiene el tamaño actual del pincel.
      * @return el tamaño del pincel
      */
-    public int getBrushSize() {
+    public BrushSize getBrushSize() {
         return brushSize;
     }
     
@@ -97,12 +98,8 @@ public class StudEditController {
                 return applyBrushWithSize(grid, x, y);
             case EYEDROPPER:
                 return applyEyedropper(grid, x, y);
-            case ERASER:
-                return applyEraserWithSize(grid, x, y);
-            case RESTORE:
-                return applyRestoreWithSize(grid, x, y);
             case RESET:
-                return applyReset(grid, x, y);
+                return applyResetWithSize(grid, x, y);
             default:
                 return false;
         }
@@ -153,7 +150,7 @@ public class StudEditController {
         }
         
         boolean anyChange = false;
-        int radius = (brushSize - 1) / 2;
+        int radius = brushSize.getRadius();
         
         for (int dy = -radius; dy <= radius; dy++) {
             for (int dx = -radius; dx <= radius; dx++) {
@@ -178,12 +175,14 @@ public class StudEditController {
         return anyChange;
     }
     
+
+    
     /**
-     * Aplica la herramienta borrador con el tamaño especificado.
+     * Aplica la herramienta reset con el tamaño especificado.
      */
-    private boolean applyEraserWithSize(LEGOColorGrid grid, int x, int y) {
+    private boolean applyResetWithSize(LEGOColorGrid grid, int x, int y) {
         boolean anyChange = false;
-        int radius = (brushSize - 1) / 2;
+        int radius = brushSize.getRadius();
         
         for (int dy = -radius; dy <= radius; dy++) {
             for (int dx = -radius; dx <= radius; dx++) {
@@ -191,11 +190,11 @@ public class StudEditController {
                 int targetY = y + dy;
                 
                 LEGOColor currentColor = grid.getColorAt(targetX, targetY);
-                LEGOColor originalColor = grid.getOriginalColorAt(targetX, targetY);
-                
-                if (currentColor != null && originalColor != null && currentColor != originalColor) {
+                if (currentColor != null) {
                     boolean success = grid.resetAt(targetX, targetY);
                     if (success) {
+                        LEGOColor originalColor = grid.getColorAt(targetX, targetY); // Color después del reset
+                        // Registrar que se volvió al color original (elimina la modificación)
                         modificationManager.recordModification(targetX, targetY, originalColor, originalColor);
                         anyChange = true;
                     }
@@ -204,56 +203,10 @@ public class StudEditController {
         }
         
         if (anyChange) {
-            hasChanges = true;
+            hasChanges = true; // Sigue habiendo cambios, solo restauramos studs
             fireStateChanged();
         }
         return anyChange;
-    }
-    
-    /**
-     * Aplica la herramienta restaurar con el tamaño especificado.
-     */
-    private boolean applyRestoreWithSize(LEGOColorGrid grid, int x, int y) {
-        boolean anyChange = false;
-        int radius = (brushSize - 1) / 2;
-        
-        for (int dy = -radius; dy <= radius; dy++) {
-            for (int dx = -radius; dx <= radius; dx++) {
-                int targetX = x + dx;
-                int targetY = y + dy;
-                
-                boolean success = grid.resetAt(targetX, targetY);
-                if (success) {
-                    LEGOColor originalColor = grid.getOriginalColorAt(targetX, targetY);
-                    if (originalColor != null) {
-                        modificationManager.recordModification(targetX, targetY, originalColor, originalColor);
-                        anyChange = true;
-                    }
-                }
-            }
-        }
-        
-        if (anyChange) {
-            hasChanges = true;
-            fireStateChanged();
-        }
-        return anyChange;
-    }
-    
-    /**
-     * Aplica la herramienta reset (individual).
-     */
-    private boolean applyReset(LEGOColorGrid grid, int x, int y) {
-        LEGOColor currentColor = grid.getColorAt(x, y);
-        boolean success = grid.resetAt(x, y);
-        if (success) {
-            LEGOColor originalColor = grid.getColorAt(x, y); // Color después del reset
-            // Registrar que se volvió al color original (elimina la modificación)
-            modificationManager.recordModification(x, y, originalColor, originalColor);
-            hasChanges = true; // Sigue habiendo cambios, solo restauramos un stud
-            fireStateChanged();
-        }
-        return success;
     }
     
     /**

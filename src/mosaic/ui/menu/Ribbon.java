@@ -11,6 +11,7 @@ import mosaic.controllers.*;
 import mosaic.io.MosaicIO;
 import mosaic.ui.*;
 import mosaic.ui.actions.*;
+import mosaic.ui.components.BrushSizeSelector;
 
 public class Ribbon extends JToolBar {
 	public Ribbon(MainController mc, MainWindow mw) {
@@ -49,6 +50,9 @@ public class Ribbon extends JToolBar {
 		
 		// Add color preview panel
 		add(createColorPreviewPanel(studEditController));
+		
+		// Add brush size selector
+		add(new BrushSizeSelector(studEditController));
 		
 		add(new JButton(new EyedropperToolAction(studEditController)));
 		add(new JButton(new ResetToolAction(studEditController)));
