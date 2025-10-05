@@ -246,7 +246,7 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 	 * Sistema automático de preservación de modificaciones.
 	 * @return el LEGOColorGrid o null si no está disponible
 	 */
-	private LEGOColorGrid getColorGrid() {
+	public LEGOColorGrid getColorGrid() {
 		if (toBricksTransform == null) {
 			System.out.println("DEBUG: getColorGrid() - toBricksTransform es null");
 			return null;
@@ -292,6 +292,49 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 	private int lastDraggedY = -1;
 	
 	/**
+	 * Convierte coordenadas de pantalla a coordenadas del mosaico considerando el zoom.
+	 */
+	private Point screenToMosaic(Point screenPoint) {
+		if (mosaicImageSize == null || shownImageSize == null) {
+			return new Point(0, 0);
+		}
+		
+		// Si no hay zoom activo, usar conversión simple
+		double zoomFactor = mosaicZoomController.getCurrentZoomFactor();
+		if (Math.abs(zoomFactor - 1.0) < 0.001) {
+			double scaleX = (double) mosaicImageSize.width / shownImageSize.width;
+			double scaleY = (double) mosaicImageSize.height / shownImageSize.height;
+			return new Point((int) (screenPoint.x * scaleX), (int) (screenPoint.y * scaleY));
+		}
+		
+		// Con zoom: aplicar transformación inversa exacta a la del paintComponent
+		Rectangle viewport = mosaicZoomController.getViewportBounds();
+		Dimension size = getSize();
+		
+		// CORREGIDO: Usar size.width/size.height como en paintComponent
+		// En paintComponent: scaleX = size.width / viewport.width
+		// En paintComponent: scaleY = size.height / viewport.height
+		double scaleX = (double) size.width / viewport.width;  
+		double scaleY = (double) size.height / viewport.height;
+		
+		// Aplicar transformación inversa en el orden correcto:
+		// paintComponent hace: scale() luego translate()  
+		// Para la inversa: aplicar escala inversa directamente
+		double invScaleX = (double) viewport.width / size.width;
+		double invScaleY = (double) viewport.height / size.height;
+		
+		// Convertir coordenadas de pantalla a coordenadas del viewport
+		double viewportX = screenPoint.x * invScaleX;
+		double viewportY = screenPoint.y * invScaleY;
+		
+		// Agregar el offset del viewport para obtener coordenadas del mosaico
+		int mosaicX = (int) (viewportX + viewport.x);
+		int mosaicY = (int) (viewportY + viewport.y);
+		
+		return new Point(mosaicX, mosaicY);
+	}
+
+	/**
 	 * Actualiza la posición del cursor visual sobre el mosaico.
 	 */
 	private void updateHoverCursor(int mouseX, int mouseY) {
@@ -314,36 +357,12 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 			return;
 		}
 		
-		// Convertir coordenadas del mouse a coordenadas del mosaico
-		int mosaicX, mosaicY;
-		
-		if (mosaicZoomController.getCurrentZoomFactor() != 1.0) {
-			// Con zoom: aplicar transformación inversa a la usada en paintComponent
-			Rectangle viewport = mosaicZoomController.getViewportBounds();
-			
-			// Usar shownImageSize que sabemos que existe y representa el tamaño actual en pantalla
-			double scaleX = (double) shownImageSize.width / viewport.width;
-			double scaleY = (double) shownImageSize.height / viewport.height;
-			
-			// Aplicar transformación inversa:
-			// 1. Escala inversa
-			double unscaledX = mouseX / scaleX;
-			double unscaledY = mouseY / scaleY;
-			
-			// 2. Traslación inversa  
-			mosaicX = (int) (unscaledX + viewport.x);
-			mosaicY = (int) (unscaledY + viewport.y);
-		} else {
-			// Sin zoom: conversión directa usando shownImageSize
-			mosaicX = (mouseX * mosaicImageSize.width) / shownImageSize.width;
-			mosaicY = (mouseY * mosaicImageSize.height) / shownImageSize.height;
-		}
+		// Convertir coordenadas del mouse a coordenadas del mosaico usando el método corregido
+		Point mosaicPoint = screenToMosaic(new Point(mouseX, mouseY));
 		
 		// Convertir coordenadas del mosaico directamente a coordenadas del grid
-		// El mosaicPoint ya está en coordenadas reales del mosaico, ahora necesitamos 
-		// convertir a coordenadas de la cuadrícula
-		int newHoveredX = (mosaicX * colorGrid.getWidth()) / mosaicImageSize.width;
-		int newHoveredY = (mosaicY * colorGrid.getHeight()) / mosaicImageSize.height;
+		int newHoveredX = (mosaicPoint.x * colorGrid.getWidth()) / mosaicImageSize.width;
+		int newHoveredY = (mosaicPoint.y * colorGrid.getHeight()) / mosaicImageSize.height;
 		
 		// Verificar que esté dentro del rango válido
 		if (newHoveredX >= 0 && newHoveredX < colorGrid.getWidth() && 
@@ -370,8 +389,10 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 	 * @param mouseY coordenada Y del mouse
 	 */
 	private void handleMosaicDrag(int mouseX, int mouseY) {
-		if (!isDragging || (studEditController.getActiveTool() != EditTool.BRUSH && studEditController.getActiveTool() != EditTool.RESET)) {
-			return; // Solo el pincel y reset permiten arrastre continuo
+		EditTool activeTool = studEditController.getActiveTool();
+		if (!isDragging || (activeTool != EditTool.BRUSH && activeTool != EditTool.RESET && 
+		                   activeTool != EditTool.ERASER && activeTool != EditTool.RESTORE)) {
+			return; // Solo ciertas herramientas permiten arrastre continuo
 		}
 		
 		LEGOColorGrid colorGrid = getColorGrid();
@@ -497,6 +518,10 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 		private boolean isZoomMode = false;
 		private Point zoomSelectionStart = null;
 		
+		// Variables para paneo
+		private boolean isPanning = false;
+		private Point panningStart = null;
+		
 		public MosaicCanvas() {
 			// Configurar zoom controller listener
 			mosaicZoomController.addZoomListener(this);
@@ -532,10 +557,12 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 						// Resetear estados anteriores
 						isDragging = false;
 						zoomSelectionStart = null;
+						isPanning = false;
 						
 						// Decisión basada en herramienta activa y modificadores
 						EditTool activeTool = studEditController.getActiveTool();
-						if ((activeTool == EditTool.BRUSH || activeTool == EditTool.RESET) && !e.isControlDown()) {
+						if ((activeTool == EditTool.BRUSH || activeTool == EditTool.RESET || 
+						     activeTool == EditTool.ERASER || activeTool == EditTool.RESTORE) && !e.isControlDown()) {
 							// Herramientas de edición (pincel/reset) SIN Ctrl - activar edición
 							isDragging = true;
 							lastDraggedX = -1;
@@ -551,12 +578,26 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 							// Click normal para otras herramientas
 							handleMosaicClick(e.getX(), e.getY());
 						}
+					} else if (SwingUtilities.isMiddleMouseButton(e) || (SwingUtilities.isLeftMouseButton(e) && e.isShiftDown())) {
+						// Botón central o Shift+Click izquierdo para paneo
+						if (mosaicZoomController != null && mosaicZoomController.isPanningAvailable()) {
+							isPanning = true;
+							panningStart = new Point(e.getX(), e.getY());
+							setCursor(Cursor.getPredefinedCursor(Cursor.MOVE_CURSOR));
+							System.out.println("Paneo iniciado en: " + panningStart);
+						}
 					}
 				}
 				
 				@Override
 				public void mouseReleased(MouseEvent e) {
-					if (zoomSelectionStart != null) {
+					if (isPanning && panningStart != null) {
+						// Terminar paneo
+						isPanning = false;
+						panningStart = null;
+						setCursor(Cursor.getDefaultCursor());
+						System.out.println("Paneo terminado");
+					} else if (zoomSelectionStart != null) {
 						// Terminar selección de zoom
 						mosaicZoomController.endSelection();
 						Rectangle selection = mosaicZoomController.getSelectionArea();
@@ -579,11 +620,34 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 				@Override
 				public void mouseMoved(MouseEvent e) {
 					updateHoverCursor(e.getX(), e.getY());
+					
+					// Actualizar cursor para indicar disponibilidad de paneo
+					if (!isPanning && !isDragging && zoomSelectionStart == null) {
+						if (mosaicZoomController != null && mosaicZoomController.isPanningAvailable() && 
+							(e.isShiftDown() || SwingUtilities.isMiddleMouseButton(e))) {
+							setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+						} else {
+							setCursor(Cursor.getDefaultCursor());
+						}
+					}
 				}
 				
 				@Override
 				public void mouseDragged(MouseEvent e) {
-					if (zoomSelectionStart != null) {
+					if (isPanning && panningStart != null) {
+						// Realizar paneo
+						int deltaX = e.getX() - panningStart.x;
+						int deltaY = e.getY() - panningStart.y;
+						
+						if (mosaicZoomController != null) {
+							mosaicZoomController.panViewport(deltaX, deltaY);
+							System.out.println("Paneo delta: (" + deltaX + ", " + deltaY + ")");
+						}
+						
+						// Actualizar punto de inicio para el siguiente arrastre
+						panningStart.setLocation(e.getX(), e.getY());
+						repaint();
+					} else if (zoomSelectionStart != null) {
 						// Actualizar selección de zoom (solo si se inició zoom)
 						mosaicZoomController.updateSelection(new Point(e.getX(), e.getY()));
 						System.out.println("Actualizando selección de zoom");
@@ -629,6 +693,36 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 					
 					// Forzar repaint
 					repaint();
+				}
+			}
+		});
+		
+		// Agregar soporte de teclado para paneo
+		setFocusable(true);
+		addKeyListener(new KeyAdapter() {
+			@Override
+			public void keyPressed(KeyEvent e) {
+				if (mosaicZoomController != null && mosaicZoomController.isPanningAvailable()) {
+					int panStep = 20; // pixels de paneo por tecla
+					
+					switch (e.getKeyCode()) {
+						case KeyEvent.VK_LEFT:
+							mosaicZoomController.panViewport(-panStep, 0);
+							repaint();
+							break;
+						case KeyEvent.VK_RIGHT:
+							mosaicZoomController.panViewport(panStep, 0);
+							repaint();
+							break;
+						case KeyEvent.VK_UP:
+							mosaicZoomController.panViewport(0, -panStep);
+							repaint();
+							break;
+						case KeyEvent.VK_DOWN:
+							mosaicZoomController.panViewport(0, panStep);
+							repaint();
+							break;
+					}
 				}
 			}
 		});
@@ -850,13 +944,22 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 				return new Point((int) (screenPoint.x * scaleX), (int) (screenPoint.y * scaleY));
 			}
 			
-			// Con zoom: considerar el viewport actual
+			// Con zoom: aplicar transformación inversa exacta a la del paintComponent
 			Rectangle viewport = mosaicZoomController.getViewportBounds();
-			double scaleX = (double) viewport.width / shownImageSize.width;
-			double scaleY = (double) viewport.height / shownImageSize.height;
+			Dimension size = getSize();
 			
-			int mosaicX = viewport.x + (int) (screenPoint.x * scaleX);
-			int mosaicY = viewport.y + (int) (screenPoint.y * scaleY);
+			// En paintComponent se aplica: scale(size.width/viewport.width, size.height/viewport.height)
+			// Para la inversa necesitamos: scale(viewport.width/size.width, viewport.height/size.height)
+			double invScaleX = (double) viewport.width / size.width;
+			double invScaleY = (double) viewport.height / size.height;
+			
+			// 1. Aplicar escala inversa
+			double unscaledX = screenPoint.x * invScaleX;
+			double unscaledY = screenPoint.y * invScaleY;
+			
+			// 2. Aplicar traslación inversa (en paintComponent se hace translate(-viewport.x, -viewport.y))
+			int mosaicX = (int) (unscaledX + viewport.x);
+			int mosaicY = (int) (unscaledY + viewport.y);
 			
 			return new Point(mosaicX, mosaicY);
 		}
@@ -879,6 +982,7 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 			
 			// Con zoom: considerar el viewport actual
 			Rectangle viewport = mosaicZoomController.getViewportBounds();
+			Dimension size = getSize();
 			
 			// Convertir punto del mosaico a coordenadas relativas del viewport
 			int relativeX = mosaicPoint.x - viewport.x;
@@ -890,9 +994,9 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 				return new Point(-1, -1);
 			}
 			
-			// Escalar a coordenadas de pantalla
-			double scaleX = (double) shownImageSize.width / viewport.width;
-			double scaleY = (double) shownImageSize.height / viewport.height;
+			// CORREGIDO: Usar getSize() como en screenToMosaic para consistencia
+			double scaleX = (double) size.width / viewport.width;
+			double scaleY = (double) size.height / viewport.height;
 			
 			return new Point((int) (relativeX * scaleX), (int) (relativeY * scaleY));
 		}

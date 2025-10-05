@@ -12,9 +12,9 @@ public class ResetToolAction extends AbstractAction {
     private StudEditController studEditController;
     
     public ResetToolAction(StudEditController studEditController) {
-        super("Restaurar");
+        super("Reset Single");
         this.studEditController = studEditController;
-        putValue(SHORT_DESCRIPTION, "Restaurar - Volver al mosaico original");
+        putValue(SHORT_DESCRIPTION, "Reset Single - Clear individual stud");
     }
     
     @Override

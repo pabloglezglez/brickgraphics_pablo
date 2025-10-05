@@ -7,22 +7,32 @@ public enum EditTool {
     /**
      * Herramienta por defecto - navegación normal
      */
-    DEFAULT("Default", "Navegación normal"),
+    DEFAULT("Default", "Default - Normal navigation"),
     
     /**
      * Herramienta pincel - permite cambiar el color de studs individuales
      */
-    BRUSH("Brush", "Pincel - Cambiar color de stud"),
+    BRUSH("Brush", "Brush - Paint individual studs"),
     
     /**
-     * Herramienta eyedropper - permite seleccionar un color del mosaico
+     * Herramienta cuentagotas - permite seleccionar un color del mosaico
      */
-    EYEDROPPER("Eyedropper", "Cuentagotas - Seleccionar color del mosaico"),
+    EYEDROPPER("Eyedropper", "Eyedropper - Pick color from mosaic"),
     
     /**
-     * Herramienta reset - restaura el mosaico al estado original
+     * Herramienta borrador - restaura studs individuales al color original
      */
-    RESET("Reset", "Restaurar - Volver al mosaico original");
+    ERASER("Eraser", "Eraser - Restore individual studs to original"),
+    
+    /**
+     * Herramienta restaurar - restaura una zona al estado original
+     */
+    RESTORE("Restore", "Restore - Restore area to original state"),
+    
+    /**
+     * Herramienta reset - borra un stud individual (lo hace transparente)
+     */
+    RESET("Reset Single", "Reset Single - Clear individual stud");
     
     private final String id;
     private final String description;

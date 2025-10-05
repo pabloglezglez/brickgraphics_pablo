@@ -23,6 +23,7 @@ public class MosaicZoomPanel extends JPanel {
     private JToggleButton zoomModeButton;
     private JLabel zoomLabel;
     private JComboBox<String> zoomComboBox;
+    private JLabel panningIndicator;
     
     public MosaicZoomPanel(MosaicZoomController zoomController, BrickedView brickedView) {
         this.zoomController = zoomController;
@@ -65,6 +66,11 @@ public class MosaicZoomPanel extends JPanel {
         zoomComboBox.setSelectedIndex(MosaicZoomController.DEFAULT_ZOOM_INDEX);
         zoomComboBox.setPreferredSize(new Dimension(80, 25));
         zoomComboBox.setToolTipText("Seleccionar nivel de zoom específico");
+        
+        // Indicador de paneo
+        panningIndicator = new JLabel();
+        panningIndicator.setToolTipText("Paneo disponible: Click medio + arrastrar o flechas del teclado");
+        updatePanningIndicator();
     }
     
     private void layoutComponents() {
@@ -81,6 +87,8 @@ public class MosaicZoomPanel extends JPanel {
         add(zoomToActualButton);
         add(Box.createHorizontalStrut(5));
         add(zoomModeButton);
+        add(Box.createHorizontalStrut(5));
+        add(panningIndicator);
     }
     
     private void setupListeners() {
@@ -167,6 +175,24 @@ public class MosaicZoomPanel extends JPanel {
         
         // Actualizar tooltip del combo con porcentaje exacto
         zoomComboBox.setToolTipText("Zoom actual: " + zoomController.getCurrentZoomPercentage());
+        
+        // Actualizar indicador de paneo
+        updatePanningIndicator();
+    }
+    
+    /**
+     * Actualiza el indicador de paneo basado en si está disponible o no.
+     */
+    private void updatePanningIndicator() {
+        if (zoomController.isPanningAvailable()) {
+            panningIndicator.setText("🔍");
+            panningIndicator.setToolTipText("Paneo disponible: Click medio + arrastrar o flechas del teclado");
+            panningIndicator.setForeground(Color.GREEN);
+        } else {
+            panningIndicator.setText("○");
+            panningIndicator.setToolTipText("Paneo no disponible (zoom al 100% o menos)");
+            panningIndicator.setForeground(Color.GRAY);
+        }
     }
     
     /**

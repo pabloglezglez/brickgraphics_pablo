@@ -19,6 +19,7 @@ public class StudEditController {
     private ColorController colorController;
     private boolean hasChanges; // Bandera para saber si hay cambios no guardados
     private ModificationManager modificationManager; // Gestor de modificaciones manuales
+    private int brushSize = 1; // Tamaño del pincel (1x1, 2x2, 3x3, etc.)
     
     public StudEditController(ColorController colorController) {
         this.activeTool = EditTool.DEFAULT;
@@ -48,6 +49,25 @@ public class StudEditController {
     }
     
     /**
+     * Establece el tamaño del pincel.
+     * @param size el nuevo tamaño (1, 2, 3, etc.)
+     */
+    public void setBrushSize(int size) {
+        if (size >= 1 && size <= 5) { // Limitar a tamaños razonables
+            this.brushSize = size;
+            fireStateChanged();
+        }
+    }
+    
+    /**
+     * Obtiene el tamaño actual del pincel.
+     * @return el tamaño del pincel
+     */
+    public int getBrushSize() {
+        return brushSize;
+    }
+    
+    /**
      * Establece el color seleccionado para la herramienta pincel.
      * @param color el color a usar
      */
@@ -74,9 +94,13 @@ public class StudEditController {
     public boolean applyToolAt(LEGOColorGrid grid, int x, int y) {
         switch (activeTool) {
             case BRUSH:
-                return applyBrush(grid, x, y);
+                return applyBrushWithSize(grid, x, y);
             case EYEDROPPER:
                 return applyEyedropper(grid, x, y);
+            case ERASER:
+                return applyEraserWithSize(grid, x, y);
+            case RESTORE:
+                return applyRestoreWithSize(grid, x, y);
             case RESET:
                 return applyReset(grid, x, y);
             default:
@@ -121,7 +145,103 @@ public class StudEditController {
     }
     
     /**
-     * Aplica la herramienta reset.
+     * Aplica la herramienta pincel con el tamaño especificado.
+     */
+    private boolean applyBrushWithSize(LEGOColorGrid grid, int x, int y) {
+        if (selectedColor == null) {
+            return false;
+        }
+        
+        boolean anyChange = false;
+        int radius = (brushSize - 1) / 2;
+        
+        for (int dy = -radius; dy <= radius; dy++) {
+            for (int dx = -radius; dx <= radius; dx++) {
+                int targetX = x + dx;
+                int targetY = y + dy;
+                
+                LEGOColor currentColor = grid.getColorAt(targetX, targetY);
+                if (currentColor != null && currentColor != selectedColor) {
+                    boolean success = grid.setColorAt(targetX, targetY, selectedColor);
+                    if (success) {
+                        modificationManager.recordModification(targetX, targetY, selectedColor, currentColor);
+                        anyChange = true;
+                    }
+                }
+            }
+        }
+        
+        if (anyChange) {
+            hasChanges = true;
+            fireStateChanged();
+        }
+        return anyChange;
+    }
+    
+    /**
+     * Aplica la herramienta borrador con el tamaño especificado.
+     */
+    private boolean applyEraserWithSize(LEGOColorGrid grid, int x, int y) {
+        boolean anyChange = false;
+        int radius = (brushSize - 1) / 2;
+        
+        for (int dy = -radius; dy <= radius; dy++) {
+            for (int dx = -radius; dx <= radius; dx++) {
+                int targetX = x + dx;
+                int targetY = y + dy;
+                
+                LEGOColor currentColor = grid.getColorAt(targetX, targetY);
+                LEGOColor originalColor = grid.getOriginalColorAt(targetX, targetY);
+                
+                if (currentColor != null && originalColor != null && currentColor != originalColor) {
+                    boolean success = grid.resetAt(targetX, targetY);
+                    if (success) {
+                        modificationManager.recordModification(targetX, targetY, originalColor, originalColor);
+                        anyChange = true;
+                    }
+                }
+            }
+        }
+        
+        if (anyChange) {
+            hasChanges = true;
+            fireStateChanged();
+        }
+        return anyChange;
+    }
+    
+    /**
+     * Aplica la herramienta restaurar con el tamaño especificado.
+     */
+    private boolean applyRestoreWithSize(LEGOColorGrid grid, int x, int y) {
+        boolean anyChange = false;
+        int radius = (brushSize - 1) / 2;
+        
+        for (int dy = -radius; dy <= radius; dy++) {
+            for (int dx = -radius; dx <= radius; dx++) {
+                int targetX = x + dx;
+                int targetY = y + dy;
+                
+                boolean success = grid.resetAt(targetX, targetY);
+                if (success) {
+                    LEGOColor originalColor = grid.getOriginalColorAt(targetX, targetY);
+                    if (originalColor != null) {
+                        modificationManager.recordModification(targetX, targetY, originalColor, originalColor);
+                        anyChange = true;
+                    }
+                }
+            }
+        }
+        
+        if (anyChange) {
+            hasChanges = true;
+            fireStateChanged();
+        }
+        return anyChange;
+    }
+    
+    /**
+     * Aplica la herramienta reset (individual).
      */
     private boolean applyReset(LEGOColorGrid grid, int x, int y) {
         LEGOColor currentColor = grid.getColorAt(x, y);
@@ -134,6 +254,22 @@ public class StudEditController {
             fireStateChanged();
         }
         return success;
+    }
+    
+    /**
+     * Reset global: restaura todo el mosaico a su estado original.
+     */
+    public void globalReset(LEGOColorGrid grid) {
+        if (grid != null) {
+            for (int y = 0; y < grid.getHeight(); y++) {
+                for (int x = 0; x < grid.getWidth(); x++) {
+                    grid.resetAt(x, y);
+                }
+            }
+            modificationManager.clearModifications();
+            hasChanges = false;
+            fireStateChanged();
+        }
     }
     
     /**

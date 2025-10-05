@@ -52,6 +52,7 @@ public class Ribbon extends JToolBar {
 		
 		add(new JButton(new EyedropperToolAction(studEditController)));
 		add(new JButton(new ResetToolAction(studEditController)));
+		add(new JButton(new GlobalResetAction(studEditController, mw.getBrickedView())));
 		
 		// Add magnifier buttons:
 		final MagnifierController magnifierController = mc.getMagnifierController();
