@@ -17,8 +17,8 @@ public class ZoomInAction extends AbstractAction {
         super("Zoom In");
         this.zoomController = zoomController;
         
-        putValue(Action.SHORT_DESCRIPTION, "Aumentar zoom del mosaico");
-        putValue(Action.ACCELERATOR_KEY, KeyStroke.getKeyStroke(KeyEvent.VK_EQUALS, KeyEvent.CTRL_DOWN_MASK));
+        putValue(Action.SHORT_DESCRIPTION, "Aumentar zoom del mosaico (Ctrl++)");
+        putValue(Action.ACCELERATOR_KEY, KeyStroke.getKeyStroke(KeyEvent.VK_PLUS, KeyEvent.CTRL_DOWN_MASK));
         putValue(Action.MNEMONIC_KEY, KeyEvent.VK_I);
     }
     

@@ -50,6 +50,7 @@ public class ToBricksTransform implements InstructionsTransform {
 	}
 	
 	public ToBricksTransform(LEGOColor[] colors, ToBricksType toBricksType, int propagationPercentage, int width, int height, ColorController cc) {
+		System.out.println("DEBUG: Creando nuevo ToBricksTransform - " + width + "x" + height);
 		this.cc = cc;
 		brickFromTopTransform = new ScaleTransform("Construct from top",  false, ScaleQuality.RetainColors);
 		brickFromSideTransform = new ScaleTransform("Construct bricks from side", false, ScaleQuality.RetainColors);
