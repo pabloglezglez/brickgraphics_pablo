@@ -13,10 +13,10 @@ public class ZoomToFitAction extends AbstractAction {
     private MosaicZoomController zoomController;
     
     public ZoomToFitAction(MosaicZoomController zoomController) {
-        super("Ajustar a Ventana");
+        super("Fit to Window");
         this.zoomController = zoomController;
         
-        putValue(Action.SHORT_DESCRIPTION, "Ajustar mosaico completo en la ventana");
+        putValue(Action.SHORT_DESCRIPTION, "Fit complete mosaic in window");
         putValue(Action.ACCELERATOR_KEY, KeyStroke.getKeyStroke(KeyEvent.VK_0, KeyEvent.CTRL_DOWN_MASK));
         putValue(Action.MNEMONIC_KEY, KeyEvent.VK_F);
     }

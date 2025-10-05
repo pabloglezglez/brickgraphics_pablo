@@ -390,8 +390,7 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 	 */
 	private void handleMosaicDrag(int mouseX, int mouseY) {
 		EditTool activeTool = studEditController.getActiveTool();
-		if (!isDragging || (activeTool != EditTool.BRUSH && activeTool != EditTool.RESET && 
-		                   activeTool != EditTool.ERASER && activeTool != EditTool.RESTORE)) {
+		if (!isDragging || (activeTool != EditTool.BRUSH && activeTool != EditTool.RESET)) {
 			return; // Solo ciertas herramientas permiten arrastre continuo
 		}
 		
@@ -561,8 +560,7 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 						
 						// Decisión basada en herramienta activa y modificadores
 						EditTool activeTool = studEditController.getActiveTool();
-						if ((activeTool == EditTool.BRUSH || activeTool == EditTool.RESET || 
-						     activeTool == EditTool.ERASER || activeTool == EditTool.RESTORE) && !e.isControlDown()) {
+						if ((activeTool == EditTool.BRUSH || activeTool == EditTool.RESET) && !e.isControlDown()) {
 							// Herramientas de edición (pincel/reset) SIN Ctrl - activar edición
 							isDragging = true;
 							lastDraggedX = -1;
@@ -832,74 +830,112 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 			drawZoomSelection(g2);
 		}
 		
-		/**
-		 * Dibuja el cursor de edición sobre el stud seleccionado.
-		 */
-		private void drawEditCursor(Graphics2D g2) {
-			if (!showHoverCursor || studEditController.getActiveTool() == EditTool.DEFAULT) {
-				return;
-			}
-			
-			LEGOColorGrid colorGrid = getColorGrid();
-			if (colorGrid == null || hoveredX < 0 || hoveredY < 0) {
-				return;
-			}
-			
-			// Calcular posición en píxeles del stud en el espacio del mosaico original
-			int studPixelWidth = mosaicImageSize.width / colorGrid.getWidth();
-			int studPixelHeight = mosaicImageSize.height / colorGrid.getHeight();
-			
-			// Coordenadas del stud en el mosaico original
-			int mosaicX = hoveredX * studPixelWidth;
-			int mosaicY = hoveredY * studPixelHeight;
-			
-			// Convertir a coordenadas de pantalla usando el método existente
-			Point screenStart = mosaicToScreen(new Point(mosaicX, mosaicY));
-			Point screenEnd = mosaicToScreen(new Point(mosaicX + studPixelWidth, mosaicY + studPixelHeight));
-			
-			// Si está fuera de la pantalla, no dibujar
-			if (screenStart.x < 0 || screenStart.y < 0 || screenEnd.x < 0 || screenEnd.y < 0) {
-				return;
-			}
-			
-			int pixelX = screenStart.x;
-			int pixelY = screenStart.y;
-			int pixelW = screenEnd.x - screenStart.x;
-			int pixelH = screenEnd.y - screenStart.y;
-			
-			// Configurar el cursor según la herramienta activa y estado de arrastre
-			if (isDragging) {
-				g2.setStroke(new BasicStroke(3)); // Línea más gruesa durante arrastre
-			} else {
-				g2.setStroke(new BasicStroke(2));
-			}
-			
-			switch (studEditController.getActiveTool()) {
-				case BRUSH:
-					// Cuadrado verde para el pincel, más intenso si está arrastrando
-					if (isDragging) {
-						g2.setColor(new Color(0, 200, 0)); // Verde más intenso
-						g2.fillRect(pixelX + 2, pixelY + 2, pixelW - 4, pixelH - 4); // Relleno parcial
-					} else {
-						g2.setColor(Color.GREEN);
-					}
-					g2.drawRect(pixelX, pixelY, pixelW, pixelH);
-					break;
-				case EYEDROPPER:
-					// Círculo azul para el eyedropper
-					g2.setColor(Color.BLUE);
-					g2.drawOval(pixelX, pixelY, pixelW, pixelH);
-					break;
-				case RESET:
-					// Cruz roja para reset
-					g2.setColor(Color.RED);
-					g2.drawLine(pixelX, pixelY, pixelX + pixelW, pixelY + pixelH);
-					g2.drawLine(pixelX + pixelW, pixelY, pixelX, pixelY + pixelH);
-					break;
-			}
+	/**
+	 * Dibuja el cursor de edición sobre el stud seleccionado.
+	 * Muestra el área de efecto basada en el tamaño del pincel.
+	 */
+	private void drawEditCursor(Graphics2D g2) {
+		if (!showHoverCursor || studEditController.getActiveTool() == EditTool.DEFAULT) {
+			return;
 		}
 		
-		/**
+		LEGOColorGrid colorGrid = getColorGrid();
+		if (colorGrid == null || hoveredX < 0 || hoveredY < 0) {
+			return;
+		}
+		
+		// Calcular dimensiones de un stud en píxeles del mosaico original
+		int studPixelWidth = mosaicImageSize.width / colorGrid.getWidth();
+		int studPixelHeight = mosaicImageSize.height / colorGrid.getHeight();
+		
+		// Obtener el tamaño del pincel
+		int brushRadius = studEditController.getBrushSize().getRadius();
+		
+		// Configurar el cursor según la herramienta activa y estado de arrastre
+		if (isDragging) {
+			g2.setStroke(new BasicStroke(3)); // Línea más gruesa durante arrastre
+		} else {
+			g2.setStroke(new BasicStroke(2));
+		}
+		
+		// Dibujar cada celda del área de efecto del pincel
+		for (int dy = -brushRadius; dy <= brushRadius; dy++) {
+			for (int dx = -brushRadius; dx <= brushRadius; dx++) {
+				int targetX = hoveredX + dx;
+				int targetY = hoveredY + dy;
+				
+				// Verificar que el stud objetivo esté dentro del grid
+				if (targetX < 0 || targetX >= colorGrid.getWidth() || 
+					targetY < 0 || targetY >= colorGrid.getHeight()) {
+					continue;
+				}
+				
+				// Coordenadas del stud en el mosaico original
+				int mosaicX = targetX * studPixelWidth;
+				int mosaicY = targetY * studPixelHeight;
+				
+				// Convertir a coordenadas de pantalla
+				Point screenStart = mosaicToScreen(new Point(mosaicX, mosaicY));
+				Point screenEnd = mosaicToScreen(new Point(mosaicX + studPixelWidth, mosaicY + studPixelHeight));
+				
+				// Si está fuera de la pantalla, no dibujar
+				if (screenStart.x < 0 || screenStart.y < 0 || screenEnd.x < 0 || screenEnd.y < 0) {
+					continue;
+				}
+				
+				int pixelX = screenStart.x;
+				int pixelY = screenStart.y;
+				int pixelW = screenEnd.x - screenStart.x;
+				int pixelH = screenEnd.y - screenStart.y;
+				
+				// Determinar la intensidad basada en la distancia del centro
+				boolean isCenterCell = (dx == 0 && dy == 0);
+				
+				switch (studEditController.getActiveTool()) {
+					case BRUSH:
+						// Cuadrado verde para el pincel
+						if (isCenterCell) {
+							// Centro más intenso
+							if (isDragging) {
+								g2.setColor(new Color(0, 200, 0)); // Verde más intenso
+								g2.fillRect(pixelX + 2, pixelY + 2, pixelW - 4, pixelH - 4);
+							} else {
+								g2.setColor(Color.GREEN);
+							}
+						} else {
+							// Bordes menos intensos
+							g2.setColor(new Color(0, 150, 0, 120)); // Verde semi-transparente
+						}
+						g2.drawRect(pixelX, pixelY, pixelW, pixelH);
+						break;
+					case EYEDROPPER:
+						// Solo mostrar cursor en el centro para eyedropper
+						if (isCenterCell) {
+							g2.setColor(Color.BLUE);
+							g2.drawOval(pixelX, pixelY, pixelW, pixelH);
+						}
+						break;
+					case RESET:
+						// Cuadrado rojo para reset con tamaño
+						if (isCenterCell) {
+							if (isDragging) {
+								g2.setColor(new Color(255, 0, 0)); // Rojo intenso
+								g2.fillRect(pixelX + 2, pixelY + 2, pixelW - 4, pixelH - 4);
+							} else {
+								g2.setColor(Color.RED);
+							}
+							// Dibujar cruz en el centro
+							g2.drawLine(pixelX, pixelY, pixelX + pixelW, pixelY + pixelH);
+							g2.drawLine(pixelX + pixelW, pixelY, pixelX, pixelY + pixelH);
+						} else {
+							g2.setColor(new Color(255, 0, 0, 120)); // Rojo semi-transparente
+						}
+						g2.drawRect(pixelX, pixelY, pixelW, pixelH);
+						break;
+				}
+			}
+		}
+	}		/**
 		 * Dibuja la selección de zoom cuando está activa.
 		 */
 		private void drawZoomSelection(Graphics2D g2) {

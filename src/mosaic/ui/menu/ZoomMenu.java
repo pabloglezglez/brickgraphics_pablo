@@ -23,8 +23,8 @@ public class ZoomMenu extends JMenu {
         addSeparator();
         
         // Submenu con niveles específicos
-        JMenu levelsMenu = new JMenu("Nivel Específico");
-        levelsMenu.setMnemonic('N');
+        JMenu levelsMenu = new JMenu("Specific Level");
+        levelsMenu.setMnemonic('S');
         
         for (int i = 0; i < MosaicZoomController.ZOOM_LEVELS.length; i++) {
             final int index = i;

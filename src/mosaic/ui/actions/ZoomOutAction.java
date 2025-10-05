@@ -16,7 +16,7 @@ public class ZoomOutAction extends AbstractAction {
         super("Zoom Out");
         this.zoomController = zoomController;
         
-        putValue(Action.SHORT_DESCRIPTION, "Reducir zoom del mosaico (Ctrl+-)");
+        putValue(Action.SHORT_DESCRIPTION, "Decrease mosaic zoom (Ctrl+-)");
         putValue(Action.ACCELERATOR_KEY, KeyStroke.getKeyStroke(KeyEvent.VK_MINUS, KeyEvent.CTRL_DOWN_MASK));
         putValue(Action.MNEMONIC_KEY, KeyEvent.VK_O);
     }

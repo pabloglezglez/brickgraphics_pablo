@@ -38,21 +38,21 @@ public class MosaicZoomPanel extends JPanel {
     private void initializeComponents() {
         // Botones de zoom
         zoomInButton = new JButton("+");
-        zoomInButton.setToolTipText("Zoom In (Ctrl + Rueda del ratón hacia arriba)");
+        zoomInButton.setToolTipText("Zoom In (Ctrl + Mouse wheel up)");
         zoomInButton.setPreferredSize(new Dimension(30, 25));
         
         zoomOutButton = new JButton("-");
-        zoomOutButton.setToolTipText("Zoom Out (Ctrl + Rueda del ratón hacia abajo)");
+        zoomOutButton.setToolTipText("Zoom Out (Ctrl + Mouse wheel down)");
         zoomOutButton.setPreferredSize(new Dimension(30, 25));
         
-        zoomToFitButton = new JButton("Ajustar");
-        zoomToFitButton.setToolTipText("Ajustar mosaico completo en ventana");
+        zoomToFitButton = new JButton("Fit");
+        zoomToFitButton.setToolTipText("Fit complete mosaic in window");
         
         zoomToActualButton = new JButton("100%");
-        zoomToActualButton.setToolTipText("Zoom al tamaño real");
+        zoomToActualButton.setToolTipText("Zoom to actual size");
         
-        zoomModeButton = new JToggleButton("Selección");
-        zoomModeButton.setToolTipText("Activar modo de selección para zoom (Ctrl + arrastrar)");
+        zoomModeButton = new JToggleButton("Selection");
+        zoomModeButton.setToolTipText("Enable selection mode for zoom (Ctrl + drag)");
         
         // Etiqueta y combo de zoom
         zoomLabel = new JLabel("Zoom:");
@@ -65,17 +65,17 @@ public class MosaicZoomPanel extends JPanel {
         zoomComboBox = new JComboBox<>(zoomOptions);
         zoomComboBox.setSelectedIndex(MosaicZoomController.DEFAULT_ZOOM_INDEX);
         zoomComboBox.setPreferredSize(new Dimension(80, 25));
-        zoomComboBox.setToolTipText("Seleccionar nivel de zoom específico");
+        zoomComboBox.setToolTipText("Select specific zoom level");
         
         // Indicador de paneo
         panningIndicator = new JLabel();
-        panningIndicator.setToolTipText("Paneo disponible: Click medio + arrastrar o flechas del teclado");
+        panningIndicator.setToolTipText("Panning available: Middle click + drag or keyboard arrows");
         updatePanningIndicator();
     }
     
     private void layoutComponents() {
         setLayout(new FlowLayout(FlowLayout.LEFT, 2, 2));
-        setBorder(BorderFactory.createTitledBorder("Zoom del Mosaico"));
+        setBorder(BorderFactory.createTitledBorder("Mosaic Zoom"));
         
         add(zoomLabel);
         add(zoomComboBox);
@@ -174,7 +174,7 @@ public class MosaicZoomPanel extends JPanel {
         zoomOutButton.setEnabled(zoomController.canZoomOut());
         
         // Actualizar tooltip del combo con porcentaje exacto
-        zoomComboBox.setToolTipText("Zoom actual: " + zoomController.getCurrentZoomPercentage());
+        zoomComboBox.setToolTipText("Current zoom: " + zoomController.getCurrentZoomPercentage());
         
         // Actualizar indicador de paneo
         updatePanningIndicator();
@@ -186,11 +186,11 @@ public class MosaicZoomPanel extends JPanel {
     private void updatePanningIndicator() {
         if (zoomController.isPanningAvailable()) {
             panningIndicator.setText("🔍");
-            panningIndicator.setToolTipText("Paneo disponible: Click medio + arrastrar o flechas del teclado");
+            panningIndicator.setToolTipText("Panning available: Middle click + drag or keyboard arrows");
             panningIndicator.setForeground(Color.GREEN);
         } else {
             panningIndicator.setText("○");
-            panningIndicator.setToolTipText("Paneo no disponible (zoom al 100% o menos)");
+            panningIndicator.setToolTipText("Panning not available (zoom at 100% or less)");
             panningIndicator.setForeground(Color.GRAY);
         }
     }

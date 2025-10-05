@@ -13,10 +13,10 @@ public class ZoomToActualSizeAction extends AbstractAction {
     private MosaicZoomController zoomController;
     
     public ZoomToActualSizeAction(MosaicZoomController zoomController) {
-        super("Tamaño Real (100%)");
+        super("Actual Size (100%)");
         this.zoomController = zoomController;
         
-        putValue(Action.SHORT_DESCRIPTION, "Zoom al tamaño real del mosaico");
+        putValue(Action.SHORT_DESCRIPTION, "Zoom to actual mosaic size");
         putValue(Action.ACCELERATOR_KEY, KeyStroke.getKeyStroke(KeyEvent.VK_1, KeyEvent.CTRL_DOWN_MASK));
         putValue(Action.MNEMONIC_KEY, KeyEvent.VK_A);
     }
