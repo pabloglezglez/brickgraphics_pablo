@@ -43,7 +43,9 @@ public class ColorLegend extends JToolBar implements ChangeListener, PipelineMos
 		super("Legend");
 		cc = mc.getColorController();
 		uc = mc.getUIController();
+		StudEditController studEditController = mc.getStudEditController();
 		uc.addChangeListener(this);
+		studEditController.addChangeListener(this); // Escuchar cambios de edición
 		pipeline.addMosaicListener(this);
 		
 		list = new JList<LEGOColor.CountingLEGOColor>();

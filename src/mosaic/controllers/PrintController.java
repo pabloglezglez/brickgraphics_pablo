@@ -14,6 +14,7 @@ import java.util.*;
 import java.util.List;
 import javax.swing.*;
 import javax.swing.event.*;
+import javax.swing.SwingUtilities;
 import colors.LEGOColor;
 import mosaic.controllers.MagnifierController;
 import mosaic.io.BrickGraphicsState;
@@ -103,6 +104,12 @@ public class PrintController implements Printable, ModelHandler<BrickGraphicsSta
 	}
 	
 	public void print() {
+		// Ensure print dialog is shown on EDT (Event Dispatch Thread) for JAR compatibility
+		if (!SwingUtilities.isEventDispatchThread()) {
+			SwingUtilities.invokeLater(() -> print());
+			return;
+		}
+		
 		Log.log("About to show print dialog.");
 		
 		if(mw == null)
@@ -148,7 +155,7 @@ public class PrintController implements Printable, ModelHandler<BrickGraphicsSta
         				Log.log("Using previous print configuration: " + lastUsedPrintService.getName());
         			} catch(Exception e) {
         				Log.log("Failed to reuse print config: " + e.getMessage());
-        				dialogResult = printerJob.printDialog();
+        				dialogResult = showPrintDialogSafely();
         			}
         			break;
         			
@@ -171,14 +178,14 @@ public class PrintController implements Printable, ModelHandler<BrickGraphicsSta
         				printerJob.setPrintable(PrintController.this, pageFormat);
         				
         				// Show dialog with fresh state
-        				dialogResult = printerJob.printDialog();
+        				dialogResult = showPrintDialogSafely();
         				Log.log("Fresh print dialog shown, result: " + dialogResult);
         				
         				// If first attempt fails (common in macOS), try once more
         				if(!dialogResult) {
         					Log.log("First attempt failed, trying second attempt after brief pause...");
         					Thread.sleep(200);
-        					dialogResult = printerJob.printDialog();
+        					dialogResult = showPrintDialogSafely();
         					Log.log("Second attempt result: " + dialogResult);
         				}
         			} catch(Exception e) {
@@ -193,7 +200,7 @@ public class PrintController implements Printable, ModelHandler<BrickGraphicsSta
         			break;
         			
         		case 2: // Mostrar diálogo completo
-        			dialogResult = printerJob.printDialog();
+        			dialogResult = showPrintDialogSafely();
         			break;
         			
         		default: // Cancelar
@@ -202,7 +209,7 @@ public class PrintController implements Printable, ModelHandler<BrickGraphicsSta
         	}
         } else {
         	// First time or no saved config, show dialog
-        	dialogResult = printerJob.printDialog();
+        	dialogResult = showPrintDialogSafely();
         }
         
         Log.log("Print dialog result: " + dialogResult);
@@ -1209,6 +1216,30 @@ public class PrintController implements Printable, ModelHandler<BrickGraphicsSta
 				"Intenta cerrar y volver a abrir la aplicación.",
 				"Error",
 				JOptionPane.WARNING_MESSAGE);
+		}
+	}
+	
+	/**
+	 * Shows print dialog in a way that's compatible with both source code and JAR execution.
+	 */
+	private boolean showPrintDialogSafely() {
+		try {			
+			Log.log("Attempting to show print dialog...");
+			boolean result = printerJob.printDialog();
+			Log.log("Print dialog result: " + result);
+			return result;
+		} catch (Exception e) {
+			Log.log("Error showing print dialog: " + e.getMessage());
+			e.printStackTrace();
+			
+			// Fallback: Show a message to user
+			JOptionPane.showMessageDialog(mw,
+				"No se pudo abrir el diálogo de impresión del sistema.\n\n" +
+				"Esto puede ocurrir en versiones empaquetadas de la aplicación.\n" +
+				"Intenta usar 'Exportar como PDF' desde el menú File.",
+				"Problema con diálogo de impresión",
+				JOptionPane.WARNING_MESSAGE);
+			return false;
 		}
 	}
 }

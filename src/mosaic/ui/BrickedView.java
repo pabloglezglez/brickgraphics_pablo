@@ -851,7 +851,8 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 		int studPixelHeight = mosaicImageSize.height / colorGrid.getHeight();
 		
 		// Obtener el tamaño del pincel
-		int brushRadius = studEditController.getBrushSize().getRadius();
+		BrushSize brushSize = studEditController.getBrushSize();
+		int brushSizeValue = brushSize.getSize();
 		
 		// Configurar el cursor según la herramienta activa y estado de arrastre
 		if (isDragging) {
@@ -860,11 +861,27 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 			g2.setStroke(new BasicStroke(2));
 		}
 		
+		// Calcular el área correcta del cursor basado en el algoritmo real del brush
+		int startX, startY, endX, endY;
+		
+		if (brushSizeValue % 2 == 1) {
+			// Tamaños impares: centrar alrededor del punto hovereado
+			int offset = (brushSizeValue - 1) / 2;
+			startX = hoveredX - offset;
+			startY = hoveredY - offset;
+		} else {
+			// Tamaños pares: el punto hovereado está en la esquina superior izquierda del área
+			int offset = brushSizeValue / 2;
+			startX = hoveredX - offset + 1;
+			startY = hoveredY - offset + 1;
+		}
+		
+		endX = startX + brushSizeValue - 1;
+		endY = startY + brushSizeValue - 1;
+		
 		// Dibujar cada celda del área de efecto del pincel
-		for (int dy = -brushRadius; dy <= brushRadius; dy++) {
-			for (int dx = -brushRadius; dx <= brushRadius; dx++) {
-				int targetX = hoveredX + dx;
-				int targetY = hoveredY + dy;
+		for (int targetY = startY; targetY <= endY; targetY++) {
+			for (int targetX = startX; targetX <= endX; targetX++) {
 				
 				// Verificar que el stud objetivo esté dentro del grid
 				if (targetX < 0 || targetX >= colorGrid.getWidth() || 
@@ -890,8 +907,23 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 				int pixelW = screenEnd.x - screenStart.x;
 				int pixelH = screenEnd.y - screenStart.y;
 				
-				// Determinar la intensidad basada en la distancia del centro
-				boolean isCenterCell = (dx == 0 && dy == 0);
+				// Determinar si está en el centro basado en el tamaño del brush
+				boolean isCenterCell = false;
+				
+				if (brushSizeValue % 2 == 1) {
+					// Para tamaños impares, el centro es una sola celda
+					isCenterCell = (targetX == hoveredX && targetY == hoveredY);
+				} else {
+					// Para tamaños pares, el centro es una cuadrícula de 2x2
+					// Calculamos el centro del área
+					int centerStartX = startX + brushSizeValue / 2 - 1;
+					int centerEndX = centerStartX + 1;
+					int centerStartY = startY + brushSizeValue / 2 - 1;
+					int centerEndY = centerStartY + 1;
+					
+					isCenterCell = (targetX >= centerStartX && targetX <= centerEndX && 
+								   targetY >= centerStartY && targetY <= centerEndY);
+				}
 				
 				switch (studEditController.getActiveTool()) {
 					case BRUSH:

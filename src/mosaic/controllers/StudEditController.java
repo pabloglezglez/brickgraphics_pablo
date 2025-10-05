@@ -93,6 +93,7 @@ public class StudEditController {
      * @return true si se realizó algún cambio
      */
     public boolean applyToolAt(LEGOColorGrid grid, int x, int y) {
+        System.out.println("DEBUG: Aplicando herramienta " + activeTool + " con pincel " + brushSize + " en (" + x + "," + y + ")");
         switch (activeTool) {
             case BRUSH:
                 return applyBrushWithSize(grid, x, y);
@@ -150,13 +151,28 @@ public class StudEditController {
         }
         
         boolean anyChange = false;
-        int radius = brushSize.getRadius();
+        int brushSizeValue = brushSize.getSize();
         
-        for (int dy = -radius; dy <= radius; dy++) {
-            for (int dx = -radius; dx <= radius; dx++) {
-                int targetX = x + dx;
-                int targetY = y + dy;
-                
+        // Calculamos las coordenadas de inicio correctamente
+        int startX, startY;
+        
+        if (brushSizeValue % 2 == 1) {
+            // Tamaños impares: centrar alrededor del punto clickeado
+            int offset = (brushSizeValue - 1) / 2;
+            startX = x - offset;
+            startY = y - offset;
+        } else {
+            // Tamaños pares: el punto clickeado está en la esquina superior izquierda del área
+            int offset = brushSizeValue / 2;
+            startX = x - offset + 1;
+            startY = y - offset + 1;
+        }
+        
+        int endX = startX + brushSizeValue - 1;
+        int endY = startY + brushSizeValue - 1;
+        
+        for (int targetY = startY; targetY <= endY; targetY++) {
+            for (int targetX = startX; targetX <= endX; targetX++) {
                 LEGOColor currentColor = grid.getColorAt(targetX, targetY);
                 if (currentColor != null && currentColor != selectedColor) {
                     boolean success = grid.setColorAt(targetX, targetY, selectedColor);
@@ -182,13 +198,28 @@ public class StudEditController {
      */
     private boolean applyResetWithSize(LEGOColorGrid grid, int x, int y) {
         boolean anyChange = false;
-        int radius = brushSize.getRadius();
+        int brushSizeValue = brushSize.getSize();
         
-        for (int dy = -radius; dy <= radius; dy++) {
-            for (int dx = -radius; dx <= radius; dx++) {
-                int targetX = x + dx;
-                int targetY = y + dy;
-                
+        // Calculamos las coordenadas de inicio correctamente
+        int startX, startY;
+        
+        if (brushSizeValue % 2 == 1) {
+            // Tamaños impares: centrar alrededor del punto clickeado
+            int offset = (brushSizeValue - 1) / 2;
+            startX = x - offset;
+            startY = y - offset;
+        } else {
+            // Tamaños pares: el punto clickeado está en la esquina superior izquierda del área
+            int offset = brushSizeValue / 2;
+            startX = x - offset + 1;
+            startY = y - offset + 1;
+        }
+        
+        int endX = startX + brushSizeValue - 1;
+        int endY = startY + brushSizeValue - 1;
+        
+        for (int targetY = startY; targetY <= endY; targetY++) {
+            for (int targetX = startX; targetX <= endX; targetX++) {
                 LEGOColor currentColor = grid.getColorAt(targetX, targetY);
                 if (currentColor != null) {
                     boolean success = grid.resetAt(targetX, targetY);
