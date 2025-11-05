@@ -588,6 +588,17 @@ public class ColorController implements ModelHandler<BrickGraphicsState> {
 		
 		notifyListeners(null);
 	}
+	
+	/**
+	 * Resetea todas las intensidades de colores a 1.0 (valor por defecto)
+	 * Útil al abrir un nuevo proyecto para empezar con valores limpios
+	 */
+	public void resetAllColorIntensities() {
+		for(LEGOColor color : colorsFromDisk) {
+			color.setIntensity(1.0);
+		}
+		notifyListeners(null);
+	}
 
 	public void addChangeListener(ChangeListener listener) {
 		listeners.add(listener);
