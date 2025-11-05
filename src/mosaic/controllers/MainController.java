@@ -164,6 +164,10 @@ public class MainController implements ModelHandler<BrickGraphicsState> {
 		fis.close();
 		
 		mosaicFile = file;
+		
+		// Resetear todas las intensidades de colores a 1.0 al abrir un archivo
+		colorController.resetAllColorIntensities();
+		
 		notifyListeners(model);
 	}
 	

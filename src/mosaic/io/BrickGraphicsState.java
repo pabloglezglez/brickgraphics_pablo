@@ -13,7 +13,7 @@ import mosaic.controllers.*;
 public enum BrickGraphicsState implements ModelState {
 	MainWindowPlacement(new Rectangle(0, 0, 860, 430)),
 	MainWindowDividerLocation(412),
-	ImageFileName("mosaic_sample_input.jpg"),
+	ImageFileName("lddmc.kvm"),
 	ImageFile(new DataFile()),
 
 	// How to display colors:
