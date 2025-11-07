@@ -83,7 +83,7 @@ public class LayerManager implements ModelHandler<BrickGraphicsState> {
     public void addLayer(Layer layer) {
         if (layer != null) {
             layers.add(layer);
-            System.out.println("DEBUG: LayerManager - Añadida capa: " + layer.getName());
+            io.Log.log("DEBUG: LayerManager - Añadida capa: " + layer.getName());
         }
     }
     
@@ -95,11 +95,11 @@ public class LayerManager implements ModelHandler<BrickGraphicsState> {
             if (selectedLayer == layer) {
                 selectedLayer = layers.isEmpty() ? null : layers.get(layers.size() - 1);
             }
-            System.out.println("DEBUG: LayerManager - Eliminada capa: " + layer.getName());
+            io.Log.log("DEBUG: LayerManager - Eliminada capa: " + layer.getName());
             
             // Si no quedan capas, notificar para restaurar imagen original
             if (layers.isEmpty() && onAllLayersRemovedCallback != null) {
-                System.out.println("DEBUG: LayerManager - No quedan capas, restaurando imagen original");
+                io.Log.log("DEBUG: LayerManager - No quedan capas, restaurando imagen original");
                 onAllLayersRemovedCallback.run();
             }
             
@@ -117,11 +117,11 @@ public class LayerManager implements ModelHandler<BrickGraphicsState> {
             if (selectedLayer == removedLayer) {
                 selectedLayer = layers.isEmpty() ? null : layers.get(Math.min(index, layers.size() - 1));
             }
-            System.out.println("DEBUG: LayerManager - Eliminada capa: " + removedLayer.getName());
+            io.Log.log("DEBUG: LayerManager - Eliminada capa: " + removedLayer.getName());
             
             // Si no quedan capas, notificar para restaurar imagen original
             if (layers.isEmpty() && onAllLayersRemovedCallback != null) {
-                System.out.println("DEBUG: LayerManager - No quedan capas, restaurando imagen original");
+                io.Log.log("DEBUG: LayerManager - No quedan capas, restaurando imagen original");
                 onAllLayersRemovedCallback.run();
             }
             
@@ -137,7 +137,7 @@ public class LayerManager implements ModelHandler<BrickGraphicsState> {
         int index = layers.indexOf(layer);
         if (index > 0) {
             Collections.swap(layers, index, index - 1);
-            System.out.println("DEBUG: LayerManager - Movida capa hacia arriba: " + layer.getName());
+            io.Log.log("DEBUG: LayerManager - Movida capa hacia arriba: " + layer.getName());
             return true;
         }
         return false;
@@ -150,7 +150,7 @@ public class LayerManager implements ModelHandler<BrickGraphicsState> {
         int index = layers.indexOf(layer);
         if (index >= 0 && index < layers.size() - 1) {
             Collections.swap(layers, index, index + 1);
-            System.out.println("DEBUG: LayerManager - Movida capa hacia abajo: " + layer.getName());
+            io.Log.log("DEBUG: LayerManager - Movida capa hacia abajo: " + layer.getName());
             return true;
         }
         return false;
@@ -165,7 +165,7 @@ public class LayerManager implements ModelHandler<BrickGraphicsState> {
             int index = layers.indexOf(layer);
             layers.add(index + 1, duplicate);
             setSelectedLayer(duplicate);
-            System.out.println("DEBUG: LayerManager - Duplicada capa: " + layer.getName());
+            io.Log.log("DEBUG: LayerManager - Duplicada capa: " + layer.getName());
             return duplicate;
         }
         return null;
@@ -260,7 +260,7 @@ public class LayerManager implements ModelHandler<BrickGraphicsState> {
     public void setSelectedLayer(Layer layer) {
         if (layers.contains(layer)) {
             this.selectedLayer = layer;
-            System.out.println("DEBUG: LayerManager - Seleccionada capa: " + 
+            io.Log.log("DEBUG: LayerManager - Seleccionada capa: " + 
                              (layer != null ? layer.getName() : "null"));
         }
     }
@@ -276,8 +276,8 @@ public class LayerManager implements ModelHandler<BrickGraphicsState> {
     }
     
     public void setLayersEnabled(boolean enabled) {
-        this.layersEnabled = enabled;
-        System.out.println("DEBUG: LayerManager - Capas " + (enabled ? "habilitadas" : "deshabilitadas"));
+    this.layersEnabled = enabled;
+    io.Log.log("DEBUG: LayerManager - Capas " + (enabled ? "habilitadas" : "deshabilitadas"));
     }
     
     public float getGlobalOpacity() {
@@ -300,9 +300,9 @@ public class LayerManager implements ModelHandler<BrickGraphicsState> {
      * Limpia todas las capas
      */
     public void clear() {
-        layers.clear();
-        selectedLayer = null;
-        System.out.println("DEBUG: LayerManager - Todas las capas eliminadas");
+    layers.clear();
+    selectedLayer = null;
+    io.Log.log("DEBUG: LayerManager - Todas las capas eliminadas");
     }
     
     /**
@@ -396,11 +396,11 @@ public class LayerManager implements ModelHandler<BrickGraphicsState> {
         // Aplicar los pixels transformados de vuelta a la imagen
         transformedImage.setRGB(0, 0, width, height, pixels, 0, width);
         
-        System.out.println("DEBUG: Transformaciones aplicadas a " + pixels.length + " píxeles");
+    io.Log.log("DEBUG: Transformaciones aplicadas a " + pixels.length + " píxeles");
         
         // TODO: Aplicar sharpness si es necesario (requiere convolución)
         if (sharpness != 1.0f) {
-            System.out.println("DEBUG: Nitidez no implementada completamente, valor: " + sharpness);
+            io.Log.log("DEBUG: Nitidez no implementada completamente, valor: " + sharpness);
         }
         
         return transformedImage;
@@ -423,9 +423,9 @@ public class LayerManager implements ModelHandler<BrickGraphicsState> {
                                                                  float sharpness) {
         if (baseImage == null) return null;
         
-        System.out.println("DEBUG: Aplicando transformaciones de fondo - Brillo: " + brightness + 
-                          ", Contraste: " + contrast + ", Saturación: " + saturation + 
-                          ", Gamma: " + gamma + ", Nitidez: " + sharpness);
+    io.Log.log("DEBUG: Aplicando transformaciones de fondo - Brillo: " + brightness + 
+              ", Contraste: " + contrast + ", Saturación: " + saturation + 
+              ", Gamma: " + gamma + ", Nitidez: " + sharpness);
         
         // Verificar si hay transformaciones que aplicar
         boolean hasTransformations = brightness != 1.0f || contrast != 1.0f || 
@@ -438,16 +438,16 @@ public class LayerManager implements ModelHandler<BrickGraphicsState> {
                                                           brightness, contrast, 
                                                           saturation, gamma, 
                                                           sharpness);
-            System.out.println("DEBUG: Transformaciones aplicadas a imagen de fondo");
+            io.Log.log("DEBUG: Transformaciones aplicadas a imagen de fondo");
         } else {
             // Si no hay transformaciones, usar imagen original
             transformedBase = baseImage;
-            System.out.println("DEBUG: No hay transformaciones, usando imagen original");
+            io.Log.log("DEBUG: No hay transformaciones, usando imagen original");
         }
         
         // Luego aplicar las capas sobre la imagen de fondo transformada
         BufferedImage result = applyLayersToImage(transformedBase);
-        System.out.println("DEBUG: Capas aplicadas sobre imagen transformada");
+    io.Log.log("DEBUG: Capas aplicadas sobre imagen transformada");
         return result;
     }
 
@@ -502,7 +502,7 @@ public class LayerManager implements ModelHandler<BrickGraphicsState> {
         
         // Si había capas y ahora no quedan, notificar para restaurar imagen original
         if (hadLayers && onAllLayersRemovedCallback != null) {
-            System.out.println("DEBUG: LayerManager - Todas las capas eliminadas, restaurando imagen original");
+            io.Log.log("DEBUG: LayerManager - Todas las capas eliminadas, restaurando imagen original");
             onAllLayersRemovedCallback.run();
         }
     }

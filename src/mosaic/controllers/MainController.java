@@ -90,7 +90,7 @@ public class MainController implements ModelHandler<BrickGraphicsState> {
 		printController = new PrintController(model, this, pipeline);
 		studEditController = new StudEditController(colorController); // Crear temprano sin BrickedView
 		mosaicZoomController = new MosaicZoomController(model);		
-		System.out.println("MosaicZoomController creado: " + (mosaicZoomController != null));
+		io.Log.log("MosaicZoomController creado: " + (mosaicZoomController != null));
 		Log.log("Created controllers after " + (System.currentTimeMillis()-startTime) + "ms.");
 
 		// Initialize layer system BEFORE creating UI
@@ -114,7 +114,7 @@ public class MainController implements ModelHandler<BrickGraphicsState> {
 		// Set up callback para cuando se eliminen todas las capas
 		layerManager.setOnAllLayersRemovedCallback(() -> {
 			// Restaurar la imagen original cuando no queden capas
-			System.out.println("DEBUG: MainController - Restaurando imagen original al eliminar todas las capas");
+			io.Log.log("DEBUG: MainController - Restaurando imagen original al eliminar todas las capas");
 			updateImageWithLayers(); // Esto aplicará las capas (vacías) sobre la imagen original
 		});
 		
@@ -214,14 +214,14 @@ public class MainController implements ModelHandler<BrickGraphicsState> {
 	 * Aplica las capas sobre la imagen original y actualiza el pipeline
 	 */
 	public void updateImageWithLayers() {
-		System.out.println("DEBUG: MainController - updateImageWithLayers() llamado");
+		io.Log.log("DEBUG: MainController - updateImageWithLayers() llamado");
 		if (originalImage == null || layerManager == null) {
-			System.out.println("DEBUG: MainController - Skipping, originalImage o layerManager es null");
+			io.Log.log("DEBUG: MainController - Skipping, originalImage o layerManager es null");
 			return; // Skip si no están inicializados aún
 		}
 		
 		// Aplicar transformaciones de imagen de fondo y capas sobre la imagen original
-		System.out.println("DEBUG: MainController - Aplicando capas a imagen original...");
+		io.Log.log("DEBUG: MainController - Aplicando capas a imagen original...");
 		BufferedImage imageWithLayers;
 		
 		// Verificar si hay transformaciones de imagen de fondo configuradas
@@ -232,7 +232,7 @@ public class MainController implements ModelHandler<BrickGraphicsState> {
 			float gamma = layerPanel.getBackgroundGamma();
 			float sharpness = layerPanel.getBackgroundSharpness();
 			
-			System.out.println("DEBUG: MainController - Llamando applyBackgroundTransformationsAndLayers con valores: " +
+			io.Log.log("DEBUG: MainController - Llamando applyBackgroundTransformationsAndLayers con valores: " +
 							  "brightness=" + brightness + ", contrast=" + contrast + ", saturation=" + saturation + 
 							  ", gamma=" + gamma + ", sharpness=" + sharpness);
 			
@@ -245,16 +245,16 @@ public class MainController implements ModelHandler<BrickGraphicsState> {
 			// Fallback al método original si no hay panel de transformaciones
 			imageWithLayers = layerManager.applyLayersToImage(originalImage);
 		}
-		System.out.println("DEBUG: MainController - Imagen con capas creada");
+		io.Log.log("DEBUG: MainController - Imagen con capas creada");
 		
 		// Establecer la imagen procesada en el pipeline
 		pipeline.setStartImage(imageWithLayers);
-		System.out.println("DEBUG: MainController - Pipeline actualizado con imagen+capas");
+		io.Log.log("DEBUG: MainController - Pipeline actualizado con imagen+capas");
 		
 		// Repintar la vista para mostrar los cambios
 		if (mw != null && mw.getBrickedView() != null) {
-			mw.getBrickedView().repaint();
-			System.out.println("DEBUG: MainController - BrickedView repintada");
+					mw.getBrickedView().repaint();
+					io.Log.log("DEBUG: MainController - BrickedView repintada");
 		}
 	}
 	
@@ -385,7 +385,7 @@ public class MainController implements ModelHandler<BrickGraphicsState> {
 			try {
 				BufferedImage originalImageFromFile = MosaicIO.removeAlpha(ImageIO.read(originalImageDataFile.fakeStream()));
 				originalImage = originalImageFromFile;
-				System.out.println("DEBUG: MainController - Imagen original restaurada desde KMV");
+				io.Log.log("DEBUG: MainController - Imagen original restaurada desde KMV");
 				updateImageWithLayers();
 			} catch (IOException e) {
 				Log.log("Error cargando imagen original: " + e.getMessage());
@@ -425,7 +425,7 @@ public class MainController implements ModelHandler<BrickGraphicsState> {
 			try {
 				DataFile originalImageDataFile = new DataFile(originalImage);
 				model.set(BrickGraphicsState.OriginalImageFile, originalImageDataFile);
-				System.out.println("DEBUG: MainController - Imagen original guardada en KMV");
+				io.Log.log("DEBUG: MainController - Imagen original guardada en KMV");
 			} catch (Exception e) {
 				Log.log("Error guardando imagen original: " + e.getMessage());
 				// En caso de error, no guardar imagen original
