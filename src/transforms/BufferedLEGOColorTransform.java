@@ -131,12 +131,12 @@ public abstract class BufferedLEGOColorTransform implements LEGOColorTransform, 
 		int cellH = (int) Math.round(scaleH);
 
 		if(lastIndex == -1 || sets[lastIndex] == null) {
-			System.out.println("DEBUG: drawLastInstructions() - No hay datos válidos (lastIndex=" + lastIndex + ")");
+			io.Log.log("DEBUG: drawLastInstructions() - No hay datos válidos (lastIndex=" + lastIndex + ")");
 			return new LEGOColor.CountingLEGOColor[]{};
 		}
 		
-		LEGOColorGrid transformedColors = sets[lastIndex].colors;
-		System.out.println("DEBUG: drawLastInstructions() - Usando grid para impresión: " + (transformedColors != null ? "válido" : "null"));
+	LEGOColorGrid transformedColors = sets[lastIndex].colors;
+	io.Log.log("DEBUG: drawLastInstructions() - Usando grid para impresión: " + (transformedColors != null ? "válido" : "null"));
 		// Reducir el tamaño de la fuente para ajustarse mejor a los círculos
 		Font font = LEGOColor.makeFont(g2, (int)((cellW - 4) * 0.7), (int)((cellH - 4) * 0.7), cc,
 				lastUsedColorCounts());

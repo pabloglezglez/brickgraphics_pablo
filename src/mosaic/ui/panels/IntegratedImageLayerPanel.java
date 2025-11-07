@@ -218,7 +218,7 @@ public class IntegratedImageLayerPanel extends JPanel {
         layerScrollPane.setBorder(BorderFactory.createLoweredBevelBorder());
         centerPanel.add(layerScrollPane, BorderLayout.CENTER);
         
-        System.out.println("DEBUG: setupLayout() - ScrollPane creado con tamaño: " + layerScrollPane.getPreferredSize());
+    io.Log.log("DEBUG: setupLayout() - ScrollPane creado con tamaño: " + layerScrollPane.getPreferredSize());
         
         // Panel de botones de capa
         JPanel layerButtonsPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 5, 5));
@@ -259,8 +259,8 @@ public class IntegratedImageLayerPanel extends JPanel {
             repaint();
             
             // Debug: imprimir dimensiones
-            System.out.println("TopPanel size: " + topPanel.getSize());
-            System.out.println("AddLayerButton size: " + addLayerButton.getSize());
+            io.Log.log("TopPanel size: " + topPanel.getSize());
+            io.Log.log("AddLayerButton size: " + addLayerButton.getSize());
         });
     }
     
@@ -345,7 +345,7 @@ public class IntegratedImageLayerPanel extends JPanel {
         resetBgButton.setPreferredSize(new Dimension(150, 22));
         slidersGrid.add(resetBgButton, gbc);
         
-        // Configurar listeners funcionales para imagen de fondo
+    // Configurar listeners funcionales para imagen de fondo
         setupBackgroundSliderListeners(bgBrightness, bgBrightnessLabel, 
                                      bgContrast, bgContrastLabel,
                                      bgSaturation, bgSaturationLabel,
@@ -428,12 +428,12 @@ public class IntegratedImageLayerPanel extends JPanel {
         // Brightness listener - modifica SOLO la imagen de fondo
         brightness.addChangeListener(e -> {
             if (updatingControls) return;
-            System.out.println("DEBUG: Listener - brightness.getValue() = " + brightness.getValue());
+            io.Log.log("DEBUG: Listener - brightness.getValue() = " + brightness.getValue());
             backgroundBrightness = brightness.getValue() / 100.0f;
-            System.out.println("DEBUG: Listener - backgroundBrightness ANTES = " + backgroundBrightness);
+            io.Log.log("DEBUG: Listener - backgroundBrightness ANTES = " + backgroundBrightness);
             brightnessLabel.setText(String.format("%.2f", backgroundBrightness));
-            System.out.println("DEBUG: Listener - backgroundBrightness DESPUÉS = " + backgroundBrightness);
-            System.out.println("DEBUG: Slider de fondo - Brillo cambiado a: " + backgroundBrightness);
+            io.Log.log("DEBUG: Listener - backgroundBrightness DESPUÉS = " + backgroundBrightness);
+            io.Log.log("DEBUG: Slider de fondo - Brillo cambiado a: " + backgroundBrightness);
             notifyLayersChanged(); // Aplicar transformación a imagen de fondo
         });
         
@@ -442,7 +442,7 @@ public class IntegratedImageLayerPanel extends JPanel {
             if (updatingControls) return;
             backgroundContrast = contrast.getValue() / 100.0f;
             contrastLabel.setText(String.format("%.2f", backgroundContrast));
-            System.out.println("DEBUG: Slider de fondo - Contraste cambiado a: " + backgroundContrast);
+            io.Log.log("DEBUG: Slider de fondo - Contraste cambiado a: " + backgroundContrast);
             notifyLayersChanged(); // Aplicar transformación a imagen de fondo
         });
         
@@ -451,7 +451,7 @@ public class IntegratedImageLayerPanel extends JPanel {
             if (updatingControls) return;
             backgroundSaturation = saturation.getValue() / 100.0f;
             saturationLabel.setText(String.format("%.2f", backgroundSaturation));
-            System.out.println("DEBUG: Slider de fondo - Saturación cambiada a: " + backgroundSaturation);
+            io.Log.log("DEBUG: Slider de fondo - Saturación cambiada a: " + backgroundSaturation);
             notifyLayersChanged(); // Aplicar transformación a imagen de fondo
         });
         
@@ -657,28 +657,28 @@ public class IntegratedImageLayerPanel extends JPanel {
      * Añade una nueva capa desde un archivo
      */
     private void addLayer() {
-        System.out.println("DEBUG: IntegratedImageLayerPanel - Iniciando addLayer()");
+    io.Log.log("DEBUG: IntegratedImageLayerPanel - Iniciando addLayer()");
         JFileChooser fileChooser = new JFileChooser();
         fileChooser.setFileFilter(new javax.swing.filechooser.FileNameExtensionFilter(
             "Imágenes (PNG, JPG, GIF)", "png", "jpg", "jpeg", "gif"));
         
         if (fileChooser.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
             File selectedFile = fileChooser.getSelectedFile();
-            System.out.println("DEBUG: IntegratedImageLayerPanel - Archivo seleccionado: " + selectedFile.getAbsolutePath());
+            io.Log.log("DEBUG: IntegratedImageLayerPanel - Archivo seleccionado: " + selectedFile.getAbsolutePath());
             try {
                 Layer layer = layerManager.addLayerFromFile(
                     selectedFile.getAbsolutePath(), 
                     new Point(0, 0)
                 );
-                System.out.println("DEBUG: IntegratedImageLayerPanel - Capa creada: " + layer.getName());
+                io.Log.log("DEBUG: IntegratedImageLayerPanel - Capa creada: " + layer.getName());
                 layerManager.setSelectedLayer(layer);
-                System.out.println("DEBUG: IntegratedImageLayerPanel - Capa seleccionada");
+                io.Log.log("DEBUG: IntegratedImageLayerPanel - Capa seleccionada");
                 updateUI();
-                System.out.println("DEBUG: IntegratedImageLayerPanel - UI actualizada");
+                io.Log.log("DEBUG: IntegratedImageLayerPanel - UI actualizada");
                 notifyLayersChanged();
-                System.out.println("DEBUG: IntegratedImageLayerPanel - Notificación enviada");
+                io.Log.log("DEBUG: IntegratedImageLayerPanel - Notificación enviada");
             } catch (IOException ex) {
-                System.out.println("DEBUG: IntegratedImageLayerPanel - Error: " + ex.getMessage());
+                io.Log.log("DEBUG: IntegratedImageLayerPanel - Error: " + ex.getMessage());
                 JOptionPane.showMessageDialog(this, 
                     "Error al cargar la imagen: " + ex.getMessage(), 
                     "Error", JOptionPane.ERROR_MESSAGE);
@@ -791,7 +791,7 @@ public class IntegratedImageLayerPanel extends JPanel {
             sharpnessLabel.setText(String.format("%.0f%%", sharpness * 100));
             scaleLabel.setText(String.format("%.0f%%", scale * 100));
             
-            System.out.println("DEBUG: Aplicando transformaciones - Brillo: " + brightness + 
+            io.Log.log("DEBUG: Aplicando transformaciones - Brillo: " + brightness + 
                              ", Contraste: " + contrast + ", Saturación: " + saturation + 
                              ", Gamma: " + gamma + ", Nitidez: " + sharpness + 
                              ", Escala: " + scale);
@@ -919,31 +919,31 @@ public class IntegratedImageLayerPanel extends JPanel {
      * Actualiza la lista de capas
      */
     private void updateLayerList() {
-        System.out.println("DEBUG: updateLayerList() - Iniciando actualización de lista");
+    io.Log.log("DEBUG: updateLayerList() - Iniciando actualización de lista");
         if (listModel == null) {
-            System.out.println("DEBUG: updateLayerList() - listModel es null");
+            io.Log.log("DEBUG: updateLayerList() - listModel es null");
             return;
         }
         
-        System.out.println("DEBUG: updateLayerList() - Limpiando lista existente");
+    io.Log.log("DEBUG: updateLayerList() - Limpiando lista existente");
         listModel.clear();
         
         List<Layer> layers = layerManager.getLayers();
-        System.out.println("DEBUG: updateLayerList() - Número de capas: " + layers.size());
+    io.Log.log("DEBUG: updateLayerList() - Número de capas: " + layers.size());
         
         for (Layer layer : layers) {
-            System.out.println("DEBUG: updateLayerList() - Añadiendo capa a lista: " + layer.getName());
+            io.Log.log("DEBUG: updateLayerList() - Añadiendo capa a lista: " + layer.getName());
             listModel.addElement(layer);
         }
         
         // Mantener selección
         Layer selected = layerManager.getSelectedLayer();
         if (selected != null) {
-            System.out.println("DEBUG: updateLayerList() - Seleccionando capa: " + selected.getName());
+            io.Log.log("DEBUG: updateLayerList() - Seleccionando capa: " + selected.getName());
             layerList.setSelectedValue(selected, true);
         }
         
-        System.out.println("DEBUG: updateLayerList() - Lista actualizada, tamaño del modelo: " + listModel.getSize());
+    io.Log.log("DEBUG: updateLayerList() - Lista actualizada, tamaño del modelo: " + listModel.getSize());
         
         // Forzar actualización visual del JList
         SwingUtilities.invokeLater(() -> {
@@ -955,7 +955,7 @@ public class IntegratedImageLayerPanel extends JPanel {
                 scrollPane.revalidate();
                 scrollPane.repaint();
             }
-            System.out.println("DEBUG: updateLayerList() - Forzada actualización visual del JList");
+                io.Log.log("DEBUG: updateLayerList() - Forzada actualización visual del JList");
         });
     }
     
@@ -964,11 +964,11 @@ public class IntegratedImageLayerPanel extends JPanel {
      */
     public void updateUI() {
         if (layerManager == null || enableLayersCheckBox == null) {
-            System.out.println("DEBUG: updateUI() - Componentes no inicializados");
+            io.Log.log("DEBUG: updateUI() - Componentes no inicializados");
             return; // Skip si no están inicializados
         }
         
-        System.out.println("DEBUG: updateUI() - Iniciando actualización completa");
+    io.Log.log("DEBUG: updateUI() - Iniciando actualización completa");
         updateLayerList();
         updateLayerControls();
         enableLayersCheckBox.setSelected(layerManager.isLayersEnabled());
@@ -976,11 +976,11 @@ public class IntegratedImageLayerPanel extends JPanel {
         // Actualizar información
         int layerCount = layerManager.getLayers().size();
         layerInfoLabel.setText("Capas: " + layerCount);
-        System.out.println("DEBUG: updateUI() - Actualización completa finalizada");
+    io.Log.log("DEBUG: updateUI() - Actualización completa finalizada");
         
         // Prueba manual: añadir una entrada de test al modelo
         if (listModel.getSize() == 0 && layerCount > 0) {
-            System.out.println("DEBUG: updateUI() - Hay capas pero la lista está vacía. Añadiendo entrada de prueba.");
+            io.Log.log("DEBUG: updateUI() - Hay capas pero la lista está vacía. Añadiendo entrada de prueba.");
             listModel.addElement(new TestLayer("Capa de Prueba"));
         }
     }
@@ -1000,11 +1000,11 @@ public class IntegratedImageLayerPanel extends JPanel {
     private void notifyLayersChanged() {
     // notifyLayersChanged called
         if (onLayersChangedCallback != null) {
-            System.out.println("DEBUG: IntegratedImageLayerPanel - Ejecutando callback");
+            io.Log.log("DEBUG: IntegratedImageLayerPanel - Ejecutando callback");
             onLayersChangedCallback.run();
-            System.out.println("DEBUG: IntegratedImageLayerPanel - Callback ejecutado");
+            io.Log.log("DEBUG: IntegratedImageLayerPanel - Callback ejecutado");
         } else {
-            System.out.println("DEBUG: IntegratedImageLayerPanel - WARNING: Callback es null!");
+            io.Log.log("DEBUG: IntegratedImageLayerPanel - WARNING: Callback es null!");
         }
     }
     
@@ -1012,27 +1012,27 @@ public class IntegratedImageLayerPanel extends JPanel {
      * Obtiene los valores actuales de transformación de imagen de fondo
      */
     public float getBackgroundBrightness() {
-        System.out.println("DEBUG: IntegratedImageLayerPanel - getBackgroundBrightness() devuelve: " + backgroundBrightness);
+        io.Log.log("DEBUG: IntegratedImageLayerPanel - getBackgroundBrightness() devuelve: " + backgroundBrightness);
         return backgroundBrightness;
     }
     
     public float getBackgroundContrast() {
-        System.out.println("DEBUG: IntegratedImageLayerPanel - getBackgroundContrast() devuelve: " + backgroundContrast);
+        io.Log.log("DEBUG: IntegratedImageLayerPanel - getBackgroundContrast() devuelve: " + backgroundContrast);
         return backgroundContrast;
     }
     
     public float getBackgroundSaturation() {
-        System.out.println("DEBUG: IntegratedImageLayerPanel - getBackgroundSaturation() devuelve: " + backgroundSaturation);
+        io.Log.log("DEBUG: IntegratedImageLayerPanel - getBackgroundSaturation() devuelve: " + backgroundSaturation);
         return backgroundSaturation;
     }
     
     public float getBackgroundGamma() {
-        System.out.println("DEBUG: IntegratedImageLayerPanel - getBackgroundGamma() devuelve: " + backgroundGamma);
+        io.Log.log("DEBUG: IntegratedImageLayerPanel - getBackgroundGamma() devuelve: " + backgroundGamma);
         return backgroundGamma;
     }
     
     public float getBackgroundSharpness() {
-        System.out.println("DEBUG: IntegratedImageLayerPanel - getBackgroundSharpness() devuelve: " + backgroundSharpness);
+        io.Log.log("DEBUG: IntegratedImageLayerPanel - getBackgroundSharpness() devuelve: " + backgroundSharpness);
         return backgroundSharpness;
     }
 

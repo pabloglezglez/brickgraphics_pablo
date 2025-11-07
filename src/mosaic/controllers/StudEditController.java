@@ -6,6 +6,7 @@ import mosaic.io.BrickGraphicsState;
 import mosaic.ui.BrickedView;
 import io.Model;
 import io.ModelHandler;
+import io.Log;
 import colors.LEGOColor;
 import colors.LEGOColorGrid;
 import java.util.ArrayList;
@@ -124,16 +125,16 @@ public class StudEditController implements ModelHandler<BrickGraphicsState> {
      */
     public boolean applyToolAt(LEGOColorGrid grid, int x, int y) {
         if (grid == null) {
-            System.out.println("ERROR: Grid es null en applyToolAt");
+            io.Log.log("ERROR: Grid es null en applyToolAt");
             return false;
         }
         
-        System.out.println("DEBUG: Aplicando herramienta " + activeTool + " con pincel " + brushSize + " en (" + x + "," + y + ")");
-        System.out.println("DEBUG: Grid dimensiones: " + grid.getWidth() + "x" + grid.getHeight());
+            Log.log("DEBUG: Aplicando herramienta " + activeTool + " con pincel " + brushSize + " en (" + x + "," + y + ")");
+            Log.log("DEBUG: Grid dimensiones: " + grid.getWidth() + "x" + grid.getHeight());
         
         // Verificar que las coordenadas estén dentro del rango válido
         if (x < 0 || x >= grid.getWidth() || y < 0 || y >= grid.getHeight()) {
-            System.out.println("ERROR: Coordenadas fuera de rango - Grid: " + grid.getWidth() + "x" + grid.getHeight() + ", Click: (" + x + "," + y + ")");
+            io.Log.log("ERROR: Coordenadas fuera de rango - Grid: " + grid.getWidth() + "x" + grid.getHeight() + ", Click: (" + x + "," + y + ")");
             return false;
         }
         
@@ -222,7 +223,8 @@ public class StudEditController implements ModelHandler<BrickGraphicsState> {
                     if (success) {
                         modificationManager.recordModification(targetX, targetY, selectedColor, currentColor);
                         anyChange = true;
-                        System.out.println("DEBUG: Pintado stud en (" + targetX + "," + targetY + ") con color " + selectedColor.getName());
+                        io.Log.log("DEBUG: Pintado stud en (" + targetX + "," + targetY + ") con color " + selectedColor.getName());
+                            Log.log("DEBUG: Pintado stud en (" + targetX + "," + targetY + ") con color " + selectedColor.getName());
                     }
                 }
             }
@@ -350,11 +352,11 @@ public class StudEditController implements ModelHandler<BrickGraphicsState> {
     
     @Override
     public void save(Model<BrickGraphicsState> model) {
-        System.out.println("DEBUG: StudEditController.save() - MÉTODO SAVE INVOCADO");
+    io.Log.log("DEBUG: StudEditController.save() - MÉTODO SAVE INVOCADO");
         
         // Guardar las modificaciones manuales en el modelo
         Map<String, Integer> modificationsForSave = modificationManager.getModificationsForSave();
-        System.out.println("DEBUG: StudEditController.save() - ModificationManager devuelve " + modificationsForSave.size() + " modificaciones");
+            Log.log("DEBUG: StudEditController.save() - ModificationManager devuelve " + modificationsForSave.size() + " modificaciones");
         
         // Serializar el mapa a String
         StringBuilder sb = new StringBuilder();
@@ -368,10 +370,10 @@ public class StudEditController implements ModelHandler<BrickGraphicsState> {
         }
         
         String serializedModifications = sb.toString();
-        System.out.println("DEBUG: StudEditController - Guardando " + modificationsForSave.size() + " modificaciones manuales como: " + serializedModifications);
+            Log.log("DEBUG: StudEditController - Guardando " + modificationsForSave.size() + " modificaciones manuales como: " + serializedModifications);
         
         model.set(BrickGraphicsState.ManualModifications, serializedModifications);
-        System.out.println("DEBUG: StudEditController - Guardadas " + modificationsForSave.size() + " modificaciones manuales");
+            Log.log("DEBUG: StudEditController - Guardadas " + modificationsForSave.size() + " modificaciones manuales");
     }
 
     @Override
@@ -393,7 +395,7 @@ public class StudEditController implements ModelHandler<BrickGraphicsState> {
                                 try {
                                     savedModifications.put(parts[0], Integer.parseInt(parts[1]));
                                 } catch (NumberFormatException e) {
-                                    System.out.println("WARNING: No se pudo convertir el valor '" + parts[1] + "' a Integer para la clave '" + parts[0] + "'");
+                                    io.Log.log("WARNING: No se pudo convertir el valor '" + parts[1] + "' a Integer para la clave '" + parts[0] + "'");
                                 }
                             }
                         }
@@ -411,8 +413,8 @@ public class StudEditController implements ModelHandler<BrickGraphicsState> {
                         } else if (value instanceof String) {
                             try {
                                 savedModifications.put(entry.getKey(), Integer.parseInt((String) value));
-                            } catch (NumberFormatException e) {
-                                System.out.println("WARNING: No se pudo convertir el valor '" + value + "' a Integer para la clave '" + entry.getKey() + "'");
+                                } catch (NumberFormatException e) {
+                                io.Log.log("WARNING: No se pudo convertir el valor '" + value + "' a Integer para la clave '" + entry.getKey() + "'");
                             }
                         }
                     }
@@ -420,24 +422,24 @@ public class StudEditController implements ModelHandler<BrickGraphicsState> {
                 
                 if (!savedModifications.isEmpty()) {
                     modificationManager.loadModificationsFromSave(savedModifications);
-                    System.out.println("DEBUG: StudEditController - Cargadas " + savedModifications.size() + " modificaciones manuales desde KMV");
+                        Log.log("DEBUG: StudEditController - Cargadas " + savedModifications.size() + " modificaciones manuales desde KMV");
                     
                     // Aplicar las modificaciones al grid actual inmediatamente después de cargar
                     if (brickedView != null) {
                         LEGOColorGrid currentGrid = brickedView.getColorGrid();
                         if (currentGrid != null) {
-                            System.out.println("DEBUG: StudEditController - Aplicando " + savedModifications.size() + " modificaciones al grid");
+                                Log.log("DEBUG: StudEditController - Aplicando " + savedModifications.size() + " modificaciones al grid");
                             modificationManager.restoreModifications(currentGrid);
-                            System.out.println("DEBUG: StudEditController - COMPLETADO: Aplicadas modificaciones al grid después de cargar desde KMV");
+                                Log.log("DEBUG: StudEditController - COMPLETADO: Aplicadas modificaciones al grid después de cargar desde KMV");
                         } else {
-                            System.out.println("DEBUG: StudEditController - Grid no disponible, las modificaciones se aplicarán cuando esté listo");
+                                Log.log("DEBUG: StudEditController - Grid no disponible, las modificaciones se aplicarán cuando esté listo");
                         }
                     } else {
-                        System.out.println("DEBUG: StudEditController - BrickedView no disponible, las modificaciones se aplicarán cuando esté listo");
+                            Log.log("DEBUG: StudEditController - BrickedView no disponible, las modificaciones se aplicarán cuando esté listo");
                     }
                 }
             } catch (Exception e) {
-                System.out.println("ERROR: StudEditController - Error al cargar modificaciones: " + e.getMessage());
+                    Log.log("ERROR: StudEditController - Error al cargar modificaciones: " + e.getMessage());
                 e.printStackTrace();
             }
         }

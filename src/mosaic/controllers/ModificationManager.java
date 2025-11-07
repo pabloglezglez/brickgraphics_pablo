@@ -39,11 +39,11 @@ public class ModificationManager {
         if (originalColor != null && originalColor.equals(newColor)) {
             // Si volvemos al color original, eliminamos la modificación
             modifications.remove(key);
-            System.out.println("DEBUG: ModificationManager - Removida modificación en (" + x + "," + y + ")");
+            io.Log.log("DEBUG: ModificationManager - Removida modificación en (" + x + "," + y + ")");
         } else {
             // Registramos la nueva modificación
             modifications.put(key, newColor);
-            System.out.println("DEBUG: ModificationManager - Registrada modificación en (" + x + "," + y + ") -> " + newColor.toString());
+            io.Log.log("DEBUG: ModificationManager - Registrada modificación en (" + x + "," + y + ") -> " + newColor.toString());
         }
     }
     
@@ -53,7 +53,7 @@ public class ModificationManager {
     public void backupGrid(LEGOColorGrid grid) {
         if (grid != null && !modifications.isEmpty()) {
             originalGrid = grid;
-            System.out.println("DEBUG: ModificationManager - Backup realizado. Modificaciones: " + modifications.size());
+            io.Log.log("DEBUG: ModificationManager - Backup realizado. Modificaciones: " + modifications.size());
         }
     }
     
@@ -79,7 +79,7 @@ public class ModificationManager {
             }
         }
         
-        System.out.println("DEBUG: ModificationManager - Restauradas " + restored + " de " + modifications.size() + " modificaciones");
+    io.Log.log("DEBUG: ModificationManager - Restauradas " + restored + " de " + modifications.size() + " modificaciones");
     }
     
     /**
@@ -100,9 +100,9 @@ public class ModificationManager {
      * Limpia todas las modificaciones registradas.
      */
     public void clearModifications() {
-        modifications.clear();
-        originalGrid = null;
-        System.out.println("DEBUG: ModificationManager - Todas las modificaciones limpiadas");
+    modifications.clear();
+    originalGrid = null;
+    io.Log.log("DEBUG: ModificationManager - Todas las modificaciones limpiadas");
     }
     
     /**
@@ -126,17 +126,17 @@ public class ModificationManager {
                 try {
                     Integer colorID = Integer.valueOf(colorIDStr);
                     saveMap.put(coordinates, colorID);
-                    System.out.println("DEBUG: ModificationManager - Agregando al mapa: " + coordinates + " -> " + colorID);
+                    io.Log.log("DEBUG: ModificationManager - Agregando al mapa: " + coordinates + " -> " + colorID);
                 } catch (NumberFormatException e) {
-                    System.out.println("ERROR: ModificationManager - No se puede convertir '" + colorIDStr + "' a Integer para coordenada " + coordinates);
+                    io.Log.log("ERROR: ModificationManager - No se puede convertir '" + colorIDStr + "' a Integer para coordenada " + coordinates);
                     continue;
                 }
             } else {
-                System.out.println("WARNING: ModificationManager - Entrada inválida: coordinates=" + coordinates + ", color=" + color);
+                io.Log.log("WARNING: ModificationManager - Entrada inválida: coordinates=" + coordinates + ", color=" + color);
             }
         }
         
-        System.out.println("DEBUG: ModificationManager - Retornando " + saveMap.size() + " modificaciones válidas para guardado");
+    io.Log.log("DEBUG: ModificationManager - Retornando " + saveMap.size() + " modificaciones válidas para guardado");
         return saveMap;
     }
     
@@ -161,15 +161,15 @@ public class ModificationManager {
             try {
                 if (colorIDValue instanceof String) {
                     colorID = Integer.parseInt((String) colorIDValue);
-                    System.out.println("DEBUG: ModificationManager - Convertido String a Integer: " + colorIDValue + " -> " + colorID);
+                    io.Log.log("DEBUG: ModificationManager - Convertido String a Integer: " + colorIDValue + " -> " + colorID);
                 } else if (colorIDValue instanceof Integer) {
                     colorID = ((Integer) colorIDValue).intValue();
                 } else {
-                    System.out.println("ERROR: ModificationManager - Tipo de dato inesperado para colorID: " + colorIDValue.getClass() + " valor: " + colorIDValue);
+                    io.Log.log("ERROR: ModificationManager - Tipo de dato inesperado para colorID: " + colorIDValue.getClass() + " valor: " + colorIDValue);
                     continue;
                 }
             } catch (Exception e) {
-                System.out.println("ERROR: ModificationManager - No se puede convertir a Integer: " + colorIDValue + " error: " + e.getMessage());
+                io.Log.log("ERROR: ModificationManager - No se puede convertir a Integer: " + colorIDValue + " error: " + e.getMessage());
                 continue;
             }
             
@@ -184,9 +184,9 @@ public class ModificationManager {
             
             if (foundColor != null) {
                 modifications.put(coordinates, foundColor);
-                System.out.println("DEBUG: ModificationManager - Cargada modificación en " + coordinates + " -> " + foundColor.toString());
+                io.Log.log("DEBUG: ModificationManager - Cargada modificación en " + coordinates + " -> " + foundColor.toString());
             } else {
-                System.out.println("WARNING: ModificationManager - Color con ID " + colorID + " no encontrado");
+                io.Log.log("WARNING: ModificationManager - Color con ID " + colorID + " no encontrado");
             }
         }
     }

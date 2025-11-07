@@ -358,7 +358,7 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 				return LEGOColor.WHITE;
 			}
 			
-			System.out.println("DEBUG SNOT: getColorAt(" + x + "," + y + ") -> Grid " + 
+			io.Log.log("DEBUG SNOT: getColorAt(" + x + "," + y + ") -> Grid " + 
 							   (pos.isNormal ? "normal" : "sideways") + " en (" + pos.gridX + "," + pos.gridY + ")");
 			
 			return targetGrid.getColorAt(pos.gridX, pos.gridY);
@@ -382,7 +382,7 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 				return false;
 			}
 			
-			System.out.println("DEBUG SNOT: setColorAt(" + x + "," + y + ", " + color.getName() + ") -> Grid " + 
+			io.Log.log("DEBUG SNOT: setColorAt(" + x + "," + y + ", " + color.getName() + ") -> Grid " + 
 							   (pos.isNormal ? "normal" : "sideways") + " en (" + pos.gridX + "," + pos.gridY + ")");
 			
 			boolean success = targetGrid.setColorAt(pos.gridX, pos.gridY, color);
@@ -452,7 +452,7 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 	private void updateSnotVisualization() {
 		// Para SNOT, simplemente forzar una actualización visual
 		// El grid editable ya contiene los cambios, solo necesitamos actualizar la vista
-		System.out.println("DEBUG: Actualizando visualización SNOT");
+	Log.log("DEBUG: Actualizando visualización SNOT");
 		
 		// Notificar que hay cambios pendientes de visualizar
 		MosaicCanvas canvas = getMosaicCanvas();
