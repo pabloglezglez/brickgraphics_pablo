@@ -95,7 +95,9 @@ public class MainController implements ModelHandler<BrickGraphicsState> {
 
 		// Initialize layer system BEFORE creating UI
 		layerManager = new LayerManager();
-		layerPanel = new IntegratedImageLayerPanel(layerManager, null, model);
+		// Note: the IntegratedImageLayerPanel is created by the MainWindow UI
+		// and passed to this controller via setLayerPanel(...) to avoid having
+		// two separate instances (one in the UI and one here).
 		
 		// Set up UI:
 		mw = new MainWindow(this, model, pipeline, renderingProgressBar);
@@ -104,11 +106,10 @@ public class MainController implements ModelHandler<BrickGraphicsState> {
 		// Initialize recent files manager
 		recentFilesManager = new RecentFilesManager(this, mw);
 		
-		// Set up layer panel callback after MainWindow is created
-		layerPanel.setOnLayersChangedCallback(() -> {
-			// Cuando cambien las capas, re-aplicar sobre la imagen original
-			updateImageWithLayers();
-		});
+		// The MainWindow creates the IntegratedImageLayerPanel and registers
+		// the callback that calls updateImageWithLayers(). The controller's
+		// setLayerPanel(...) will be used by MainWindow to provide the
+		// shared instance.
 		
 		// Set up callback para cuando se eliminen todas las capas
 		layerManager.setOnAllLayersRemovedCallback(() -> {

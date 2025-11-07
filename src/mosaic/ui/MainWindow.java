@@ -127,6 +127,7 @@ public class MainWindow extends JFrame implements ChangeListener, ModelHandler<B
 			// para evitar tener dos paneles distintos (uno en el controlador y otro en la UI)
 			if (mc != null) {
 				mc.setLayerPanel(integratedPanel);
+
 			}
 			
 			leftPanel.add(integratedPanel, BorderLayout.CENTER);
