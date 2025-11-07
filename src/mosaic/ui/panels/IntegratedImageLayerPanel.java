@@ -50,11 +50,12 @@ public class IntegratedImageLayerPanel extends JPanel {
     private JSlider saturationSlider;
     
     // Variables para transformaciones de imagen de fondo independientes
-    private float backgroundBrightness = 1.0f;
-    private float backgroundContrast = 1.0f;
-    private float backgroundSaturation = 1.0f;
-    private float backgroundGamma = 1.0f;
-    private float backgroundSharpness = 1.0f;
+    // Se marcan como volatile para asegurar visibilidad entre hilos (EDT vs pipeline)
+    private volatile float backgroundBrightness = 1.0f;
+    private volatile float backgroundContrast = 1.0f;
+    private volatile float backgroundSaturation = 1.0f;
+    private volatile float backgroundGamma = 1.0f;
+    private volatile float backgroundSharpness = 1.0f;
     private JSlider gammaSlider;
     private JSlider sharpnessSlider;
     private JSlider scaleSlider;
@@ -89,6 +90,7 @@ public class IntegratedImageLayerPanel extends JPanel {
         setupLayout();
         setupEventHandlers();
         updateUI();
+    // construction complete
     }
     
     /**
@@ -996,7 +998,7 @@ public class IntegratedImageLayerPanel extends JPanel {
      * Notifica que las capas han cambiado
      */
     private void notifyLayersChanged() {
-        System.out.println("DEBUG: IntegratedImageLayerPanel - notifyLayersChanged() llamado");
+    // notifyLayersChanged called
         if (onLayersChangedCallback != null) {
             System.out.println("DEBUG: IntegratedImageLayerPanel - Ejecutando callback");
             onLayersChangedCallback.run();
