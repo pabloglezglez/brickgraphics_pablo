@@ -39216,3 +39216,239 @@ Could not open image file 'icons/16x16/mosaic.png'. Creating backup image.
 Could not open image file 'icons/16x16/mosaic.png'. Creating backup image.
 Could not open image file 'icons/16x16/mosaic.png'. Creating backup image.
 Could not open image file 'icons/16x16/mosaic.png'. Creating backup image.
+Initiating components
+Model file loaded
+Created controllers after 166ms.
+Created left view after 618ms.
+Created right view after 647ms.
+State value OriginalImageFile was not saved!
+java.lang.IllegalStateException: State value OriginalImageFile was not saved!
+	at io.Model.runModelsavers(Model.java:117)
+	at io.Model.saveToFile(Model.java:128)
+	at io.Model.saveToFile(Model.java:124)
+	at mosaic.ui.MainWindow$1.windowClosing(MainWindow.java:57)
+	at java.desktop/java.awt.AWTEventMulticaster.windowClosing(AWTEventMulticaster.java:359)
+	at java.desktop/java.awt.Window.processWindowEvent(Window.java:1995)
+	at java.desktop/javax.swing.JFrame.processWindowEvent(JFrame.java:298)
+	at java.desktop/java.awt.Window.processEvent(Window.java:1954)
+	at java.desktop/java.awt.Component.dispatchEventImpl(Component.java:4958)
+	at java.desktop/java.awt.Container.dispatchEventImpl(Container.java:2318)
+	at java.desktop/java.awt.Window.dispatchEventImpl(Window.java:2671)
+	at java.desktop/java.awt.Component.dispatchEvent(Component.java:4790)
+	at java.desktop/java.awt.EventQueue.dispatchEventImpl(EventQueue.java:725)
+	at java.desktop/java.awt.EventQueue.dispatchEvent(EventQueue.java:702)
+	at java.desktop/java.awt.EventDispatchThread.pumpOneEventForFilters(EventDispatchThread.java:203)
+	at java.desktop/java.awt.EventDispatchThread.pumpEventsForFilter(EventDispatchThread.java:124)
+	at java.desktop/java.awt.EventDispatchThread.pumpEventsForHierarchy(EventDispatchThread.java:113)
+	at java.desktop/java.awt.EventDispatchThread.pumpEvents(EventDispatchThread.java:109)
+	at java.desktop/java.awt.EventDispatchThread.pumpEvents(EventDispatchThread.java:101)
+	at java.desktop/java.awt.EventDispatchThread.run(EventDispatchThread.java:90)
+State value LayerData was not saved!
+java.lang.IllegalStateException: State value LayerData was not saved!
+	at io.Model.runModelsavers(Model.java:117)
+	at io.Model.saveToFile(Model.java:128)
+	at io.Model.saveToFile(Model.java:124)
+	at mosaic.ui.MainWindow$1.windowClosing(MainWindow.java:57)
+	at java.desktop/java.awt.AWTEventMulticaster.windowClosing(AWTEventMulticaster.java:359)
+	at java.desktop/java.awt.Window.processWindowEvent(Window.java:1995)
+	at java.desktop/javax.swing.JFrame.processWindowEvent(JFrame.java:298)
+	at java.desktop/java.awt.Window.processEvent(Window.java:1954)
+	at java.desktop/java.awt.Component.dispatchEventImpl(Component.java:4958)
+	at java.desktop/java.awt.Container.dispatchEventImpl(Container.java:2318)
+	at java.desktop/java.awt.Window.dispatchEventImpl(Window.java:2671)
+	at java.desktop/java.awt.Component.dispatchEvent(Component.java:4790)
+	at java.desktop/java.awt.EventQueue.dispatchEventImpl(EventQueue.java:725)
+	at java.desktop/java.awt.EventQueue.dispatchEvent(EventQueue.java:702)
+	at java.desktop/java.awt.EventDispatchThread.pumpOneEventForFilters(EventDispatchThread.java:203)
+	at java.desktop/java.awt.EventDispatchThread.pumpEventsForFilter(EventDispatchThread.java:124)
+	at java.desktop/java.awt.EventDispatchThread.pumpEventsForHierarchy(EventDispatchThread.java:113)
+	at java.desktop/java.awt.EventDispatchThread.pumpEvents(EventDispatchThread.java:109)
+	at java.desktop/java.awt.EventDispatchThread.pumpEvents(EventDispatchThread.java:101)
+	at java.desktop/java.awt.EventDispatchThread.run(EventDispatchThread.java:90)
+State value ImageFile was not saved!
+java.lang.IllegalStateException: State value ImageFile was not saved!
+	at io.Model.runModelsavers(Model.java:117)
+	at io.Model.saveToFile(Model.java:128)
+	at io.Model.saveToFile(Model.java:124)
+	at mosaic.ui.MainWindow$1.windowClosing(MainWindow.java:57)
+	at java.desktop/java.awt.AWTEventMulticaster.windowClosing(AWTEventMulticaster.java:359)
+	at java.desktop/java.awt.Window.processWindowEvent(Window.java:1995)
+	at java.desktop/javax.swing.JFrame.processWindowEvent(JFrame.java:298)
+	at java.desktop/java.awt.Window.processEvent(Window.java:1954)
+	at java.desktop/java.awt.Component.dispatchEventImpl(Component.java:4958)
+	at java.desktop/java.awt.Container.dispatchEventImpl(Container.java:2318)
+	at java.desktop/java.awt.Window.dispatchEventImpl(Window.java:2671)
+	at java.desktop/java.awt.Component.dispatchEvent(Component.java:4790)
+	at java.desktop/java.awt.EventQueue.dispatchEventImpl(EventQueue.java:725)
+	at java.desktop/java.awt.EventQueue.dispatchEvent(EventQueue.java:702)
+	at java.desktop/java.awt.EventDispatchThread.pumpOneEventForFilters(EventDispatchThread.java:203)
+	at java.desktop/java.awt.EventDispatchThread.pumpEventsForFilter(EventDispatchThread.java:124)
+	at java.desktop/java.awt.EventDispatchThread.pumpEventsForHierarchy(EventDispatchThread.java:113)
+	at java.desktop/java.awt.EventDispatchThread.pumpEvents(EventDispatchThread.java:109)
+	at java.desktop/java.awt.EventDispatchThread.pumpEvents(EventDispatchThread.java:101)
+	at java.desktop/java.awt.EventDispatchThread.run(EventDispatchThread.java:90)
+State value ImageFileName was not saved!
+java.lang.IllegalStateException: State value ImageFileName was not saved!
+	at io.Model.runModelsavers(Model.java:117)
+	at io.Model.saveToFile(Model.java:128)
+	at io.Model.saveToFile(Model.java:124)
+	at mosaic.ui.MainWindow$1.windowClosing(MainWindow.java:57)
+	at java.desktop/java.awt.AWTEventMulticaster.windowClosing(AWTEventMulticaster.java:359)
+	at java.desktop/java.awt.Window.processWindowEvent(Window.java:1995)
+	at java.desktop/javax.swing.JFrame.processWindowEvent(JFrame.java:298)
+	at java.desktop/java.awt.Window.processEvent(Window.java:1954)
+	at java.desktop/java.awt.Component.dispatchEventImpl(Component.java:4958)
+	at java.desktop/java.awt.Container.dispatchEventImpl(Container.java:2318)
+	at java.desktop/java.awt.Window.dispatchEventImpl(Window.java:2671)
+	at java.desktop/java.awt.Component.dispatchEvent(Component.java:4790)
+	at java.desktop/java.awt.EventQueue.dispatchEventImpl(EventQueue.java:725)
+	at java.desktop/java.awt.EventQueue.dispatchEvent(EventQueue.java:702)
+	at java.desktop/java.awt.EventDispatchThread.pumpOneEventForFilters(EventDispatchThread.java:203)
+	at java.desktop/java.awt.EventDispatchThread.pumpEventsForFilter(EventDispatchThread.java:124)
+	at java.desktop/java.awt.EventDispatchThread.pumpEventsForHierarchy(EventDispatchThread.java:113)
+	at java.desktop/java.awt.EventDispatchThread.pumpEvents(EventDispatchThread.java:109)
+	at java.desktop/java.awt.EventDispatchThread.pumpEvents(EventDispatchThread.java:101)
+	at java.desktop/java.awt.EventDispatchThread.run(EventDispatchThread.java:90)
+State value ManualModifications was not saved!
+java.lang.IllegalStateException: State value ManualModifications was not saved!
+	at io.Model.runModelsavers(Model.java:117)
+	at io.Model.saveToFile(Model.java:128)
+	at io.Model.saveToFile(Model.java:124)
+	at mosaic.ui.MainWindow$1.windowClosing(MainWindow.java:57)
+	at java.desktop/java.awt.AWTEventMulticaster.windowClosing(AWTEventMulticaster.java:359)
+	at java.desktop/java.awt.Window.processWindowEvent(Window.java:1995)
+	at java.desktop/javax.swing.JFrame.processWindowEvent(JFrame.java:298)
+	at java.desktop/java.awt.Window.processEvent(Window.java:1954)
+	at java.desktop/java.awt.Component.dispatchEventImpl(Component.java:4958)
+	at java.desktop/java.awt.Container.dispatchEventImpl(Container.java:2318)
+	at java.desktop/java.awt.Window.dispatchEventImpl(Window.java:2671)
+	at java.desktop/java.awt.Component.dispatchEvent(Component.java:4790)
+	at java.desktop/java.awt.EventQueue.dispatchEventImpl(EventQueue.java:725)
+	at java.desktop/java.awt.EventQueue.dispatchEvent(EventQueue.java:702)
+	at java.desktop/java.awt.EventDispatchThread.pumpOneEventForFilters(EventDispatchThread.java:203)
+	at java.desktop/java.awt.EventDispatchThread.pumpEventsForFilter(EventDispatchThread.java:124)
+	at java.desktop/java.awt.EventDispatchThread.pumpEventsForHierarchy(EventDispatchThread.java:113)
+	at java.desktop/java.awt.EventDispatchThread.pumpEvents(EventDispatchThread.java:109)
+	at java.desktop/java.awt.EventDispatchThread.pumpEvents(EventDispatchThread.java:101)
+	at java.desktop/java.awt.EventDispatchThread.run(EventDispatchThread.java:90)
+State value LayersEnabled was not saved!
+java.lang.IllegalStateException: State value LayersEnabled was not saved!
+	at io.Model.runModelsavers(Model.java:117)
+	at io.Model.saveToFile(Model.java:128)
+	at io.Model.saveToFile(Model.java:124)
+	at mosaic.ui.MainWindow$1.windowClosing(MainWindow.java:57)
+	at java.desktop/java.awt.AWTEventMulticaster.windowClosing(AWTEventMulticaster.java:359)
+	at java.desktop/java.awt.Window.processWindowEvent(Window.java:1995)
+	at java.desktop/javax.swing.JFrame.processWindowEvent(JFrame.java:298)
+	at java.desktop/java.awt.Window.processEvent(Window.java:1954)
+	at java.desktop/java.awt.Component.dispatchEventImpl(Component.java:4958)
+	at java.desktop/java.awt.Container.dispatchEventImpl(Container.java:2318)
+	at java.desktop/java.awt.Window.dispatchEventImpl(Window.java:2671)
+	at java.desktop/java.awt.Component.dispatchEvent(Component.java:4790)
+	at java.desktop/java.awt.EventQueue.dispatchEventImpl(EventQueue.java:725)
+	at java.desktop/java.awt.EventQueue.dispatchEvent(EventQueue.java:702)
+	at java.desktop/java.awt.EventDispatchThread.pumpOneEventForFilters(EventDispatchThread.java:203)
+	at java.desktop/java.awt.EventDispatchThread.pumpEventsForFilter(EventDispatchThread.java:124)
+	at java.desktop/java.awt.EventDispatchThread.pumpEventsForHierarchy(EventDispatchThread.java:113)
+	at java.desktop/java.awt.EventDispatchThread.pumpEvents(EventDispatchThread.java:109)
+	at java.desktop/java.awt.EventDispatchThread.pumpEvents(EventDispatchThread.java:101)
+	at java.desktop/java.awt.EventDispatchThread.run(EventDispatchThread.java:90)
+Initiating components
+Model file loaded
+Created controllers after 168ms.
+Created left view after 638ms.
+Created right view after 670ms.
+LDDMC main window operational after 715ms.
+LDDMC main window operational after 904ms.
+MainController initiated.
+Could not open image file 'icons/16x16/document-open-recent.png'. Creating backup image.
+Could not open image file 'icons/16x16/mosaic.png'. Creating backup image.
+Could not open image file 'icons/16x16/mosaic.png'. Creating backup image.
+Could not open image file 'icons/16x16/mosaic.png'. Creating backup image.
+Could not open image file 'icons/16x16/mosaic.png'. Creating backup image.
+Could not open image file 'icons/16x16/mosaic.png'. Creating backup image.
+Initiating components
+Model file loaded
+Created controllers after 173ms.
+Created left view after 106ms.
+Created right view after 115ms.
+LDDMC main window operational after 136ms.
+LDDMC main window operational after 900ms.
+MainController initiated.
+Could not open image file 'icons/16x16/document-open-recent.png'. Creating backup image.
+Could not open image file 'icons/16x16/mosaic.png'. Creating backup image.
+Could not open image file 'icons/16x16/mosaic.png'. Creating backup image.
+Could not open image file 'icons/16x16/mosaic.png'. Creating backup image.
+Could not open image file 'icons/16x16/mosaic.png'. Creating backup image.
+Could not open image file 'icons/16x16/mosaic.png'. Creating backup image.
+Initiating components
+Model file loaded
+Created controllers after 170ms.
+Created left view after 96ms.
+Created right view after 105ms.
+LDDMC main window operational after 127ms.
+LDDMC main window operational after 888ms.
+MainController initiated.
+Could not open image file 'icons/16x16/document-open-recent.png'. Creating backup image.
+Could not open image file 'icons/16x16/mosaic.png'. Creating backup image.
+Could not open image file 'icons/16x16/mosaic.png'. Creating backup image.
+Could not open image file 'icons/16x16/mosaic.png'. Creating backup image.
+Could not open image file 'icons/16x16/mosaic.png'. Creating backup image.
+Could not open image file 'icons/16x16/mosaic.png'. Creating backup image.
+Initiating components
+Model file loaded
+Created controllers after 174ms.
+Created left view after 80ms.
+Created right view after 89ms.
+LDDMC main window operational after 109ms.
+LDDMC main window operational after 880ms.
+MainController initiated.
+Could not open image file 'icons/16x16/document-open-recent.png'. Creating backup image.
+Could not open image file 'icons/16x16/mosaic.png'. Creating backup image.
+Could not open image file 'icons/16x16/mosaic.png'. Creating backup image.
+Could not open image file 'icons/16x16/mosaic.png'. Creating backup image.
+Could not open image file 'icons/16x16/mosaic.png'. Creating backup image.
+Could not open image file 'icons/16x16/mosaic.png'. Creating backup image.
+Initiating components
+Model file loaded
+Created controllers after 170ms.
+Created left view after 69ms.
+Created right view after 77ms.
+LDDMC main window operational after 97ms.
+LDDMC main window operational after 891ms.
+MainController initiated.
+Could not open image file 'icons/16x16/document-open-recent.png'. Creating backup image.
+Could not open image file 'icons/16x16/mosaic.png'. Creating backup image.
+Could not open image file 'icons/16x16/mosaic.png'. Creating backup image.
+Could not open image file 'icons/16x16/mosaic.png'. Creating backup image.
+Could not open image file 'icons/16x16/mosaic.png'. Creating backup image.
+Could not open image file 'icons/16x16/mosaic.png'. Creating backup image.
+Could not open image file 'icons/16x16/mosaic.png'. Creating backup image.
+Could not open image file 'icons/16x16/mosaic.png'. Creating backup image.
+Could not open image file 'icons/16x16/mosaic.png'. Creating backup image.
+Could not open image file 'icons/16x16/mosaic.png'. Creating backup image.
+Could not open image file 'icons/16x16/mosaic.png'. Creating backup image.
+Could not open image file 'icons/16x16/mosaic.png'. Creating backup image.
+Could not open image file 'icons/16x16/mosaic.png'. Creating backup image.
+Could not open image file 'icons/16x16/mosaic.png'. Creating backup image.
+Could not open image file 'icons/16x16/mosaic.png'. Creating backup image.
+Could not open image file 'icons/16x16/mosaic.png'. Creating backup image.
+Could not open image file 'icons/16x16/mosaic.png'. Creating backup image.
+Could not open image file 'icons/16x16/mosaic.png'. Creating backup image.
+Could not open image file 'icons/16x16/mosaic.png'. Creating backup image.
+Could not open image file 'icons/16x16/mosaic.png'. Creating backup image.
+Could not open image file 'icons/16x16/mosaic.png'. Creating backup image.
+Initiating components
+Model file loaded
+Created controllers after 168ms.
+Created left view after 113ms.
+Created right view after 123ms.
+LDDMC main window operational after 142ms.
+LDDMC main window operational after 1043ms.
+MainController initiated.
+Could not open image file 'icons/16x16/document-open-recent.png'. Creating backup image.
+Could not open image file 'icons/16x16/mosaic.png'. Creating backup image.
+Could not open image file 'icons/16x16/mosaic.png'. Creating backup image.
+Could not open image file 'icons/16x16/mosaic.png'. Creating backup image.
+Could not open image file 'icons/16x16/mosaic.png'. Creating backup image.
+Could not open image file 'icons/16x16/mosaic.png'. Creating backup image.

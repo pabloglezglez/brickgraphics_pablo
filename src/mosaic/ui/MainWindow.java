@@ -122,6 +122,12 @@ public class MainWindow extends JFrame implements ChangeListener, ModelHandler<B
 					brickedView.repaint();
 				}
 			});
+
+			// Asegurar que MainController use la misma instancia del panel integrado
+			// para evitar tener dos paneles distintos (uno en el controlador y otro en la UI)
+			if (mc != null) {
+				mc.setLayerPanel(integratedPanel);
+			}
 			
 			leftPanel.add(integratedPanel, BorderLayout.CENTER);
 			leftPanel.setPreferredSize(new Dimension(300, 600));
