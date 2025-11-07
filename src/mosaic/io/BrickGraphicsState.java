@@ -87,6 +87,11 @@ public enum BrickGraphicsState implements ModelState {
 	// Manual modifications (serialized as String):
 	ManualModifications(""),
 	
+	// Layer system:
+	LayersEnabled(false),
+	LayerData(""),
+	OriginalImageFile(new DataFile()), // Imagen original sin capas aplicadas
+	
 	// Export:
 	ExportOptimize(true);
 		

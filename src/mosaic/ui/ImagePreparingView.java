@@ -90,6 +90,11 @@ public class ImagePreparingView extends JComponent implements ModelHandler<Brick
 	}
 	
 	private void updateWidthToHeight() {
+		// Verificar que inImage no sea null para evitar excepciones
+		if (inImage == null) {
+			return;
+		}
+		
 		if(cropper.isEnabled()) {
 			float cropperWidthToHeight = cropper.getWidthToHeight();
 			float w2h = cropperWidthToHeight * inImage.getWidth() / inImage.getHeight();
