@@ -18,6 +18,7 @@ import mosaic.io.MosaicIO;
 import mosaic.rendering.Pipeline;
 import mosaic.rendering.RenderingProgressBar;
 import mosaic.ui.dialogs.ColorChooserDialog;
+import mosaic.ui.panels.IntegratedImageLayerPanel;
 import mosaic.ui.dialogs.ColorSettingsDialog;
 import mosaic.ui.menu.*;
 
@@ -101,15 +102,34 @@ public class MainWindow extends JFrame implements ChangeListener, ModelHandler<B
 		Container cp = getContentPane();
 		cp.setLayout(new BorderLayout());
 		{
-			// Preparing view tool bar:
-			JPanel pPrepairToolBar = new JPanel();
-			ImagePreparingToolBar prepareToolBar = imagePreparingView.getToolBar();
-			pPrepairToolBar.add(prepareToolBar);
-			cp.add(pPrepairToolBar, BorderLayout.WEST);			
+			// Panel lateral izquierdo: Panel integrado de capas e imagen
+			JPanel leftPanel = new JPanel(new BorderLayout());
+			
+			// Crear panel integrado que combina capas e imagen
+			IntegratedImageLayerPanel integratedPanel = new IntegratedImageLayerPanel(
+				mc.getLayerManager(), imagePreparingView, model);
+			
+			// Configurar callback para cambios de capas
+			integratedPanel.setOnLayersChangedCallback(() -> {
+				// Actualizar capas en el mainController
+				if (mc != null) {
+					// Forzar actualización de capas en la imagen
+					mc.updateImageWithLayers();
+				}
+				// También repintar la vista
+				if (brickedView != null) {
+					brickedView.repaint();
+				}
+			});
+			
+			leftPanel.add(integratedPanel, BorderLayout.CENTER);
+			leftPanel.setPreferredSize(new Dimension(300, 600));
+			cp.add(leftPanel, BorderLayout.WEST);			
 		}
 		{
-			// Legend: Se configurará después con setLegend()
+			// Panel lateral derecho: Solo Legend
 			legendPanel = new JPanel(new BorderLayout());
+			legendPanel.setPreferredSize(new Dimension(250, 400));
 			cp.add(legendPanel, BorderLayout.EAST);
 		}
 
@@ -233,7 +253,7 @@ public class MainWindow extends JFrame implements ChangeListener, ModelHandler<B
 	}
 	
 	/**
-	 * Establece la leyenda en el panel East después de que se haya creado.
+	 * Establece la leyenda en el panel derecho.
 	 */
 	public void setLegend(ColorLegend legend) {
 		if (legendPanel != null) {

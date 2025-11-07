@@ -17,6 +17,9 @@ import mosaic.rendering.RenderingProgressBar;
 import mosaic.ui.*;
 import mosaic.ui.dialogs.PrintDialog;
 import mosaic.ui.dialogs.ToBricksTypeFilterDialog;
+import mosaic.ui.panels.IntegratedImageLayerPanel;
+import mosaic.layers.LayerManager;
+import mosaic.ui.panels.LayerPanel;
 
 /**
  * @author LD
@@ -50,11 +53,14 @@ public class MainController implements ModelHandler<BrickGraphicsState> {
 	private PrintDialog printDialog;
 	private ToBricksTypeFilterDialog toBricksTypeFilterDialog;
 	private RecentFilesManager recentFilesManager;
+	private LayerManager layerManager;
+	private IntegratedImageLayerPanel layerPanel;
 	private ColorLegend legend;
 	
 	// Image (for model state):
 	private String imageFileName;
 	private DataFile imageDataFile;
+	private BufferedImage originalImage; // Imagen base sin capas aplicadas
 	private File mosaicFile;
 
 	private MainController() {		
@@ -87,12 +93,29 @@ public class MainController implements ModelHandler<BrickGraphicsState> {
 		System.out.println("MosaicZoomController creado: " + (mosaicZoomController != null));
 		Log.log("Created controllers after " + (System.currentTimeMillis()-startTime) + "ms.");
 
+		// Initialize layer system BEFORE creating UI
+		layerManager = new LayerManager();
+		layerPanel = new IntegratedImageLayerPanel(layerManager, null, model);
+		
 		// Set up UI:
 		mw = new MainWindow(this, model, pipeline, renderingProgressBar);
 		printController.setMainWindow(mw);
 		
 		// Initialize recent files manager
 		recentFilesManager = new RecentFilesManager(this, mw);
+		
+		// Set up layer panel callback after MainWindow is created
+		layerPanel.setOnLayersChangedCallback(() -> {
+			// Cuando cambien las capas, re-aplicar sobre la imagen original
+			updateImageWithLayers();
+		});
+		
+		// Set up callback para cuando se eliminen todas las capas
+		layerManager.setOnAllLayersRemovedCallback(() -> {
+			// Restaurar la imagen original cuando no queden capas
+			System.out.println("DEBUG: MainController - Restaurando imagen original al eliminar todas las capas");
+			updateImageWithLayers(); // Esto aplicará las capas (vacías) sobre la imagen original
+		});
 		
 		// Establecer la referencia al BrickedView después de crear MainWindow
 		studEditController.setBrickedView(mw.getBrickedView());
@@ -110,6 +133,7 @@ public class MainController implements ModelHandler<BrickGraphicsState> {
 		
 		// Registrar controladores como ModelHandler para que se guarden sus datos
 		model.addModelHandler(studEditController); // Para guardar modificaciones manuales
+		model.addModelHandler(layerManager); // Para guardar y cargar capas de imagen
 		model.addModelHandler(this); // Make sure the load of image file is late in the process when loading a model.
 		
 		Log.log("LDDMC main window operational after " + (System.currentTimeMillis()-startTime) + "ms.");
@@ -175,8 +199,62 @@ public class MainController implements ModelHandler<BrickGraphicsState> {
 			}
 		}
 		mosaicFile = null;
-		pipeline.setStartImage(image);
+		
+		// Guardar la imagen original sin capas
+		originalImage = image;
+		
+		// Aplicar capas y establecer en el pipeline
+		updateImageWithLayers();
+		
 		notifyListeners(this);
+	}
+	
+	/**
+	 * Aplica las capas sobre la imagen original y actualiza el pipeline
+	 */
+	public void updateImageWithLayers() {
+		System.out.println("DEBUG: MainController - updateImageWithLayers() llamado");
+		if (originalImage == null || layerManager == null) {
+			System.out.println("DEBUG: MainController - Skipping, originalImage o layerManager es null");
+			return; // Skip si no están inicializados aún
+		}
+		
+		// Aplicar transformaciones de imagen de fondo y capas sobre la imagen original
+		System.out.println("DEBUG: MainController - Aplicando capas a imagen original...");
+		BufferedImage imageWithLayers;
+		
+		// Verificar si hay transformaciones de imagen de fondo configuradas
+		if (layerPanel != null) {
+			float brightness = layerPanel.getBackgroundBrightness();
+			float contrast = layerPanel.getBackgroundContrast();
+			float saturation = layerPanel.getBackgroundSaturation();
+			float gamma = layerPanel.getBackgroundGamma();
+			float sharpness = layerPanel.getBackgroundSharpness();
+			
+			System.out.println("DEBUG: MainController - Llamando applyBackgroundTransformationsAndLayers con valores: " +
+							  "brightness=" + brightness + ", contrast=" + contrast + ", saturation=" + saturation + 
+							  ", gamma=" + gamma + ", sharpness=" + sharpness);
+			
+			// Usar método que aplica transformaciones de fondo y luego capas
+			imageWithLayers = layerManager.applyBackgroundTransformationsAndLayers(
+				originalImage,
+				brightness, contrast, saturation, gamma, sharpness
+			);
+		} else {
+			// Fallback al método original si no hay panel de transformaciones
+			imageWithLayers = layerManager.applyLayersToImage(originalImage);
+		}
+		System.out.println("DEBUG: MainController - Imagen con capas creada");
+		
+		// Establecer la imagen procesada en el pipeline
+		pipeline.setStartImage(imageWithLayers);
+		System.out.println("DEBUG: MainController - Pipeline actualizado con imagen+capas");
+		
+		// Repintar la vista para mostrar los cambios
+		if (mw != null && mw.getBrickedView() != null) {
+			mw.getBrickedView().repaint();
+			System.out.println("DEBUG: MainController - BrickedView repintada");
+		}
 	}
 	
 	public void loadMosaicFile(File file) throws IOException {
@@ -276,25 +354,73 @@ public class MainController implements ModelHandler<BrickGraphicsState> {
 		return printDialog;
 	}
 	
+	public LayerManager getLayerManager() {
+		return layerManager;
+	}
+	
+	public IntegratedImageLayerPanel getLayerPanel() {
+		return layerPanel;
+	}
+	
 	@Override
 	public void handleModelChange(Model<BrickGraphicsState> model) {
 		imageFileName = (String)model.get(BrickGraphicsState.ImageFileName);
 		imageDataFile = (DataFile)model.get(BrickGraphicsState.ImageFile);
-		if(imageDataFile.isValid()) {
+		
+		// Cargar imagen original desde estado guardado si existe
+		DataFile originalImageDataFile = (DataFile)model.get(BrickGraphicsState.OriginalImageFile);
+		
+		if (originalImageDataFile != null && originalImageDataFile.isValid()) {
+			// Restaurar imagen original guardada
 			try {
-				BufferedImage image = MosaicIO.removeAlpha(ImageIO.read(imageDataFile.fakeStream()));
-				pipeline.setStartImage(image);
+				BufferedImage originalImageFromFile = MosaicIO.removeAlpha(ImageIO.read(originalImageDataFile.fakeStream()));
+				originalImage = originalImageFromFile;
+				System.out.println("DEBUG: MainController - Imagen original restaurada desde KMV");
+				updateImageWithLayers();
 			} catch (IOException e) {
-				Log.log(e);
-			}			
-		}
-		else
+				Log.log("Error cargando imagen original: " + e.getMessage());
+				// Fallback a imagen normal
+				loadRegularImage();
+			}
+		} else if(imageDataFile.isValid()) {
+			// No hay imagen original guardada, usar imagen normal
+			loadRegularImage();
+		} else {
 			Log.log("INVALID Image data file!");
+		}
+	}
+	
+	/**
+	 * Carga la imagen normal cuando no hay imagen original guardada
+	 */
+	private void loadRegularImage() {
+		try {
+			BufferedImage image = MosaicIO.removeAlpha(ImageIO.read(imageDataFile.fakeStream()));
+			// Guardar como imagen original
+			originalImage = image;
+			// Aplicar capas y establecer en el pipeline
+			updateImageWithLayers();
+		} catch (IOException e) {
+			Log.log(e);
+		}
 	}
 
 	@Override
 	public void save(Model<BrickGraphicsState> model) {
 		model.set(BrickGraphicsState.ImageFileName, imageFileName);
 		model.set(BrickGraphicsState.ImageFile, imageDataFile);
+		
+		// Guardar imagen original sin capas si existe
+		if (originalImage != null) {
+			try {
+				DataFile originalImageDataFile = new DataFile(originalImage);
+				model.set(BrickGraphicsState.OriginalImageFile, originalImageDataFile);
+				System.out.println("DEBUG: MainController - Imagen original guardada en KMV");
+			} catch (Exception e) {
+				Log.log("Error guardando imagen original: " + e.getMessage());
+				// En caso de error, no guardar imagen original
+				model.set(BrickGraphicsState.OriginalImageFile, new DataFile());
+			}
+		}
 	}
 }
