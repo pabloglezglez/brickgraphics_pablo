@@ -32,6 +32,7 @@ public class MainWindow extends JFrame implements ChangeListener, ModelHandler<B
 	private Pipeline pipeline;
 	private Rectangle lastNormalPlacement;
 	private MosaicZoomPanel zoomPanel;
+	private IntegratedImageLayerPanel integratedPanel; // Panel integrado de capas e imagen
 
 	public MainWindow(final MainController mc, final Model<BrickGraphicsState> model, 
 			final Pipeline pipeline, RenderingProgressBar renderingProgressBar) {
@@ -106,7 +107,7 @@ public class MainWindow extends JFrame implements ChangeListener, ModelHandler<B
 			JPanel leftPanel = new JPanel(new BorderLayout());
 			
 			// Crear panel integrado que combina capas e imagen
-			IntegratedImageLayerPanel integratedPanel = new IntegratedImageLayerPanel(
+			integratedPanel = new IntegratedImageLayerPanel(
 				mc.getLayerManager(), imagePreparingView, model);
 			
 			// Configurar callback para cambios de capas
@@ -268,6 +269,12 @@ public class MainWindow extends JFrame implements ChangeListener, ModelHandler<B
 		if(imagePreparingView == null)
 			throw new IllegalStateException();
 		return imagePreparingView;
+	}
+	
+	public IntegratedImageLayerPanel getLayerPanel() {
+		if(integratedPanel == null)
+			throw new IllegalStateException();
+		return integratedPanel;
 	}
 	
 	public MosaicZoomPanel getZoomPanel() {
