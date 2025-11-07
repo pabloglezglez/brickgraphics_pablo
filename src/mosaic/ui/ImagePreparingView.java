@@ -143,8 +143,9 @@ public class ImagePreparingView extends JComponent implements ModelHandler<Brick
 				public BufferedImage transform(BufferedImage in) {
 					if(allowFilterReordering && 
 							lastTransformUsedAsSource != null && 
-							lastTransformUsedAsSource == t)
-						return in; // Ignore progress here.
+							lastTransformUsedAsSource == t) {
+						return t.transform(in); // Always apply transform
+					}
 					return t.transform(in); // t reports progress.
 				}
 				@Override
