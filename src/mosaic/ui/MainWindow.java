@@ -25,6 +25,7 @@ public class MainWindow extends JFrame implements ChangeListener, ModelHandler<B
 	private ImagePreparingView imagePreparingView;
 	private BrickedView brickedView;
 	private JSplitPane splitPane;
+	private JPanel legendPanel; // Panel para la leyenda
 	private ColorChooserDialog colorChooserDialog;
 	private MainController mc;
 	private Pipeline pipeline;
@@ -107,11 +108,9 @@ public class MainWindow extends JFrame implements ChangeListener, ModelHandler<B
 			cp.add(pPrepairToolBar, BorderLayout.WEST);			
 		}
 		{
-			// Legend:
-			JPanel pLegend = new JPanel(new BorderLayout());
-			ColorLegend colorLegend = mc.getLegend();
-			pLegend.add(colorLegend, BorderLayout.CENTER);
-			cp.add(pLegend, BorderLayout.EAST);
+			// Legend: Se configurará después con setLegend()
+			legendPanel = new JPanel(new BorderLayout());
+			cp.add(legendPanel, BorderLayout.EAST);
 		}
 
 		{
@@ -231,6 +230,18 @@ public class MainWindow extends JFrame implements ChangeListener, ModelHandler<B
 		if(brickedView == null)
 			throw new IllegalStateException();		
 		return brickedView;
+	}
+	
+	/**
+	 * Establece la leyenda en el panel East después de que se haya creado.
+	 */
+	public void setLegend(ColorLegend legend) {
+		if (legendPanel != null) {
+			legendPanel.removeAll();
+			legendPanel.add(legend, BorderLayout.CENTER);
+			legendPanel.revalidate();
+			legendPanel.repaint();
+		}
 	}
 
 	public ImagePreparingView getImagePreparingView() {

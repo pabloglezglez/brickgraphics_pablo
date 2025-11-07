@@ -2,10 +2,16 @@ package mosaic.controllers;
 
 import mosaic.ui.EditTool;
 import mosaic.ui.BrushSize;
+import mosaic.io.BrickGraphicsState;
+import mosaic.ui.BrickedView;
+import io.Model;
+import io.ModelHandler;
 import colors.LEGOColor;
 import colors.LEGOColorGrid;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
 
@@ -13,21 +19,45 @@ import javax.swing.event.ChangeListener;
  * Controlador para las herramientas de edición del mosaico.
  * Maneja el cambio de herramientas activas y las operaciones de edición.
  */
-public class StudEditController {
+public class StudEditController implements ModelHandler<BrickGraphicsState> {
     private EditTool activeTool;
     private LEGOColor selectedColor;
     private List<ChangeListener> listeners;
     private ColorController colorController;
+    private BrickedView brickedView; // Referencia al view para acceder al grid
     private boolean hasChanges; // Bandera para saber si hay cambios no guardados
     private ModificationManager modificationManager; // Gestor de modificaciones manuales
     private BrushSize brushSize = BrushSize.SMALL; // Tamaño del pincel
     
+    public StudEditController(ColorController colorController, BrickedView brickedView) {
+        this.activeTool = EditTool.DEFAULT;
+        this.colorController = colorController;
+        this.brickedView = brickedView;
+        this.listeners = new ArrayList<>();
+        this.hasChanges = false;
+        this.modificationManager = new ModificationManager(colorController);
+    }
+    
+    /**
+     * Constructor alternativo sin BrickedView para evitar dependencias circulares.
+     */
     public StudEditController(ColorController colorController) {
         this.activeTool = EditTool.DEFAULT;
         this.colorController = colorController;
+        this.brickedView = null; // Se establecerá después
         this.listeners = new ArrayList<>();
         this.hasChanges = false;
-        this.modificationManager = new ModificationManager();
+        this.modificationManager = new ModificationManager(colorController);
+    }
+    
+    /**
+     * Establece la referencia al BrickedView después de la creación.
+     */
+    public void setBrickedView(BrickedView brickedView) {
+        this.brickedView = brickedView;
+        if (brickedView != null) {
+            brickedView.setModificationManager(this.modificationManager);
+        }
     }
     
     /**
@@ -93,7 +123,20 @@ public class StudEditController {
      * @return true si se realizó algún cambio
      */
     public boolean applyToolAt(LEGOColorGrid grid, int x, int y) {
+        if (grid == null) {
+            System.out.println("ERROR: Grid es null en applyToolAt");
+            return false;
+        }
+        
         System.out.println("DEBUG: Aplicando herramienta " + activeTool + " con pincel " + brushSize + " en (" + x + "," + y + ")");
+        System.out.println("DEBUG: Grid dimensiones: " + grid.getWidth() + "x" + grid.getHeight());
+        
+        // Verificar que las coordenadas estén dentro del rango válido
+        if (x < 0 || x >= grid.getWidth() || y < 0 || y >= grid.getHeight()) {
+            System.out.println("ERROR: Coordenadas fuera de rango - Grid: " + grid.getWidth() + "x" + grid.getHeight() + ", Click: (" + x + "," + y + ")");
+            return false;
+        }
+        
         switch (activeTool) {
             case BRUSH:
                 return applyBrushWithSize(grid, x, y);
@@ -179,6 +222,7 @@ public class StudEditController {
                     if (success) {
                         modificationManager.recordModification(targetX, targetY, selectedColor, currentColor);
                         anyChange = true;
+                        System.out.println("DEBUG: Pintado stud en (" + targetX + "," + targetY + ") con color " + selectedColor.getName());
                     }
                 }
             }
@@ -301,6 +345,101 @@ public class StudEditController {
         ChangeEvent e = new ChangeEvent(this);
         for (ChangeListener listener : listeners) {
             listener.stateChanged(e);
+        }
+    }
+    
+    @Override
+    public void save(Model<BrickGraphicsState> model) {
+        System.out.println("DEBUG: StudEditController.save() - MÉTODO SAVE INVOCADO");
+        
+        // Guardar las modificaciones manuales en el modelo
+        Map<String, Integer> modificationsForSave = modificationManager.getModificationsForSave();
+        System.out.println("DEBUG: StudEditController.save() - ModificationManager devuelve " + modificationsForSave.size() + " modificaciones");
+        
+        // Serializar el mapa a String
+        StringBuilder sb = new StringBuilder();
+        boolean first = true;
+        for (Map.Entry<String, Integer> entry : modificationsForSave.entrySet()) {
+            if (!first) {
+                sb.append(";");
+            }
+            sb.append(entry.getKey()).append(":").append(entry.getValue());
+            first = false;
+        }
+        
+        String serializedModifications = sb.toString();
+        System.out.println("DEBUG: StudEditController - Guardando " + modificationsForSave.size() + " modificaciones manuales como: " + serializedModifications);
+        
+        model.set(BrickGraphicsState.ManualModifications, serializedModifications);
+        System.out.println("DEBUG: StudEditController - Guardadas " + modificationsForSave.size() + " modificaciones manuales");
+    }
+
+    @Override
+    public void handleModelChange(Model<BrickGraphicsState> model) {
+        // Cargar las modificaciones manuales desde el modelo
+        Object savedData = model.get(BrickGraphicsState.ManualModifications);
+        if (savedData != null) {
+            try {
+                Map<String, Integer> savedModifications = new TreeMap<>();
+                
+                if (savedData instanceof String) {
+                    // Deserializar desde String
+                    String serializedData = (String) savedData;
+                    if (!serializedData.isEmpty()) {
+                        String[] entries = serializedData.split(";");
+                        for (String entry : entries) {
+                            String[] parts = entry.split(":");
+                            if (parts.length == 2) {
+                                try {
+                                    savedModifications.put(parts[0], Integer.parseInt(parts[1]));
+                                } catch (NumberFormatException e) {
+                                    System.out.println("WARNING: No se pudo convertir el valor '" + parts[1] + "' a Integer para la clave '" + parts[0] + "'");
+                                }
+                            }
+                        }
+                    }
+                } else if (savedData instanceof Map) {
+                    // Compatibilidad con formato anterior (Map)
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> rawMap = (Map<String, Object>) savedData;
+                    
+                    // Convertir todos los valores a Integer, ya sean String o Integer
+                    for (Map.Entry<String, Object> entry : rawMap.entrySet()) {
+                        Object value = entry.getValue();
+                        if (value instanceof Integer) {
+                            savedModifications.put(entry.getKey(), (Integer) value);
+                        } else if (value instanceof String) {
+                            try {
+                                savedModifications.put(entry.getKey(), Integer.parseInt((String) value));
+                            } catch (NumberFormatException e) {
+                                System.out.println("WARNING: No se pudo convertir el valor '" + value + "' a Integer para la clave '" + entry.getKey() + "'");
+                            }
+                        }
+                    }
+                }
+                
+                if (!savedModifications.isEmpty()) {
+                    modificationManager.loadModificationsFromSave(savedModifications);
+                    System.out.println("DEBUG: StudEditController - Cargadas " + savedModifications.size() + " modificaciones manuales desde KMV");
+                    
+                    // Aplicar las modificaciones al grid actual inmediatamente después de cargar
+                    if (brickedView != null) {
+                        LEGOColorGrid currentGrid = brickedView.getColorGrid();
+                        if (currentGrid != null) {
+                            System.out.println("DEBUG: StudEditController - Aplicando " + savedModifications.size() + " modificaciones al grid");
+                            modificationManager.restoreModifications(currentGrid);
+                            System.out.println("DEBUG: StudEditController - COMPLETADO: Aplicadas modificaciones al grid después de cargar desde KMV");
+                        } else {
+                            System.out.println("DEBUG: StudEditController - Grid no disponible, las modificaciones se aplicarán cuando esté listo");
+                        }
+                    } else {
+                        System.out.println("DEBUG: StudEditController - BrickedView no disponible, las modificaciones se aplicarán cuando esté listo");
+                    }
+                }
+            } catch (Exception e) {
+                System.out.println("ERROR: StudEditController - Error al cargar modificaciones: " + e.getMessage());
+                e.printStackTrace();
+            }
         }
     }
 }

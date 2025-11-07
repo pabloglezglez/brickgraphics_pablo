@@ -17,6 +17,8 @@ public class MainMenu extends JMenuBar {
 		fileMenu.setDisplayedMnemonicIndex(0);
 		fileMenu.setMnemonic('F');
 		fileMenu.add(MosaicIO.createOpenAction(mc, mw));
+		fileMenu.add(mc.getRecentFilesManager().createRecentFilesMenu());
+		fileMenu.addSeparator();
 		fileMenu.add(MosaicIO.createSaveAction(mc, mw));
 		fileMenu.add(MosaicIO.createSaveAsAction(mc, mw));
 		fileMenu.add(new ExportLDR(mc, mw));

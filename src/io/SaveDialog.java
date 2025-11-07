@@ -35,16 +35,42 @@ public class SaveDialog {
 	public File showSaveDialog(String saveMessage, FileFilter... filters) {
 		for(FileFilter ff : fileChooser.getChoosableFileFilters())
 			fileChooser.removeChoosableFileFilter(ff);
-		for(FileFilter ff : filters)
+		
+		FileFilter kmvFilter = null;
+		for(FileFilter ff : filters) {
 			fileChooser.addChoosableFileFilter(ff);
+			// Buscar el filtro KMV para establecerlo como predeterminado
+			if (ff instanceof FileNameExtensionFilter) {
+				FileNameExtensionFilter fileFilter = (FileNameExtensionFilter) ff;
+				String[] exts = fileFilter.getExtensions();
+				if (exts != null && exts.length > 0 && "kvm".equals(exts[0])) {
+					kmvFilter = ff;
+				}
+			}
+		}
+		
+		// Establecer el filtro KMV como predeterminado si está disponible
+		if (kmvFilter != null) {
+			fileChooser.setFileFilter(kmvFilter);
+		}
 	
 		int retVal = fileChooser.showSaveDialog(toModalize);
 		if(retVal != JFileChooser.APPROVE_OPTION) {
 			return null;
 		}
 		File file = fileChooser.getSelectedFile();
-		FileNameExtensionFilter fileFilter = (FileNameExtensionFilter)fileChooser.getFileFilter();
-		String type = fileFilter.getExtensions()[0];
+		
+		// Fix for macOS compatibility - avoid casting issues
+		String type = "kvm"; // default extension
+		FileFilter selectedFilter = fileChooser.getFileFilter();
+		if (selectedFilter instanceof FileNameExtensionFilter) {
+			FileNameExtensionFilter fileFilter = (FileNameExtensionFilter) selectedFilter;
+			String[] exts = fileFilter.getExtensions();
+			if (exts != null && exts.length > 0) {
+				type = exts[0];
+			}
+		}
+		
 		file = MosaicIO.ensureSuffix(file, type);
 		if(file.exists()) {
 			int ret = JOptionPane.showConfirmDialog(toModalize, "Warning. The file \n" + file.getName() + "\nalready exists. Overwrite?", "File already exists", JOptionPane.OK_CANCEL_OPTION, JOptionPane.WARNING_MESSAGE);
