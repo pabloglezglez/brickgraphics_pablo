@@ -361,6 +361,15 @@ public class MainController implements ModelHandler<BrickGraphicsState> {
 	public IntegratedImageLayerPanel getLayerPanel() {
 		return layerPanel;
 	}
+
+	/**
+	 * Reemplaza el panel de capas integrado que usa el controlador.
+	 * Esto permite que la instancia creada por la UI (MainWindow) se comparta
+	 * con el controlador para evitar duplicados y valores desincronizados.
+	 */
+	public void setLayerPanel(IntegratedImageLayerPanel panel) {
+		this.layerPanel = panel;
+	}
 	
 	@Override
 	public void handleModelChange(Model<BrickGraphicsState> model) {
