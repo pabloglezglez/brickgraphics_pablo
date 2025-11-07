@@ -11,6 +11,7 @@ import javax.swing.*;
 import javax.swing.event.*;
 import colors.parsers.*;
 import mosaic.io.*;
+import mosaic.io.RecentFilesManager;
 import mosaic.rendering.Pipeline;
 import mosaic.rendering.RenderingProgressBar;
 import mosaic.ui.*;
@@ -48,6 +49,7 @@ public class MainController implements ModelHandler<BrickGraphicsState> {
 	private SaveDialog saveDialog;
 	private PrintDialog printDialog;
 	private ToBricksTypeFilterDialog toBricksTypeFilterDialog;
+	private RecentFilesManager recentFilesManager;
 	private ColorLegend legend;
 	
 	// Image (for model state):
@@ -80,20 +82,36 @@ public class MainController implements ModelHandler<BrickGraphicsState> {
 		magnifierController = new MagnifierController(model, uiController);
 		toBricksController = new ToBricksController(this, model);
 		printController = new PrintController(model, this, pipeline);
-		studEditController = new StudEditController(colorController);
+		studEditController = new StudEditController(colorController); // Crear temprano sin BrickedView
 		mosaicZoomController = new MosaicZoomController(model);		
 		System.out.println("MosaicZoomController creado: " + (mosaicZoomController != null));
 		Log.log("Created controllers after " + (System.currentTimeMillis()-startTime) + "ms.");
 
 		// Set up UI:
-		legend = new ColorLegend(this, pipeline);
 		mw = new MainWindow(this, model, pipeline, renderingProgressBar);
 		printController.setMainWindow(mw);
+		
+		// Initialize recent files manager
+		recentFilesManager = new RecentFilesManager(this, mw);
+		
+		// Establecer la referencia al BrickedView después de crear MainWindow
+		studEditController.setBrickedView(mw.getBrickedView());
+		
+		// Crear ColorLegend después de tener StudEditController completamente inicializado
+		legend = new ColorLegend(this, pipeline);
 		legend.setBrickedView(mw.getBrickedView());
+		
+		// Establecer la leyenda en MainWindow
+		mw.setLegend(legend);
+		
 		listeners.add(mw);
 		toBricksController.initiateUI(mw);
 		optionsController.initiateOptionsDialog(mw);
+		
+		// Registrar controladores como ModelHandler para que se guarden sus datos
+		model.addModelHandler(studEditController); // Para guardar modificaciones manuales
 		model.addModelHandler(this); // Make sure the load of image file is late in the process when loading a model.
+		
 		Log.log("LDDMC main window operational after " + (System.currentTimeMillis()-startTime) + "ms.");
 
 		if(colorController.usesBackupColors()) {
@@ -149,7 +167,12 @@ public class MainController implements ModelHandler<BrickGraphicsState> {
 		}
 		else {
 			imageDataFile = new DataFile(imageFile);		
-			imageFileName = imageFile.getCanonicalPath();			
+			imageFileName = imageFile.getCanonicalPath();
+			
+			// Add to recent files when opening an image
+			if (recentFilesManager != null) {
+				recentFilesManager.addRecentFile(imageFile);
+			}
 		}
 		mosaicFile = null;
 		pipeline.setStartImage(image);
@@ -165,8 +188,14 @@ public class MainController implements ModelHandler<BrickGraphicsState> {
 		
 		mosaicFile = file;
 		
+		// Add to recent files when opening a mosaic file
+		if (recentFilesManager != null) {
+			recentFilesManager.addRecentFile(file);
+		}
+		
 		// Resetear todas las intensidades de colores a 1.0 al abrir un archivo
-		colorController.resetAllColorIntensities();
+		// El método resetColorIntensitiesIfSafe evita el reset en modo SNOT
+		colorController.resetColorIntensitiesIfSafe(toBricksController);
 		
 		notifyListeners(model);
 	}
@@ -177,6 +206,15 @@ public class MainController implements ModelHandler<BrickGraphicsState> {
 	
 	public void setMosaicFile(File file) {
 		this.mosaicFile = file;
+		
+		// Add to recent files when a file is set
+		if (file != null && recentFilesManager != null) {
+			recentFilesManager.addRecentFile(file);
+		}
+	}
+	
+	public RecentFilesManager getRecentFilesManager() {
+		return recentFilesManager;
 	}
 	
 	public File showSaveDialog(String saveMessage, FileFilter... filters) {		

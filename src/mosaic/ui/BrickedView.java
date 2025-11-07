@@ -56,8 +56,8 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 		mosaicZoomController = mc.getMosaicZoomController();
 		System.out.println("BrickedView: MosaicZoomController obtenido: " + (mosaicZoomController != null));
 		
-		// Obtener el sistema de preservación del StudEditController
-		modificationManager = studEditController.getModificationManager();
+		// Inicializar modificationManager como null, se establecerá después
+		modificationManager = null;
 		lastValidGrid = null;
 		toBricksController.addChangeListener(magnifierController);
 		magnifierController.addChangeListener(this);
@@ -107,7 +107,7 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 		
 		// Obtener colores del mosaico actual (incluyendo modificaciones de edición)
 		LEGOColorGrid currentGrid = getColorGrid();
-		if (currentGrid != null && studEditController.hasUnsavedChanges()) {
+		if (currentGrid != null && studEditController != null && studEditController.hasUnsavedChanges()) {
 			// Si hay cambios sin guardar, contar colores del grid modificado
 			colors = countColorsFromGrid(currentGrid);
 		} else {
@@ -235,39 +235,62 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 			boolean changed = studEditController.applyToolAt(colorGrid, hoveredX, hoveredY);
 			
 			if (changed) {
-				// Solo actualizar la vista, NO regenerar el pipeline (mantiene ediciones)
+				// Para SNOT, necesitamos forzar actualización del renderizado
+				if (toBricksTransform.getToBricksType() == ToBricksType.SNOT_IN_2_BY_2) {
+					updateSnotVisualization();
+				}
+				
+				// Actualizar la vista
 				repaint();
 			}
 		}
 	}
+	
+	// Grid editable para modo SNOT
+	private LEGOColorGrid snotEditableGrid = null;
 	
 	/**
 	 * Obtiene el grid de colores del mosaico actual.
 	 * Sistema automático de preservación de modificaciones.
 	 * @return el LEGOColorGrid o null si no está disponible
 	 */
+	/**
+	 * Establece el gestor de modificaciones. Debe llamarse después de crear el StudEditController.
+	 */
+	public void setModificationManager(ModificationManager manager) {
+		this.modificationManager = manager;
+	}
+	
 	public LEGOColorGrid getColorGrid() {
 		if (toBricksTransform == null) {
-			System.out.println("DEBUG: getColorGrid() - toBricksTransform es null");
 			return null;
 		}
 		
-		// Obtener el grid de colores del transform principal
+		// Verificar si estamos en modo SNOT - en este modo el grid manejo es diferente
+		boolean isSnotMode = toBricksTransform.getToBricksType() == ToBricksType.SNOT_IN_2_BY_2;
+		
+		if (isSnotMode) {
+			// Para el modo SNOT, crear un grid virtual que mapee a los grids reales
+			return createSnotVirtualGrid();
+		}
+		
+		// Obtener el grid de colores del transform principal para modos NO-SNOT
 		BufferedLEGOColorTransform mainTransform = toBricksTransform.getMainTransform();
 		if (mainTransform != null) {
 			LEGOColorGrid grid = mainTransform.getCurrentColorGrid();
-			System.out.println("DEBUG: getColorGrid() - Obtenido grid: " + (grid != null ? "válido" : "null"));
 			
-			// Sistema automático de preservación
+			// Sistema automático de preservación - SOLO para modos NO-SNOT
 			if (grid == null && lastValidGrid != null) {
 				// Grid se volvió null - preservar modificaciones del último grid válido
-				System.out.println("DEBUG: Grid se volvió null, preservando modificaciones...");
-				modificationManager.backupGrid(lastValidGrid);
+				if (modificationManager != null) {
+					modificationManager.backupGrid(lastValidGrid);
+				}
 				lastValidGrid = null;
 			} else if (grid != null && lastValidGrid == null) {
 				// Grid se restauró - aplicar modificaciones preservadas
-				System.out.println("DEBUG: Grid restaurado, aplicando modificaciones preservadas...");
-				modificationManager.restoreModifications(grid);
+				if (modificationManager != null) {
+					modificationManager.restoreModifications(grid);
+				}
 				lastValidGrid = grid;
 			} else if (grid != null) {
 				// Grid válido - actualizar referencia
@@ -277,8 +300,163 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 			return grid;
 		}
 		
-		System.out.println("DEBUG: getColorGrid() - mainTransform es null");
 		return null;
+	}
+	
+	/**
+	 * Crea un grid virtual para SNOT que mapea las coordenadas del cursor 
+	 * a los grids reales normalColors y sidewaysColors.
+	 */
+	private LEGOColorGrid createSnotVirtualGrid() {
+		return new SnotVirtualGrid(toBricksTransform);
+	}
+	
+	/**
+	 * Grid virtual que permite acceso unificado a los grids SNOT reales.
+	 * Mapea coordenadas de pantalla a las posiciones correctas en normalColors y sidewaysColors.
+	 */
+	private class SnotVirtualGrid extends LEGOColorGrid {
+		private ToBricksTransform transform;
+		
+		public SnotVirtualGrid(ToBricksTransform transform) {
+			super(new LEGOColor[1][1]); // Grid dummy, no se usa
+			this.transform = transform;
+		}
+		
+		@Override
+		public int getWidth() {
+			if (mosaicImageSize == null) return 0;
+			// El ancho del grid virtual es el número de "studs" horizontales
+			// Cada bloque SNOT de 10x10 píxeles contiene múltiples studs
+			return mosaicImageSize.width / 2; // Cada stud = 2 píxeles de ancho
+		}
+		
+		@Override
+		public int getHeight() {
+			if (mosaicImageSize == null) return 0;
+			// El alto del grid virtual es el número de "studs" verticales
+			return mosaicImageSize.height / 2; // Cada stud = 2 píxeles de alto
+		}
+		
+		@Override
+		public LEGOColor getColorAt(int x, int y) {
+			if (transform == null) return LEGOColor.WHITE;
+			
+			// Determinar si estamos en una zona normal (2x5) o sideways (5x2)
+			SnotPosition pos = calculateSnotPosition(x, y);
+			
+			// Acceder al grid apropiado según la orientación
+			LEGOColorGrid targetGrid = pos.isNormal ? transform.getNormalColors() : transform.getSidewaysColors();
+			
+			if (targetGrid == null) return LEGOColor.WHITE;
+			
+			// Verificar límites del grid real
+			if (pos.gridX < 0 || pos.gridX >= targetGrid.getWidth() || 
+			    pos.gridY < 0 || pos.gridY >= targetGrid.getHeight()) {
+				return LEGOColor.WHITE;
+			}
+			
+			System.out.println("DEBUG SNOT: getColorAt(" + x + "," + y + ") -> Grid " + 
+							   (pos.isNormal ? "normal" : "sideways") + " en (" + pos.gridX + "," + pos.gridY + ")");
+			
+			return targetGrid.getColorAt(pos.gridX, pos.gridY);
+		}
+		
+		@Override
+		public boolean setColorAt(int x, int y, LEGOColor color) {
+			if (transform == null) return false;
+			
+			// Determinar si estamos en una zona normal (2x5) o sideways (5x2)
+			SnotPosition pos = calculateSnotPosition(x, y);
+			
+			// Acceder al grid apropiado según la orientación
+			LEGOColorGrid targetGrid = pos.isNormal ? transform.getNormalColors() : transform.getSidewaysColors();
+			
+			if (targetGrid == null) return false;
+			
+			// Verificar límites del grid real
+			if (pos.gridX < 0 || pos.gridX >= targetGrid.getWidth() || 
+			    pos.gridY < 0 || pos.gridY >= targetGrid.getHeight()) {
+				return false;
+			}
+			
+			System.out.println("DEBUG SNOT: setColorAt(" + x + "," + y + ", " + color.getName() + ") -> Grid " + 
+							   (pos.isNormal ? "normal" : "sideways") + " en (" + pos.gridX + "," + pos.gridY + ")");
+			
+			boolean success = targetGrid.setColorAt(pos.gridX, pos.gridY, color);
+			
+			if (success) {
+				// Forzar actualización visual
+				updateSnotVisualization();
+			}
+			
+			return success;
+		}
+		
+		/**
+		 * Calcula la posición en el grid SNOT correspondiente a las coordenadas virtuales.
+		 */
+		private SnotPosition calculateSnotPosition(int x, int y) {
+			// Calcular en qué bloque SNOT estamos (cada bloque es 5x5 studs virtuales)
+			int blockX = x / 5;
+			int blockY = y / 5;
+			
+			// Coordenadas dentro del bloque (0-4 en ambas direcciones)
+			int inBlockX = x % 5;
+			int inBlockY = y % 5;
+			
+			// Determinar orientación basada en el patrón SNOT
+			// Obtener el array normalColorsChoosen para saber la orientación
+			boolean[][] orientations = transform.getNormalColorsChoosen();
+			boolean isNormal = true; // Por defecto normal
+			
+			if (orientations != null && blockX < orientations.length && blockY < orientations[blockX].length) {
+				isNormal = orientations[blockX][blockY];
+			}
+			
+			int gridX, gridY;
+			
+			if (isNormal) {
+				// Orientación normal: 2x5 (2 studs ancho, 5 studs alto)
+				gridX = blockX * 2 + (inBlockX / 3); // Mapear 5 studs virtuales a 2 reales 
+				gridY = blockY * 5 + inBlockY;
+			} else {
+				// Orientación sideways: 5x2 (5 studs ancho, 2 studs alto)  
+				gridX = blockX * 5 + inBlockX;
+				gridY = blockY * 2 + (inBlockY / 3); // Mapear 5 studs virtuales a 2 reales
+			}
+			
+			return new SnotPosition(gridX, gridY, isNormal);
+		}
+	}
+	
+	/**
+	 * Clase auxiliar para almacenar la posición calculada en SNOT.
+	 */
+	private static class SnotPosition {
+		final int gridX, gridY;
+		final boolean isNormal;
+		
+		SnotPosition(int gridX, int gridY, boolean isNormal) {
+			this.gridX = gridX;
+			this.gridY = gridY;
+			this.isNormal = isNormal;
+		}
+	}
+	
+	/**
+	 * Actualiza la visualización de SNOT después de cambios en el grid editable.
+	 */
+	private void updateSnotVisualization() {
+		// Para SNOT, simplemente forzar una actualización visual
+		// El grid editable ya contiene los cambios, solo necesitamos actualizar la vista
+		System.out.println("DEBUG: Actualizando visualización SNOT");
+		
+		// Notificar que hay cambios pendientes de visualizar
+		MosaicCanvas canvas = getMosaicCanvas();
+		if (canvas != null) {
+			canvas.repaint();
+		}
 	}
 	
 	// Variables para el cursor visual

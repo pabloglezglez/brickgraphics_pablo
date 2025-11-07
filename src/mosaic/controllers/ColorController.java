@@ -599,6 +599,17 @@ public class ColorController implements ModelHandler<BrickGraphicsState> {
 		}
 		notifyListeners(null);
 	}
+	
+	/**
+	 * Resetea las intensidades de colores solo si no está en modo SNOT
+	 * El modo SNOT depende de intensidades específicas para funcionar correctamente
+	 */
+	public void resetColorIntensitiesIfSafe(ToBricksController toBricksController) {
+		// Solo resetear si NO es el modo SNOT (índice 4)
+		if(toBricksController.getToBricksType().ordinal() != 4) {
+			resetAllColorIntensities();
+		}
+	}
 
 	public void addChangeListener(ChangeListener listener) {
 		listeners.add(listener);

@@ -97,6 +97,30 @@ public class ToBricksTransform implements InstructionsTransform {
 
 		return rTransform;
 	}
+	
+	/**
+	 * Obtiene el grid de colores normales (para orientación horizontal en SNOT).
+	 * @return el LEGOColorGrid normal o null si no está disponible
+	 */
+	public LEGOColorGrid getNormalColors() {
+		return normalColors;
+	}
+	
+	/**
+	 * Obtiene el grid de colores sideways (para orientación vertical en SNOT).
+	 * @return el LEGOColorGrid sideways o null si no está disponible
+	 */
+	public LEGOColorGrid getSidewaysColors() {
+		return sidewaysColors;
+	}
+	
+	/**
+	 * Obtiene el array de orientaciones para SNOT.
+	 * @return el array normalColorsChoosen que indica la orientación de cada bloque
+	 */
+	public boolean[][] getNormalColorsChoosen() {
+		return normalColorsChoosen;
+	}
 
 	public Transform getVerticalPlateFromSideTransform() {
 		verticalPlateFromSideTransform.setWidth(width/SizeInfo.PLATE_HEIGHT);
@@ -327,25 +351,32 @@ public class ToBricksTransform implements InstructionsTransform {
 	public LEGOColor.CountingLEGOColor[] drawLastColors(Graphics2D g2, Rectangle basicUnitRect, int blockWidth, int blockHeight, Dimension toSize, int numStudsWide, int numStudsTall, boolean showOutlines) {
 		if(blockWidth != 10 || blockHeight != 10)
 			throw new IllegalArgumentException("Block 10x10");
-			
+		
 		return drawSnot(g2, basicUnitRect, toSize, true, showOutlines);
 	}
 	
 	private LEGOColor.CountingLEGOColor[] drawSnot(Graphics2D g2, Rectangle basicUnitRect, 
 			Dimension toSize, boolean drawColors, boolean showOutlines) {
-		if(normalColorsChoosen == null)
-			return new LEGOColor.CountingLEGOColor[]{};
-		
-		// Dibujar fondo negro para instrucciones o blanco para viewport
-		if(drawColors) {
-			// Para instrucciones: fondo negro
-			g2.setColor(Color.BLACK);
-			g2.fillRect(0, 0, toSize.width, toSize.height);
-		} else {
-			// Para viewport: fondo blanco
-			g2.setColor(Color.WHITE);
-			g2.fillRect(0, 0, toSize.width, toSize.height);			
+		if(normalColorsChoosen == null) {
+			// SNOT mode necesita que bestMatch se haya ejecutado primero
+			// Si normalColorsChoosen es null, inicializar con valores por defecto
+			if(width > 0 && height > 0) {
+				int cw = width/SizeInfo.SNOT_BLOCK_WIDTH;
+				int ch = height/SizeInfo.SNOT_BLOCK_WIDTH;
+				normalColorsChoosen = new boolean[cw][ch];
+				// Por defecto, usar orientación normal (studs up)
+				for(int x = 0; x < cw; x++) {
+					for(int y = 0; y < ch; y++) {
+						normalColorsChoosen[x][y] = true;
+					}
+				}
+			} else {
+				return new LEGOColor.CountingLEGOColor[]{};
+			}
 		}
+		
+		// El modo SNOT no necesita fondo sólido ya que dibuja piezas individuales
+		// Comentado: el fondo sólido tapaba las piezas SNOT individuales
 		
 		int w = basicUnitRect.width/10;
 		int h = basicUnitRect.height/10;
@@ -401,6 +432,11 @@ public class ToBricksTransform implements InstructionsTransform {
 	private int snot(LEGOColor.CountingLEGOColor[] m, Graphics2D g2, Rectangle basicUnitRect, 
 								 boolean normal, boolean drawColors, 
 			          			 double scaleW, double scaleH, int fontSize, int x, int y, boolean showOutlines) {
+		// Verificar que los grids de colores estén inicializados
+		if(normalColors == null || sidewaysColors == null) {
+			return 0; // Retornar sin dibujar si los grids no están disponibles
+		}
+		
 		int n2 = 2;
 		int n5 = 5;
 		if(!normal) {
@@ -413,7 +449,12 @@ public class ToBricksTransform implements InstructionsTransform {
 			int iy = basicUnitRect.y/n2+y*n5+j;
 			for(int i = 0; i < n2; i++) { // |
 				int ix = basicUnitRect.x/n5+x*n2+i;
-				LEGOColor color = (normal ? normalColors : sidewaysColors).getRow(iy)[ix];
+				// Debug: verificar grids antes de acceder
+				LEGOColorGrid gridToUse = normal ? normalColors : sidewaysColors;
+				if(gridToUse == null) {
+					return 0;
+				}
+				LEGOColor color = gridToUse.getRow(iy)[ix];
 				int idx = color.getIDRebrickable();
 				
 				if(m[idx] == null) {
@@ -429,33 +470,30 @@ public class ToBricksTransform implements InstructionsTransform {
 				int h = (int)(1+scaleH/n5);
 				Rectangle r = new Rectangle(xIndent, yIndent, w, h);
 
-				// Siempre mostrar color de fondo como círculo un poco más grande y número superpuesto
+				// Dibujar pieza SNOT como rectángulo (plate/tile)
 				g2.setColor(color.getRGB());
+				g2.fillRect(r.x, r.y, r.width, r.height);
 				
-				// Calcular círculo un poco más grande (90% del tamaño)
-				int maxDiameter = Math.min(w, h);
-				int diameter = (int)(maxDiameter * 0.90); // Aumentar a 90%
-				int circleX = (int)(r.getCenterX() - diameter/2);
-				int circleY = (int)(r.getCenterY() - diameter/2);
-				g2.fillOval(circleX, circleY, diameter, diameter);
-				
-				// Añadir contorno blanco para todos los círculos
-				g2.setColor(Color.WHITE);
+				// Añadir contorno negro para definir la pieza
+				g2.setColor(Color.BLACK);
 				Stroke originalStroke = g2.getStroke();
-				g2.setStroke(new BasicStroke(1.0f)); // Stroke muy fino
-				g2.drawOval(circleX, circleY, diameter, diameter);
-				g2.setStroke(originalStroke); // Restaurar stroke original
+				g2.setStroke(new BasicStroke(1.0f));
+				g2.drawRect(r.x, r.y, r.width, r.height);
+				g2.setStroke(originalStroke);
 				
-				// Superponer el número del color
-				String id = cc.getShortIdentifier(color);
-				int width = g2.getFontMetrics().stringWidth(id);
-				int originX = (int)(r.getCenterX() - width/2);
-				int originY = (int)(r.getCenterY() + fontSize/2);
-				
-				// Usar color de texto que contraste según la luminosidad del fondo
-				Color textColor = getContrastingTextColor(color.getRGB());
-				g2.setColor(textColor);
-				g2.drawString(id, originX, originY);
+				// Solo superponer el número del color si NO es para viewport (drawColors=true)
+				// Para viewport solo mostrar colores, para instrucciones mostrar colores + números
+				if (!drawColors) {
+					String id = cc.getShortIdentifier(color);
+					int width = g2.getFontMetrics().stringWidth(id);
+					int originX = (int)(r.getCenterX() - width/2);
+					int originY = (int)(r.getCenterY() + fontSize/2);
+					
+					// Usar color de texto que contraste según la luminosidad del fondo
+					Color textColor = getContrastingTextColor(color.getRGB());
+					g2.setColor(textColor);
+					g2.drawString(id, originX, originY);
+				}
 			}			
 		}
 		return ret;

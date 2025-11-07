@@ -4,6 +4,7 @@ import io.DataFile;
 import io.ModelState;
 import java.awt.*;
 import java.awt.geom.Rectangle2D;
+import java.util.HashMap;
 
 import transforms.ScaleTransform;
 
@@ -82,6 +83,9 @@ public enum BrickGraphicsState implements ModelState {
 	SelectedColors(new int[]{0, /*4,*/ 15, 19, 28, 70, 71, 72, 84, 308, 320, 484}),
 	ToBricksFiltered(ToBricksType.getDefaultTypes()),
 	ToBricksTypeIndex(0),
+	
+	// Manual modifications (serialized as String):
+	ManualModifications(""),
 	
 	// Export:
 	ExportOptimize(true);
