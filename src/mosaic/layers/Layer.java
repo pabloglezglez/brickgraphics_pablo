@@ -17,8 +17,6 @@ public class Layer {
     private Point position;
     private boolean visible;
     private float opacity;
-    private BlendMode blendMode;
-    private String filePath;
     
     // Propiedades de transformación de imagen individuales por capa
     private float brightness;
@@ -27,7 +25,9 @@ public class Layer {
     private float gamma;
     private float sharpness;
     private float scale;
-    
+    private BlendMode blendMode;
+    private String imagePath;
+
     /**
      * Modos de mezcla para las capas
      */
@@ -64,7 +64,7 @@ public class Layer {
      */
     public Layer(String name, BufferedImage image, Point position, String filePath) {
         this(name, image, position);
-        this.filePath = filePath;
+        this.imagePath = filePath;
     }
     
     // Getters
@@ -75,8 +75,8 @@ public class Layer {
     public int getY() { return position.y; }
     public float getOpacity() { return opacity; }
     public boolean isVisible() { return visible; }
-    public String getFilePath() { return filePath; }
-    public String getImageFilePath() { return filePath; }
+    public String getFilePath() { return imagePath; }
+    public String getImageFilePath() { return imagePath; }
     public BlendMode getBlendMode() { return blendMode; }
     
     // Setters
@@ -103,7 +103,7 @@ public class Layer {
     }
     
     public void setFilePath(String filePath) { 
-        this.filePath = filePath; 
+        this.imagePath = filePath; 
     }
     
     // Getters y setters para propiedades de transformación de imagen
@@ -207,11 +207,60 @@ public class Layer {
         
         g.dispose();
     }
+
+    public static int blend(int back, int front, BlendMode mode) {
+        int r1 = (back >> 16) & 0xff;
+        int g1 = (back >> 8) & 0xff;
+        int b1 = (back) & 0xff;
+        int a1 = (back >> 24) & 0xff;
+
+        int r2 = (front >> 16) & 0xff;
+        int g2 = (front >> 8) & 0xff;
+        int b2 = (front) & 0xff;
+        int a2 = (front >> 24) & 0xff;
+
+        int r, g, b;
+
+        switch (mode) {
+            case MULTIPLY:
+                r = (r1 * r2) / 255;
+                g = (g1 * g2) / 255;
+                b = (b1 * b2) / 255;
+                break;
+            case SCREEN:
+                r = 255 - ((255 - r1) * (255 - r2)) / 255;
+                g = 255 - ((255 - g1) * (255 - g2)) / 255;
+                b = 255 - ((255 - b1) * (255 - b2)) / 255;
+                break;
+            case OVERLAY:
+                r = (r1 < 128) ? (2 * r1 * r2) / 255 : 255 - (2 * (255 - r1) * (255 - r2)) / 255;
+                g = (g1 < 128) ? (2 * g1 * g2) / 255 : 255 - (2 * (255 - g1) * (255 - g2)) / 255;
+                b = (b1 < 128) ? (2 * b1 * b2) / 255 : 255 - (2 * (255 - b1) * (255 - b2)) / 255;
+                break;
+            case SOFT_LIGHT:
+                r = (int) ((1 - 2 * (float)r2/255) * ((float)r1/255) * ((float)r1/255) + 2 * ((float)r2/255) * ((float)r1/255)) * 255;
+                g = (int) ((1 - 2 * (float)g2/255) * ((float)g1/255) * ((float)g1/255) + 2 * ((float)g2/255) * ((float)g1/255)) * 255;
+                b = (int) ((1 - 2 * (float)b2/255) * ((float)b1/255) * ((float)b1/255) + 2 * ((float)b2/255) * ((float)b1/255)) * 255;
+                r = Math.max(0, Math.min(255, r));
+                g = Math.max(0, Math.min(255, g));
+                b = Math.max(0, Math.min(255, b));
+                break;
+            case NORMAL:
+            default:
+                r = r2;
+                g = g2;
+                b = b2;
+                break;
+        }
+
+        int alpha = Math.min(255, a1 + a2);
+        return (alpha << 24) | (r << 16) | (g << 8) | b;
+    }
     
     /**
      * Aplica transformaciones de imagen (brillo, contraste, etc.) a la imagen de la capa
      */
-    private BufferedImage applyImageTransforms(BufferedImage sourceImage) {
+    public BufferedImage applyImageTransforms(BufferedImage sourceImage) {
         if (sourceImage == null) return null;
         
         // Si no hay transformaciones, devolver imagen original
@@ -382,7 +431,7 @@ public class Layer {
             g.dispose();
         }
         
-        Layer copy = new Layer(name + " (copy)", imageCopy, position, filePath);
+        Layer copy = new Layer(name + " (copy)", imageCopy, position, imagePath);
         copy.setOpacity(opacity);
         copy.setVisible(visible);
         copy.setBlendMode(blendMode);
