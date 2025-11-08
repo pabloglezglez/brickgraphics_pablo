@@ -119,11 +119,7 @@ public class IntegratedImageLayerPanel extends JPanel {
         layerInfoLabel.setFont(layerInfoLabel.getFont().deriveFont(Font.ITALIC));
         
         // Controles de propiedades de capa
-        opacitySlider = new JSlider(0, 100, 100);
-        opacitySlider.setMajorTickSpacing(25);
-        opacitySlider.setMinorTickSpacing(5);
-        opacitySlider.setPaintTicks(true);
-        opacitySlider.setPaintLabels(true);
+        opacitySlider = createImageSlider("Opacidad", 0, 100, 100);
         
         visibilityCheckBox = new JCheckBox("Visible", true);
         blendModeCombo = new JComboBox<>(Layer.BlendMode.values());
@@ -501,20 +497,17 @@ public class IntegratedImageLayerPanel extends JPanel {
      */
     private void addCompactImageControl(JPanel panel, String label, JSlider slider, JLabel valueLabel, GridBagConstraints gbc, int row) {
         // Label
-        gbc.gridx = 0; gbc.gridy = row; gbc.fill = GridBagConstraints.NONE; gbc.weightx = 0.0;
+        gbc.gridx = 0; gbc.gridy = row; gbc.fill = GridBagConstraints.HORIZONTAL; gbc.weightx = 0.35;
         JLabel labelComp = new JLabel(label);
-        labelComp.setPreferredSize(new Dimension(70, labelComp.getPreferredSize().height));
         labelComp.setHorizontalAlignment(SwingConstants.RIGHT);
         panel.add(labelComp, gbc);
         
         // Slider
-        gbc.gridx = 1; gbc.fill = GridBagConstraints.HORIZONTAL; gbc.weightx = 1.0;
-        slider.setPreferredSize(new Dimension(100, slider.getPreferredSize().height));
+        gbc.gridx = 1; gbc.fill = GridBagConstraints.HORIZONTAL; gbc.weightx = 0.40;
         panel.add(slider, gbc);
         
         // Value label
-        gbc.gridx = 2; gbc.fill = GridBagConstraints.NONE; gbc.weightx = 0.0;
-        valueLabel.setPreferredSize(new Dimension(30, valueLabel.getPreferredSize().height));
+        gbc.gridx = 2; gbc.fill = GridBagConstraints.HORIZONTAL; gbc.weightx = 0.25;
         valueLabel.setHorizontalAlignment(SwingConstants.CENTER);
         valueLabel.setBorder(BorderFactory.createLoweredBevelBorder());
         panel.add(valueLabel, gbc);
@@ -541,26 +534,19 @@ public class IntegratedImageLayerPanel extends JPanel {
         gbc.gridx = 2; gbc.fill = GridBagConstraints.HORIZONTAL; gbc.weightx = 1.0;
         basicProps.add(blendModeCombo, gbc);
         
-        // Fila 1: Opacidad
-        gbc.gridx = 0; gbc.gridy = 1; gbc.fill = GridBagConstraints.NONE; gbc.weightx = 0.0;
-        basicProps.add(new JLabel("Opacidad:"), gbc);
-        gbc.gridx = 1; gbc.fill = GridBagConstraints.HORIZONTAL; gbc.weightx = 1.0;
-        basicProps.add(opacitySlider, gbc);
-        gbc.gridx = 2; gbc.fill = GridBagConstraints.NONE; gbc.weightx = 0.0;
-        basicProps.add(opacityLabel, gbc);
+        // Fila 1: Opacidad (movido a ajustes de imagen)
+        // addImageTransformControl(basicProps, "Opacidad:", opacitySlider, opacityLabel, gbc, 1);
         
-        // Fila 2: Posición X y Y
-        gbc.gridx = 0; gbc.gridy = 2; gbc.fill = GridBagConstraints.NONE; gbc.weightx = 0.0;
+        // Fila 2: Posición X
+        gbc.gridx = 0; gbc.gridy = 1; gbc.fill = GridBagConstraints.NONE; gbc.weightx = 0.0; // Cambiado gridy a 1
         basicProps.add(new JLabel("Pos X:"), gbc);
-        gbc.gridx = 1; gbc.fill = GridBagConstraints.HORIZONTAL; gbc.weightx = 0.5;
+        gbc.gridx = 1; gbc.gridwidth = 2; gbc.fill = GridBagConstraints.HORIZONTAL; gbc.weightx = 1.0;
         basicProps.add(positionXSpinner, gbc);
-        gbc.gridx = 2; gbc.fill = GridBagConstraints.NONE; gbc.weightx = 0.0;
+
+        // Fila 3: Posición Y
+        gbc.gridx = 0; gbc.gridy = 2; gbc.gridwidth = 1; gbc.fill = GridBagConstraints.NONE; gbc.weightx = 0.0; // Cambiado gridy a 2
         basicProps.add(new JLabel("Pos Y:"), gbc);
-        
-        // Fila 3: Posición Y en segunda columna 
-        gbc.gridx = 0; gbc.gridy = 3; gbc.fill = GridBagConstraints.NONE; gbc.weightx = 0.0;
-        basicProps.add(new JLabel(""), gbc); // Espacio vacío
-        gbc.gridx = 1; gbc.fill = GridBagConstraints.HORIZONTAL; gbc.weightx = 0.5;
+        gbc.gridx = 1; gbc.gridwidth = 2; gbc.fill = GridBagConstraints.HORIZONTAL; gbc.weightx = 1.0;
         basicProps.add(positionYSpinner, gbc);
         
         // Panel de transformaciones de imagen
@@ -572,15 +558,16 @@ public class IntegratedImageLayerPanel extends JPanel {
         igbc.anchor = GridBagConstraints.WEST;
         
         // Añadir controles de transformación
-        addImageTransformControl(imageTransformsPanel, "Brillo:", brightnessSlider, brightnessLabel, igbc, 0);
-        addImageTransformControl(imageTransformsPanel, "Contraste:", contrastSlider, contrastLabel, igbc, 1);
-        addImageTransformControl(imageTransformsPanel, "Saturación:", saturationSlider, saturationLabel, igbc, 2);
-        addImageTransformControl(imageTransformsPanel, "Gamma:", gammaSlider, gammaLabel, igbc, 3);
-        addImageTransformControl(imageTransformsPanel, "Nitidez:", sharpnessSlider, sharpnessLabel, igbc, 4);
-        addImageTransformControl(imageTransformsPanel, "Escala:", scaleSlider, scaleLabel, igbc, 5);
+        addImageTransformControl(imageTransformsPanel, "Opacidad:", opacitySlider, opacityLabel, igbc, 0);
+        addImageTransformControl(imageTransformsPanel, "Brillo:", brightnessSlider, brightnessLabel, igbc, 1);
+        addImageTransformControl(imageTransformsPanel, "Contraste:", contrastSlider, contrastLabel, igbc, 2);
+        addImageTransformControl(imageTransformsPanel, "Saturación:", saturationSlider, saturationLabel, igbc, 3);
+        addImageTransformControl(imageTransformsPanel, "Gamma:", gammaSlider, gammaLabel, igbc, 4);
+        addImageTransformControl(imageTransformsPanel, "Nitidez:", sharpnessSlider, sharpnessLabel, igbc, 5);
+        addImageTransformControl(imageTransformsPanel, "Escala:", scaleSlider, scaleLabel, igbc, 6);
         
         // Fila para botón reset
-        igbc.gridx = 0; igbc.gridy = 6; igbc.gridwidth = 2; igbc.fill = GridBagConstraints.HORIZONTAL;
+        igbc.gridx = 0; igbc.gridy = 7; igbc.gridwidth = 2; igbc.fill = GridBagConstraints.HORIZONTAL;
         imageTransformsPanel.add(resetAdjustmentsButton, igbc);
         
         panel.add(basicProps, BorderLayout.NORTH);

@@ -19,8 +19,9 @@ public abstract class RGBTransform extends StateTransform<float[]> {
 		return get()[index];
 	}
 	
-	public void set(int index, int val) {
+	public void set(int index, float val) {
 		get()[index] = val;
+		clearBuffer();
 	}
 	
 	public boolean allAreOne() {

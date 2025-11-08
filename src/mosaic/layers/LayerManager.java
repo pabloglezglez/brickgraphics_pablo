@@ -1,5 +1,6 @@
 package mosaic.layers;
 
+import java.awt.AlphaComposite;
 import java.awt.image.BufferedImage;
 import java.awt.Graphics2D;
 import java.awt.Point;
@@ -14,6 +15,7 @@ import java.io.IOException;
 import io.Model;
 import io.ModelHandler;
 import mosaic.io.BrickGraphicsState;
+import mosaic.layers.Layer.BlendMode;
 
 /**
  * Gestor principal del sistema de capas.
@@ -338,11 +340,9 @@ public class LayerManager implements ModelHandler<BrickGraphicsState> {
         
         // Crear una copia de la imagen base
         BufferedImage transformedImage = new BufferedImage(
-            baseImage.getWidth(), baseImage.getHeight(), BufferedImage.TYPE_INT_RGB);
+            baseImage.getWidth(), baseImage.getHeight(), BufferedImage.TYPE_INT_ARGB);
         
         Graphics2D g2d = transformedImage.createGraphics();
-        g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-        g2d.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
         g2d.drawImage(baseImage, 0, 0, null);
         g2d.dispose();
         
@@ -460,37 +460,110 @@ public class LayerManager implements ModelHandler<BrickGraphicsState> {
      * @return Una nueva imagen con las capas aplicadas, o la imagen original si no hay capas
      */
     public BufferedImage applyLayersToImage(BufferedImage baseImage) {
-        // Si las capas están deshabilitadas o no hay capas, devolver imagen original
         if (!layersEnabled || layers.isEmpty() || baseImage == null) {
             return baseImage;
         }
-        
-        // Crear una copia de la imagen base para no modificar el original
+
         BufferedImage result = new BufferedImage(
             baseImage.getWidth(), 
             baseImage.getHeight(), 
-            BufferedImage.TYPE_INT_RGB
+            BufferedImage.TYPE_INT_ARGB
         );
-        
-        Graphics2D g2d = result.createGraphics();
-        g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION, 
-                            RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-        g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, 
-                            RenderingHints.VALUE_ANTIALIAS_ON);
-        
-        // Dibujar la imagen base
-        g2d.drawImage(baseImage, 0, 0, null);
-        
-        // Aplicar cada capa visible
+        Graphics2D g_ = result.createGraphics();
+        g_.drawImage(baseImage, 0, 0, null);
+
         for (Layer layer : layers) {
-            if (layer.isVisible()) {
-                layer.render(g2d, 1.0f); // Opacidad global 1.0
+            if (!layer.isVisible()) {
+                continue;
             }
-        }
-        
-        g2d.dispose();
-        return result;
-    }
+
+			// Apply transformations to get the image to be rendered
+			BufferedImage layerImage = layer.applyImageTransforms(layer.getImage());
+			if (layerImage == null)
+				continue;
+
+			int originalWidth = layerImage.getWidth();
+			int originalHeight = layerImage.getHeight();
+			
+			// Handle scaling
+			float scale = layer.getScale();
+			int newWidth = (int) (originalWidth * scale);
+			int newHeight = (int) (originalHeight * scale);
+			
+			int layerX = layer.getX();
+			int layerY = layer.getY();
+
+			if (Math.abs(scale - 1.0f) > 1e-6) {
+				if (newWidth > 0 && newHeight > 0) {
+					BufferedImage scaledImage = new BufferedImage(newWidth, newHeight, BufferedImage.TYPE_INT_ARGB);
+					Graphics2D g = scaledImage.createGraphics();
+					g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+					g.drawImage(layerImage, 0, 0, newWidth, newHeight, null);
+					g.dispose();
+					layerImage = scaledImage;
+					
+					// Adjust position to keep center
+					layerX += (originalWidth - newWidth) / 2;
+					layerY += (originalHeight - newHeight) / 2;
+				}
+			}
+
+			// Blend modes
+			BlendMode mode = layer.getBlendMode();
+            float opacity = layer.getOpacity() * globalOpacity;
+
+			if (mode == BlendMode.NORMAL) {
+				// Use standard alpha compositing for NORMAL mode
+				AlphaComposite ac = AlphaComposite.getInstance(AlphaComposite.SRC_OVER, opacity);
+				g_.setComposite(ac);
+				g_.drawImage(layerImage, layerX, layerY, null);
+			}
+			else {
+				// Manual blending for other modes
+				int imageW = result.getWidth();
+				int imageH = result.getHeight();
+				int layerW = layerImage.getWidth();
+				int layerH = layerImage.getHeight();
+
+				for (int y = 0; y < layerH; y++) {
+					int canvasY = y + layerY;
+					if (canvasY < 0 || canvasY >= imageH)
+						continue;
+					for (int x = 0; x < layerW; x++) {
+						int canvasX = x + layerX;
+						if (canvasX < 0 || canvasX >= imageW)
+							continue;
+
+						int frontARGB = layerImage.getRGB(x, y);
+						int backARGB = result.getRGB(canvasX, canvasY);
+
+						int blendedARGB = Layer.blend(backARGB, frontARGB, mode);
+
+						// Manual alpha compositing
+						float pixelAlpha = ((frontARGB >> 24) & 0xff) / 255.0f;
+						float finalAlpha = opacity * pixelAlpha;
+
+						int r_back = (backARGB >> 16) & 0xff;
+						int g_back = (backARGB >> 8) & 0xff;
+						int b_back = (backARGB) & 0xff;
+
+						int r_blend = (blendedARGB >> 16) & 0xff;
+						int g_blend = (blendedARGB >> 8) & 0xff;
+						int b_blend = (blendedARGB) & 0xff;
+
+						int r = (int) (r_back * (1 - finalAlpha) + r_blend * finalAlpha);
+						int g = (int) (g_back * (1 - finalAlpha) + g_blend * finalAlpha);
+						int b = (int) (b_back * (1 - finalAlpha) + b_blend * finalAlpha);
+
+						int finalARGB = (backARGB & 0xFF000000) | (r << 16) | (g << 8) | b;
+						result.setRGB(canvasX, canvasY, finalARGB);
+					}
+				}
+			}
+		}
+		g_.dispose();
+		return result;
+	}
     
     /**
      * Limpia todas las capas de la lista

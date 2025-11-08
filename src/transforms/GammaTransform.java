@@ -22,7 +22,12 @@ public class GammaTransform extends RGBTransform {
 		int h = in.getHeight();
 		
 		progressCallback.reportProgress(100);
-		short[][] gammaSpectrum = new short[3][256];
+
+		boolean hasAlpha = in.getColorModel().hasAlpha();
+        int numChannels = hasAlpha ? 4 : 3;
+		short[][] gammaSpectrum = new short[numChannels][256];
+
+		// RGB channels
 		for(int rgb = 0; rgb < 3; rgb++) {
 			for(int i = 0; i < 256; i++) {
 				long s = Math.round(256*Math.pow(i/256.0, 1/get(rgb)));
@@ -30,13 +35,20 @@ public class GammaTransform extends RGBTransform {
 			}			
 		}
 
+		if (hasAlpha) {
+			short[] alpha = new short[256];
+			for(int i=0; i<256; ++i)
+				alpha[i] = (short)i;
+			gammaSpectrum[3] = alpha;
+		}
+
 		progressCallback.reportProgress(300);
 		LookupTable table = new ShortLookupTable(0,gammaSpectrum);
 		progressCallback.reportProgress(500);
 		LookupOp op = new LookupOp(table, null);
-		BufferedImage tmp = new BufferedImage(w, h, in.getType());
-		progressCallback.reportProgress(600);
-		BufferedImage out = op.filter(in, tmp);
+		
+		BufferedImage out = op.filter(in, null);
+
 		progressCallback.reportProgress(1000);
 		return out;
 	}
