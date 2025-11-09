@@ -6,6 +6,8 @@ import java.awt.Graphics2D;
 import java.awt.Point;
 import java.awt.RenderingHints;
 import java.awt.Color;
+import java.util.*;
+import java.util.List;
 
 /**
  * Representa una capa que puede ser superpuesta sobre el mosaico base.
@@ -14,8 +16,10 @@ import java.awt.Color;
 public class Layer {
     private String name;
     private BufferedImage image;
-    // Overlay de pintura (solo diffs pintados). Se mantiene separado para no modificar la imagen base.
-    private BufferedImage paintingOverlay; // mismo tamaño que image; píxeles transparentes donde no hay pintura
+    
+    // NUEVO: Sistema de modificaciones de píxeles como datos estructurados
+    private Map<Point, PixelModification> pixelModifications; // Coordenadas relativas a imagen original
+    
     private Point position;
     private boolean visible;
     private float opacity;
@@ -52,6 +56,9 @@ public class Layer {
         this.visible = true;
         this.blendMode = BlendMode.NORMAL;
         
+        // Inicializar sistema de modificaciones de píxeles
+        this.pixelModifications = new HashMap<>();
+        
         // Valores por defecto para transformaciones de imagen
         this.brightness = 1.0f;
         this.contrast = 1.0f;
@@ -72,7 +79,27 @@ public class Layer {
     // Getters
     public String getName() { return name; }
     public BufferedImage getImage() { return image; }
-    public BufferedImage getPaintingOverlay() { return paintingOverlay; }
+    
+    // NUEVO: Métodos para el sistema de modificaciones de píxeles
+    public Map<Point, PixelModification> getPixelModifications() { 
+        return new HashMap<>(pixelModifications); 
+    }
+    
+    public boolean hasPixelModifications() {
+        return !pixelModifications.isEmpty();
+    }
+    
+    public PixelModification getPixelModification(int x, int y) {
+        return pixelModifications.get(new Point(x, y));
+    }
+    
+    // COMPATIBILIDAD: Mantener método para compatibilidad con código existente
+    @Deprecated
+    public BufferedImage getPaintingOverlay() { 
+        // Convertir modificaciones a BufferedImage para compatibilidad
+        return convertModificationsToBufferedImage();
+    }
+    
     public Point getPosition() { return new Point(position); }
     public int getX() { return position.x; }
     public int getY() { return position.y; }
@@ -87,15 +114,43 @@ public class Layer {
     
     public void setImage(BufferedImage image) { 
         this.image = image; 
-        // Invalida overlay si el tamaño cambia
-        if (paintingOverlay != null && (paintingOverlay.getWidth() != image.getWidth() || paintingOverlay.getHeight() != image.getHeight())) {
-            paintingOverlay = null; // se recreará lazy cuando se pinte
+        // Limpiar modificaciones que estén fuera de los nuevos límites de imagen
+        if (image != null) {
+            cleanupModifications(image.getWidth(), image.getHeight());
         }
     }
+    
+    // NUEVO: Métodos para manejar modificaciones de píxeles
+    public void setPixelModifications(Map<Point, PixelModification> modifications) {
+        this.pixelModifications = new HashMap<>(modifications);
+    }
+    
+    public void addPixelModification(PixelModification modification) {
+        pixelModifications.put(modification.getPosition(), modification);
+        io.Log.log("DEBUG: Layer.addPixelModification - añadida modificación en " + modification.getPosition() + " color=" + modification.getColor());
+    }
+    
+    public void removePixelModification(int x, int y) {
+        Point pos = new Point(x, y);
+        PixelModification removed = pixelModifications.remove(pos);
+        if (removed != null) {
+            io.Log.log("DEBUG: Layer.removePixelModification - eliminada modificación en (" + x + "," + y + ")");
+        }
+    }
+    
+    public void clearPixelModifications() {
+        int count = pixelModifications.size();
+        pixelModifications.clear();
+        io.Log.log("DEBUG: Layer.clearPixelModifications - eliminadas " + count + " modificaciones de '" + name + "'");
+    }
+    
+    // COMPATIBILIDAD: Mantener para código existente
+    @Deprecated
     public void setPaintingOverlay(BufferedImage overlay) {
-        this.paintingOverlay = overlay;
+        // Convertir BufferedImage a modificaciones de píxeles
+        convertBufferedImageToModifications(overlay);
         if (overlay != null) {
-            io.Log.log("DEBUG: Layer.setPaintingOverlay - asignado overlay a '" + name + "' size=" + overlay.getWidth() + "x" + overlay.getHeight() + " id=" + System.identityHashCode(overlay));
+            io.Log.log("DEBUG: Layer.setPaintingOverlay - convertido overlay a " + pixelModifications.size() + " modificaciones para '" + name + "'");
         } else {
             io.Log.log("DEBUG: Layer.setPaintingOverlay - overlay NULL para '" + name + "'");
         }
@@ -145,18 +200,7 @@ public class Layer {
     }
 
     /**
-     * Asegura que exista un overlay de pintura del mismo tamaño que la imagen base.
-     */
-    private void ensurePaintingOverlay() {
-        if (image == null) return;
-        if (paintingOverlay == null) {
-            paintingOverlay = new BufferedImage(image.getWidth(), image.getHeight(), BufferedImage.TYPE_INT_ARGB);
-            io.Log.log("DEBUG: Layer.ensurePaintingOverlay - creado nuevo overlay para '" + name + "' size=" + image.getWidth() + "x" + image.getHeight());
-        }
-    }
-
-    /**
-     * Aplica un trazo circular simple (brush) sobre la capa de pintura.
+     * Aplica un trazo circular simple (brush) sobre la capa usando modificaciones de píxeles.
      * @param x centro X en coordenadas de imagen (antes de escala)
      * @param y centro Y en coordenadas de imagen
      * @param radius radio del pincel
@@ -165,43 +209,54 @@ public class Layer {
      */
     public boolean applyBrushStroke(int x, int y, int radius, int color) {
         if (image == null) return false;
-        ensurePaintingOverlay();
-        if (paintingOverlay == null) return false;
-        int w = paintingOverlay.getWidth();
-        int h = paintingOverlay.getHeight();
+        
+        int w = image.getWidth();
+        int h = image.getHeight();
         int r2 = radius * radius;
         boolean modified = false;
+        
+        // Extraer componentes de color
+        int alpha = (color >> 24) & 0xFF;
+        int red = (color >> 16) & 0xFF;
+        int green = (color >> 8) & 0xFF;
+        int blue = color & 0xFF;
+        
+        Color brushColor = new Color(red, green, blue);
+        float alphaFloat = alpha / 255.0f;
+        
         // Recorte de bounding box
         int minX = Math.max(0, x - radius);
         int maxX = Math.min(w - 1, x + radius);
         int minY = Math.max(0, y - radius);
         int maxY = Math.min(h - 1, y + radius);
+        
         for (int yy = minY; yy <= maxY; yy++) {
             int dy = yy - y;
             for (int xx = minX; xx <= maxX; xx++) {
                 int dx = xx - x;
                 if (dx*dx + dy*dy <= r2) {
-                    paintingOverlay.setRGB(xx, yy, color);
+                    // Crear nueva modificación de píxel
+                    PixelModification modification = new PixelModification(xx, yy, brushColor, alphaFloat);
+                    pixelModifications.put(new Point(xx, yy), modification);
                     modified = true;
                 }
             }
         }
+        
         if (modified) {
-            io.Log.log("DEBUG: Layer.applyBrushStroke - modificado overlay '" + name + "' centro=(" + x + "," + y + ") radius=" + radius);
+            io.Log.log("DEBUG: Layer.applyBrushStroke - agregadas " + 
+                      ((maxX-minX+1) * (maxY-minY+1)) + " modificaciones de píxel en '" + name + 
+                      "' centro=(" + x + "," + y + ") radius=" + radius + 
+                      " total=" + pixelModifications.size());
         }
         return modified;
     }
 
     /**
-     * Limpia completamente el overlay de pintura.
+     * Limpia completamente las modificaciones de píxeles.
      */
     public void clearPaintingOverlay() {
-        if (paintingOverlay == null) return;
-        Graphics2D g = paintingOverlay.createGraphics();
-        g.setComposite(AlphaComposite.Clear);
-        g.fillRect(0,0,paintingOverlay.getWidth(), paintingOverlay.getHeight());
-        g.dispose();
-        io.Log.log("DEBUG: Layer.clearPaintingOverlay - overlay limpiado para '" + name + "'");
+        clearPixelModifications();
     }
     
     /**
@@ -275,16 +330,15 @@ public class Layer {
             
             // Dibujar imagen escalada desde el centro
             g.drawImage(processedImage, drawX, drawY, scaledWidth, scaledHeight, null);
-            // Render overlay de pintura escalado si existe
-            if (paintingOverlay != null) {
-                g.drawImage(paintingOverlay, drawX, drawY, scaledWidth, scaledHeight, null);
-            }
+            
+            // NUEVO: Renderizar modificaciones de píxeles escaladas
+            renderPixelModifications(g, drawX, drawY, scaledWidth, scaledHeight, originalWidth, originalHeight);
         } else {
             // Dibujar imagen sin escalado
             g.drawImage(processedImage, position.x, position.y, null);
-            if (paintingOverlay != null) {
-                g.drawImage(paintingOverlay, position.x, position.y, null);
-            }
+            
+            // NUEVO: Renderizar modificaciones de píxeles sin escalar
+            renderPixelModifications(g, position.x, position.y, processedImage.getWidth(), processedImage.getHeight(), processedImage.getWidth(), processedImage.getHeight());
         }
         
         g.dispose();
@@ -531,9 +585,9 @@ public class Layer {
         copy.setGamma(gamma);
         copy.setSharpness(sharpness);
         copy.setScale(scale);
-        if (overlayCopy != null) {
-            copy.setPaintingOverlay(overlayCopy);
-        }
+        
+        // NUEVO: Copiar modificaciones de píxeles
+        copy.setPixelModifications(this.pixelModifications);
         
         return copy;
     }
@@ -552,6 +606,163 @@ public class Layer {
         g2d.dispose();
         
         this.image = scaledImage;
+    }
+    
+    // MÉTODOS AUXILIARES PARA EL NUEVO SISTEMA DE MODIFICACIONES
+    
+    /**
+     * Renderiza las modificaciones de píxeles aplicando escalado y transformaciones
+     */
+    private void renderPixelModifications(Graphics2D g, int drawX, int drawY, int renderWidth, int renderHeight, int originalWidth, int originalHeight) {
+        if (pixelModifications.isEmpty()) return;
+        
+        float scaleX = (float) renderWidth / originalWidth;
+        float scaleY = (float) renderHeight / originalHeight;
+        
+        // Renderizar cada modificación de píxel
+        for (PixelModification mod : pixelModifications.values()) {
+            Point originalPos = mod.getPosition();
+            
+            // Calcular posición escalada
+            int scaledX = Math.round(originalPos.x * scaleX);
+            int scaledY = Math.round(originalPos.y * scaleY);
+            
+            // Posición final en el canvas
+            int finalX = drawX + scaledX;
+            int finalY = drawY + scaledY;
+            
+            // Aplicar color con alpha
+            Color color = mod.getColor();
+            int alpha = Math.round(mod.getAlpha() * 255);
+            Color colorWithAlpha = new Color(color.getRed(), color.getGreen(), color.getBlue(), alpha);
+            
+            g.setColor(colorWithAlpha);
+            
+            // Dibujar píxel escalado (puede ser más grande que 1x1 si está escalado)
+            int pixelWidth = Math.max(1, Math.round(scaleX));
+            int pixelHeight = Math.max(1, Math.round(scaleY));
+            g.fillRect(finalX, finalY, pixelWidth, pixelHeight);
+        }
+    }
+    
+    /**
+     * Limpia modificaciones que estén fuera de los límites de la imagen
+     */
+    private void cleanupModifications(int width, int height) {
+        pixelModifications.entrySet().removeIf(entry -> {
+            Point pos = entry.getKey();
+            return pos.x < 0 || pos.x >= width || pos.y < 0 || pos.y >= height;
+        });
+    }
+    
+    /**
+     * Convierte las modificaciones de píxeles a BufferedImage para compatibilidad
+     */
+    private BufferedImage convertModificationsToBufferedImage() {
+        if (image == null || pixelModifications.isEmpty()) {
+            return null;
+        }
+        
+        BufferedImage overlay = new BufferedImage(image.getWidth(), image.getHeight(), BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = overlay.createGraphics();
+        
+        // Dibujar cada modificación de píxel
+        for (PixelModification mod : pixelModifications.values()) {
+            Point pos = mod.getPosition();
+            if (pos.x >= 0 && pos.x < image.getWidth() && pos.y >= 0 && pos.y < image.getHeight()) {
+                Color color = mod.getColor();
+                int alpha = Math.round(mod.getAlpha() * 255);
+                Color colorWithAlpha = new Color(color.getRed(), color.getGreen(), color.getBlue(), alpha);
+                g.setColor(colorWithAlpha);
+                g.fillRect(pos.x, pos.y, 1, 1);
+            }
+        }
+        
+        g.dispose();
+        return overlay;
+    }
+    
+    /**
+     * Convierte un BufferedImage overlay a modificaciones de píxeles
+     */
+    private void convertBufferedImageToModifications(BufferedImage overlay) {
+        pixelModifications.clear();
+        
+        if (overlay == null) return;
+        
+        for (int y = 0; y < overlay.getHeight(); y++) {
+            for (int x = 0; x < overlay.getWidth(); x++) {
+                int argb = overlay.getRGB(x, y);
+                int alpha = (argb >> 24) & 0xFF;
+                
+                // Solo agregar píxeles no transparentes
+                if (alpha > 0) {
+                    int r = (argb >> 16) & 0xFF;
+                    int g = (argb >> 8) & 0xFF;
+                    int b = argb & 0xFF;
+                    
+                    Color color = new Color(r, g, b);
+                    float alphaFloat = alpha / 255.0f;
+                    PixelModification mod = new PixelModification(x, y, color, alphaFloat);
+                    pixelModifications.put(new Point(x, y), mod);
+                }
+            }
+        }
+    }
+    
+    /**
+     * Serializa las modificaciones de píxeles a JSON
+     */
+    public String serializePixelModifications() {
+        if (pixelModifications.isEmpty()) {
+            return "[]";
+        }
+        
+        StringBuilder json = new StringBuilder("[");
+        boolean first = true;
+        for (PixelModification mod : pixelModifications.values()) {
+            if (!first) json.append(",");
+            json.append(mod.toJson());
+            first = false;
+        }
+        json.append("]");
+        return json.toString();
+    }
+    
+    /**
+     * Deserializa modificaciones de píxeles desde JSON
+     */
+    public void deserializePixelModifications(String json) {
+        pixelModifications.clear();
+        
+        if (json == null || json.trim().isEmpty() || json.equals("[]")) {
+            return;
+        }
+        
+        try {
+            json = json.trim();
+            if (!json.startsWith("[") || !json.endsWith("]")) {
+                throw new IllegalArgumentException("JSON debe ser un array");
+            }
+            
+            json = json.substring(1, json.length() - 1); // Quitar [ ]
+            if (json.trim().isEmpty()) return;
+            
+            // Dividir por objetos JSON
+            String[] modStrings = json.split("(?<=})\\s*,\\s*(?=\\{)");
+            for (String modString : modStrings) {
+                try {
+                    PixelModification mod = PixelModification.fromJson(modString.trim());
+                    pixelModifications.put(mod.getPosition(), mod);
+                } catch (Exception e) {
+                    io.Log.log("WARN: Error parseando modificación de píxel: " + modString + " - " + e.getMessage());
+                }
+            }
+            
+            io.Log.log("DEBUG: Layer.deserializePixelModifications - cargadas " + pixelModifications.size() + " modificaciones para '" + name + "'");
+        } catch (Exception e) {
+            io.Log.log("ERROR: Layer.deserializePixelModifications - " + e.getMessage());
+        }
     }
     
     @Override
