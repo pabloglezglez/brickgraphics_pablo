@@ -2,7 +2,7 @@ package mosaic.rendering;
 
 import java.awt.*;
 import java.awt.image.BufferedImage;
-import io.*;
+import io.Log;
 
 /**
  * Sistema de overlay de pintura global que se superpone al mosaico final.
@@ -48,7 +48,8 @@ public class PaintOverlay {
                 g2d.dispose();
             }
             
-            io.Log.log("DEBUG: PaintOverlay - Actualizado tamaño de " + oldOverlay.getWidth() + "x" + oldOverlay.getHeight() + 
+            io.Log.log("DEBUG: PaintOverlay - Actualizado tamaño de " + 
+                      (oldOverlay != null ? (oldOverlay.getWidth() + "x" + oldOverlay.getHeight()) : "null") + 
                       " a " + newSize.width + "x" + newSize.height);
         }
     }

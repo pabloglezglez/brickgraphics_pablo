@@ -24,6 +24,7 @@ public class IntegratedImageLayerPanel extends JPanel {
     private LayerManager layerManager;
     private ImagePreparingView imagePreparingView;
     private Model<BrickGraphicsState> model;
+    private mosaic.ui.BrickedView brickedView; // Referencia para controles de PaintOverlay
     
     // Componentes de UI
     private JList<Layer> layerList;
@@ -40,6 +41,10 @@ public class IntegratedImageLayerPanel extends JPanel {
     private JButton moveDownButton;
     private JCheckBox enableLayersCheckBox;
     private JLabel layerInfoLabel;
+    
+    // NUEVOS: Controles de Paint Overlay
+    private JCheckBox paintOverlayCheckBox;
+    private JButton clearPaintButton;
     
     // Panel de propiedades de capa seleccionada
     private JPanel layerPropertiesPanel;
@@ -84,10 +89,11 @@ public class IntegratedImageLayerPanel extends JPanel {
     /**
      * Constructor del panel integrado
      */
-    public IntegratedImageLayerPanel(LayerManager layerManager, ImagePreparingView imagePreparingView, Model<BrickGraphicsState> model) {
+    public IntegratedImageLayerPanel(LayerManager layerManager, ImagePreparingView imagePreparingView, Model<BrickGraphicsState> model, mosaic.ui.BrickedView brickedView) {
         this.layerManager = layerManager;
         this.imagePreparingView = imagePreparingView;
         this.model = model;
+        this.brickedView = brickedView;
         
         initializeComponents();
         setupLayout();
@@ -137,6 +143,12 @@ public class IntegratedImageLayerPanel extends JPanel {
     moveDownButton.setToolTipText("Mover capa seleccionada hacia abajo (Alt+↓)");
         enableLayersCheckBox = new JCheckBox("Capas Habilitadas", true);
     enableLayersCheckBox.setToolTipText("Activar / Desactivar todas las capas");
+        
+        // NUEVOS: Controles de Paint Overlay
+        paintOverlayCheckBox = new JCheckBox("Pintura Global", false);
+        paintOverlayCheckBox.setToolTipText("Activar/desactivar pintura sobre el mosaico final");
+        clearPaintButton = new JButton("Limpiar Pintura");
+        clearPaintButton.setToolTipText("Borrar toda la pintura aplicada");
         
         // Información de capas
         layerInfoLabel = new JLabel("No hay capas");
@@ -227,7 +239,15 @@ public class IntegratedImageLayerPanel extends JPanel {
     addLayerButton.setFocusable(false);
     removeLayerButton.setFocusable(false);
     duplicateButton.setFocusable(false);
+    
+    // También configurar los nuevos controles de PaintOverlay
+    paintOverlayCheckBox.setFocusable(false);
+    clearPaintButton.setFocusable(false);
+    
     mainBar.add(enableLayersCheckBox);
+    mainBar.addSeparator(new Dimension(4, 0));
+    mainBar.add(paintOverlayCheckBox);
+    mainBar.add(clearPaintButton);
     mainBar.addSeparator(new Dimension(8, 0));
     mainBar.add(addLayerButton);
     mainBar.add(removeLayerButton);
@@ -705,6 +725,21 @@ public class IntegratedImageLayerPanel extends JPanel {
         enableLayersCheckBox.addActionListener(e -> {
             layerManager.setLayersEnabled(enableLayersCheckBox.isSelected());
             notifyLayersChanged();
+        });
+        
+        // NUEVOS: Controles de Paint Overlay
+        paintOverlayCheckBox.addActionListener(e -> {
+            if (brickedView != null) {
+                brickedView.setPaintOverlayEnabled(paintOverlayCheckBox.isSelected());
+                brickedView.repaint();
+            }
+        });
+        
+        clearPaintButton.addActionListener(e -> {
+            if (brickedView != null) {
+                brickedView.clearPaintOverlay();
+                brickedView.repaint();
+            }
         });
         
         // Controles de capa

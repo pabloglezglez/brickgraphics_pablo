@@ -108,7 +108,7 @@ public class MainWindow extends JFrame implements ChangeListener, ModelHandler<B
 			
 			// Crear panel integrado que combina capas e imagen
 			integratedPanel = new IntegratedImageLayerPanel(
-				mc.getLayerManager(), imagePreparingView, model);
+				mc.getLayerManager(), imagePreparingView, model, brickedView);
 			
 			// Configurar callback para cambios de capas
 			integratedPanel.setOnLayersChangedCallback(() -> {
