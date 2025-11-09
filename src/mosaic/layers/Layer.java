@@ -566,13 +566,22 @@ public class Layer {
             g.drawImage(image, 0, 0, null);
             g.dispose();
         }
-        // Copiar overlay de pintura si existe
+        // Copiar modificaciones de píxeles
+        Map<Point, PixelModification> pixelModsCopy = null;
+        if (pixelModifications != null) {
+            pixelModsCopy = new HashMap<>(pixelModifications);
+        }
+        
+        // Mantener compatibilidad: copiar overlay de pintura si existe
         BufferedImage overlayCopy = null;
-        if (paintingOverlay != null) {
-            overlayCopy = new BufferedImage(paintingOverlay.getWidth(), paintingOverlay.getHeight(), BufferedImage.TYPE_INT_ARGB);
-            Graphics2D g = overlayCopy.createGraphics();
-            g.drawImage(paintingOverlay, 0, 0, null);
-            g.dispose();
+        if (pixelModifications == null || pixelModifications.isEmpty()) {
+            BufferedImage overlay = getPaintingOverlay();
+            if (overlay != null) {
+                overlayCopy = new BufferedImage(overlay.getWidth(), overlay.getHeight(), BufferedImage.TYPE_INT_ARGB);
+                Graphics2D g = overlayCopy.createGraphics();
+                g.drawImage(overlay, 0, 0, null);
+                g.dispose();
+            }
         }
 
         Layer copy = new Layer(name + " (copy)", imageCopy, position, imagePath);
@@ -587,7 +596,12 @@ public class Layer {
         copy.setScale(scale);
         
         // NUEVO: Copiar modificaciones de píxeles
-        copy.setPixelModifications(this.pixelModifications);
+        copy.setPixelModifications(pixelModsCopy);
+        
+        // Asignar overlay de compatibilidad si existe
+        if (overlayCopy != null) {
+            copy.setPaintingOverlay(overlayCopy);
+        }
         
         return copy;
     }

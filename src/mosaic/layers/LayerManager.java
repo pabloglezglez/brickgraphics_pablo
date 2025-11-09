@@ -816,14 +816,45 @@ public class LayerManager implements ModelHandler<BrickGraphicsState> {
                     // Usamos marcador relativo REL: para reconstruir luego
                     relativeFiles.add("REL:" + fileNameToUse);
 
-                    // 3. Exportar overlay de pintura si existe y no está vacío
-                    BufferedImage overlay = layer.getPaintingOverlay();
+                    // 3. Guardar modificaciones de píxeles como JSON si existen
+                    Map<Point, PixelModification> pixelModifications = layer.getPixelModifications();
                     String relPaintRef = null;
-                    if (overlay != null && hasNonTransparentPixels(overlay)) {
+                    if (pixelModifications != null && !pixelModifications.isEmpty()) {
+                        try {
+                            String paintJsonFileName = paintFileNameToUse.replaceFirst("\\.png$", ".json");
+                            File paintJsonFile = new File(companionDir, paintJsonFileName);
+                            
+                            // Serializar las modificaciones a JSON
+                            StringBuilder jsonBuilder = new StringBuilder();
+                            jsonBuilder.append("{\n");
+                            jsonBuilder.append("  \"pixelModifications\": {\n");
+                            boolean first = true;
+                            for (Map.Entry<Point, PixelModification> entry : pixelModifications.entrySet()) {
+                                if (!first) jsonBuilder.append(",\n");
+                                first = false;
+                                Point p = entry.getKey();
+                                PixelModification mod = entry.getValue();
+                                jsonBuilder.append("    \"").append(p.x).append(",").append(p.y).append("\": ")
+                                          .append(mod.toJson());
+                            }
+                            jsonBuilder.append("\n  }\n");
+                            jsonBuilder.append("}\n");
+                            
+                            java.nio.file.Files.writeString(paintJsonFile.toPath(), jsonBuilder.toString());
+                            io.Log.log("DEBUG: LayerManager.save() - Guardadas modificaciones de píxeles: " + paintJsonFile.getAbsolutePath());
+                            relPaintRef = "REL:" + paintJsonFileName;
+                        } catch (IOException ex) {
+                            io.Log.log("ERROR: LayerManager.save() - Falló guardado de modificaciones: " + paintFileNameToUse);
+                        }
+                    }
+                    
+                    // Mantener compatibilidad con sistema anterior (BufferedImage overlay)
+                    BufferedImage overlay = layer.getPaintingOverlay();
+                    if (relPaintRef == null && overlay != null && hasNonTransparentPixels(overlay)) {
                         try {
                             File paintFile = new File(companionDir, paintFileNameToUse);
                             ImageIO.write(overlay, "PNG", paintFile);
-                            io.Log.log("DEBUG: LayerManager.save() - Guardado overlay de pintura: " + paintFile.getAbsolutePath());
+                            io.Log.log("DEBUG: LayerManager.save() - Guardado overlay de pintura (compatibilidad): " + paintFile.getAbsolutePath());
                             relPaintRef = "REL:" + paintFileNameToUse;
                         } catch (IOException ex) {
                             io.Log.log("ERROR: LayerManager.save() - Falló guardado de overlay: " + paintFileNameToUse);
@@ -1082,33 +1113,73 @@ public class LayerManager implements ModelHandler<BrickGraphicsState> {
 
                 relativeFiles.add("REL:" + fileNameToUse);
 
-                BufferedImage overlay = layer.getPaintingOverlay();
+                // Guardar modificaciones de píxeles como JSON primero (nuevo sistema)
+                Map<Point, PixelModification> pixelModifications = layer.getPixelModifications();
                 String relPaintRef = null;
-                if (overlay != null) {
-                    int nonZero = hasNonTransparentPixels(overlay) ? countNonTransparentPixels(overlay) : 0;
-                    if (nonZero > 0) {
-                        String key = layerKey(layer);
-                        Integer prev = lastOverlayPixelCounts.get(key);
-                        if (prev != null && prev == nonZero) {
-                            io.Log.log("DEBUG: LayerManager.autosaveArtifacts - overlay sin cambios para '" + layer.getName() + "' (" + nonZero + " px), se omite escritura");
-                            // Maintain existing relPaintRef if previously written
-                            relPaintRef = "REL:" + paintFileNameToUse; // layers.json seguirá referenciando mismo archivo
-                        } else {
-                            try {
-                                File paintFile = new File(companionDir, paintFileNameToUse);
-                                ImageIO.write(overlay, "PNG", paintFile);
-                                io.Log.log("DEBUG: LayerManager.autosaveArtifacts - escrito overlay '" + paintFile.getName() + "' nonTransparent=" + nonZero);
-                                relPaintRef = "REL:" + paintFileNameToUse;
-                                lastOverlayPixelCounts.put(key, nonZero);
-                            } catch (IOException ioe) {
-                                io.Log.log("WARN: LayerManager.autosaveArtifacts - fallo escribiendo overlay '" + paintFileNameToUse + "': " + ioe.getMessage());
-                            }
-                        }
+                if (pixelModifications != null && !pixelModifications.isEmpty()) {
+                    String key = layerKey(layer);
+                    Integer prev = lastOverlayPixelCounts.get(key);
+                    int modCount = pixelModifications.size();
+                    if (prev != null && prev == modCount) {
+                        io.Log.log("DEBUG: LayerManager.autosaveArtifacts - modificaciones sin cambios para '" + layer.getName() + "' (" + modCount + " px), se omite escritura");
+                        relPaintRef = "REL:" + paintFileNameToUse.replaceFirst("\\.png$", ".json");
                     } else {
-                        io.Log.log("DEBUG: LayerManager.autosaveArtifacts - overlay vacío para capa '" + layer.getName() + "', no se guarda _paint.png");
+                        try {
+                            String paintJsonFileName = paintFileNameToUse.replaceFirst("\\.png$", ".json");
+                            File paintJsonFile = new File(companionDir, paintJsonFileName);
+                            
+                            // Serializar las modificaciones a JSON
+                            StringBuilder jsonBuilder = new StringBuilder();
+                            jsonBuilder.append("{\n");
+                            jsonBuilder.append("  \"pixelModifications\": {\n");
+                            boolean first = true;
+                            for (Map.Entry<Point, PixelModification> entry : pixelModifications.entrySet()) {
+                                if (!first) jsonBuilder.append(",\n");
+                                first = false;
+                                Point p = entry.getKey();
+                                PixelModification mod = entry.getValue();
+                                jsonBuilder.append("    \"").append(p.x).append(",").append(p.y).append("\": ")
+                                          .append(mod.toJson());
+                            }
+                            jsonBuilder.append("\n  }\n");
+                            jsonBuilder.append("}\n");
+                            
+                            java.nio.file.Files.writeString(paintJsonFile.toPath(), jsonBuilder.toString());
+                            io.Log.log("DEBUG: LayerManager.autosaveArtifacts - escrito modificaciones JSON '" + paintJsonFile.getName() + "' mods=" + modCount);
+                            relPaintRef = "REL:" + paintJsonFileName;
+                            lastOverlayPixelCounts.put(key, modCount);
+                        } catch (IOException ioe) {
+                            io.Log.log("WARN: LayerManager.autosaveArtifacts - fallo escribiendo modificaciones JSON '" + paintFileNameToUse + "': " + ioe.getMessage());
+                        }
                     }
                 } else {
-                    io.Log.log("DEBUG: LayerManager.autosaveArtifacts - capa '" + layer.getName() + "' sin overlay (null), no se guarda _paint.png");
+                    // Fallback a sistema anterior (BufferedImage overlay) para compatibilidad
+                    BufferedImage overlay = layer.getPaintingOverlay();
+                    if (overlay != null) {
+                        int nonZero = hasNonTransparentPixels(overlay) ? countNonTransparentPixels(overlay) : 0;
+                        if (nonZero > 0) {
+                            String key = layerKey(layer);
+                            Integer prev = lastOverlayPixelCounts.get(key);
+                            if (prev != null && prev == nonZero) {
+                                io.Log.log("DEBUG: LayerManager.autosaveArtifacts - overlay sin cambios para '" + layer.getName() + "' (" + nonZero + " px), se omite escritura");
+                                relPaintRef = "REL:" + paintFileNameToUse;
+                            } else {
+                                try {
+                                    File paintFile = new File(companionDir, paintFileNameToUse);
+                                    ImageIO.write(overlay, "PNG", paintFile);
+                                    io.Log.log("DEBUG: LayerManager.autosaveArtifacts - escrito overlay '" + paintFile.getName() + "' nonTransparent=" + nonZero);
+                                    relPaintRef = "REL:" + paintFileNameToUse;
+                                    lastOverlayPixelCounts.put(key, nonZero);
+                                } catch (IOException ioe) {
+                                    io.Log.log("WARN: LayerManager.autosaveArtifacts - fallo escribiendo overlay '" + paintFileNameToUse + "': " + ioe.getMessage());
+                                }
+                            }
+                        } else {
+                            io.Log.log("DEBUG: LayerManager.autosaveArtifacts - overlay vacío para capa '" + layer.getName() + "', no se guarda archivo");
+                        }
+                    } else {
+                        io.Log.log("DEBUG: LayerManager.autosaveArtifacts - capa '" + layer.getName() + "' sin overlay (null), no se guarda archivo");
+                    }
                 }
                 relativePaintFiles.add(relPaintRef);
             }
@@ -1249,25 +1320,40 @@ public class LayerManager implements ModelHandler<BrickGraphicsState> {
             if (overlayValid && paintFile != null && !paintFile.isEmpty()) {
                 File paint = resolveRelativeFile(paintFile);
                 if (paint != null && paint.exists()) {
-                    BufferedImage overlay = ImageIO.read(paint);
-                    if (overlay != null && overlay.getType() != BufferedImage.TYPE_INT_ARGB) {
-                        BufferedImage argb = new BufferedImage(overlay.getWidth(), overlay.getHeight(), BufferedImage.TYPE_INT_ARGB);
-                        Graphics2D g2d = argb.createGraphics();
-                        g2d.drawImage(overlay, 0, 0, null);
-                        g2d.dispose();
-                        overlay = argb;
-                    }
-                    // Validar hash de overlay si está presente
-                    if (paintHashStored != null) {
-                        String currentPaintHash = computeFileHash(paint);
-                        if (!paintHashStored.equals(currentPaintHash)) {
-                            io.Log.log("WARN: LayerManager.loadFromLayersJson - paintHash mismatch, descartando overlay: " + paint.getName());
-                            overlay = null;
+                    // Intentar cargar como JSON primero (nuevo sistema)
+                    if (paintFile.endsWith(".json")) {
+                        try {
+                            String jsonContent = java.nio.file.Files.readString(paint.toPath());
+                            Map<Point, PixelModification> pixelMods = loadPixelModificationsFromJson(jsonContent);
+                            if (pixelMods != null && !pixelMods.isEmpty()) {
+                                layer.setPixelModifications(pixelMods);
+                                io.Log.log("DEBUG: LayerManager.loadFromLayersJson - Cargadas " + pixelMods.size() + " modificaciones de píxeles: " + paint.getAbsolutePath());
+                            }
+                        } catch (Exception e) {
+                            io.Log.log("ERROR: LayerManager.loadFromLayersJson - Error cargando modificaciones JSON: " + e.getMessage());
                         }
-                    }
-                    if (overlay != null) {
-                    layer.setPaintingOverlay(overlay);
-                    io.Log.log("DEBUG: LayerManager.loadFromLayersJson - Cargado overlay de pintura: " + paint.getAbsolutePath());
+                    } else {
+                        // Cargar como PNG (sistema anterior para compatibilidad)
+                        BufferedImage overlay = ImageIO.read(paint);
+                        if (overlay != null && overlay.getType() != BufferedImage.TYPE_INT_ARGB) {
+                            BufferedImage argb = new BufferedImage(overlay.getWidth(), overlay.getHeight(), BufferedImage.TYPE_INT_ARGB);
+                            Graphics2D g2d = argb.createGraphics();
+                            g2d.drawImage(overlay, 0, 0, null);
+                            g2d.dispose();
+                            overlay = argb;
+                        }
+                        // Validar hash de overlay si está presente
+                        if (paintHashStored != null) {
+                            String currentPaintHash = computeFileHash(paint);
+                            if (!paintHashStored.equals(currentPaintHash)) {
+                                io.Log.log("WARN: LayerManager.loadFromLayersJson - paintHash mismatch, descartando overlay: " + paint.getName());
+                                overlay = null;
+                            }
+                        }
+                        if (overlay != null) {
+                            layer.setPaintingOverlay(overlay);
+                            io.Log.log("DEBUG: LayerManager.loadFromLayersJson - Cargado overlay de pintura: " + paint.getAbsolutePath());
+                        }
                     }
                 }
             }
@@ -1283,6 +1369,76 @@ public class LayerManager implements ModelHandler<BrickGraphicsState> {
             return new File(companionDir, name);
         }
         return new File(ref);
+    }
+    
+    /**
+     * Carga modificaciones de píxeles desde contenido JSON
+     */
+    private Map<Point, PixelModification> loadPixelModificationsFromJson(String jsonContent) {
+        Map<Point, PixelModification> modifications = new HashMap<>();
+        try {
+            // Buscar el objeto pixelModifications
+            int pixelModsIndex = jsonContent.indexOf("\"pixelModifications\"");
+            if (pixelModsIndex < 0) return modifications;
+            
+            int startObj = jsonContent.indexOf('{', pixelModsIndex);
+            int braceCount = 0;
+            int endObj = startObj;
+            boolean inString = false;
+            char prevChar = ' ';
+            
+            // Encontrar el cierre del objeto pixelModifications
+            for (int i = startObj; i < jsonContent.length(); i++) {
+                char c = jsonContent.charAt(i);
+                if (c == '"' && prevChar != '\\') {
+                    inString = !inString;
+                } else if (!inString) {
+                    if (c == '{') braceCount++;
+                    else if (c == '}') braceCount--;
+                    if (braceCount == 0) {
+                        endObj = i;
+                        break;
+                    }
+                }
+                prevChar = c;
+            }
+            
+            if (endObj > startObj) {
+                String pixelModsContent = jsonContent.substring(startObj + 1, endObj);
+                
+                // Parsear cada entrada de modificación de píxel
+                String[] entries = pixelModsContent.split(",\\s*\"");
+                for (String entry : entries) {
+                    entry = entry.trim();
+                    if (entry.isEmpty()) continue;
+                    
+                    // Extraer coordenadas "x,y"
+                    int colonIndex = entry.indexOf("\":");
+                    if (colonIndex < 0) continue;
+                    
+                    String coordStr = entry.substring(entry.startsWith("\"") ? 1 : 0, colonIndex);
+                    String[] coords = coordStr.split(",");
+                    if (coords.length != 2) continue;
+                    
+                    try {
+                        int x = Integer.parseInt(coords[0].trim());
+                        int y = Integer.parseInt(coords[1].trim());
+                        
+                        // Extraer el JSON de la modificación
+                        String modJson = entry.substring(colonIndex + 2).trim();
+                        PixelModification mod = PixelModification.fromJson(modJson);
+                        if (mod != null) {
+                            modifications.put(new Point(x, y), mod);
+                        }
+                    } catch (NumberFormatException e) {
+                        io.Log.log("WARN: LayerManager.loadPixelModificationsFromJson - Coordenadas inválidas: " + coordStr);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            io.Log.log("ERROR: LayerManager.loadPixelModificationsFromJson - " + e.getMessage());
+        }
+        return modifications;
     }
 
     /**
