@@ -9,6 +9,8 @@ import java.awt.RenderingHints;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
 import java.io.File;
 import javax.imageio.ImageIO;
 import java.io.IOException;
@@ -27,6 +29,7 @@ public class LayerManager implements ModelHandler<BrickGraphicsState> {
     private boolean layersEnabled;
     private float globalOpacity;
     private Runnable onAllLayersRemovedCallback;
+    private File mosaicFile; // archivo .kvm actual para resolver rutas relativas
     
     /**
      * Constructor del gestor de capas
@@ -35,6 +38,7 @@ public class LayerManager implements ModelHandler<BrickGraphicsState> {
         this.layers = new ArrayList<>();
         this.layersEnabled = true;
         this.globalOpacity = 1.0f;
+        this.lastOverlayPixelCounts = new HashMap<>();
     }
     
     /**
@@ -42,6 +46,33 @@ public class LayerManager implements ModelHandler<BrickGraphicsState> {
      */
     public void setOnAllLayersRemovedCallback(Runnable callback) {
         this.onAllLayersRemovedCallback = callback;
+    }
+
+    /**
+     * Informa al gestor de capas del archivo de mosaico (.kvm) actual.
+     * Esto permite guardar/leer imágenes de capas en una carpeta compañera junto al archivo.
+     */
+    public void setMosaicFile(File mosaicFile) {
+        this.mosaicFile = mosaicFile;
+        io.Log.log("DEBUG: LayerManager - mosaicFile actualizado: " + (mosaicFile != null ? mosaicFile.getAbsolutePath() : "null"));
+    }
+
+    /**
+     * Devuelve la carpeta compañera (<base>_layers) junto al archivo .kvm actual
+     */
+    private File getCompanionDir() {
+        File kmvFile;
+        if (this.mosaicFile != null) {
+            kmvFile = this.mosaicFile.getAbsoluteFile();
+        } else {
+            String kmvFileName = mosaic.controllers.MainController.STATE_FILE_NAME; // p.ej. lddmc.kvm
+            kmvFile = new File(kmvFileName).getAbsoluteFile();
+        }
+        String baseName = kmvFile.getName();
+        int dot = baseName.lastIndexOf('.');
+        if (dot > 0) baseName = baseName.substring(0, dot);
+        File companionDir = new File(kmvFile.getParentFile(), baseName + "_layers");
+        return companionDir;
     }
     
     /**
@@ -138,8 +169,32 @@ public class LayerManager implements ModelHandler<BrickGraphicsState> {
     public boolean moveLayerUp(Layer layer) {
         int index = layers.indexOf(layer);
         if (index > 0) {
+            // Preserve overlay references explicitly (they should already persist, but guard in case of external listeners)
+            BufferedImage overlay = layer.getPaintingOverlay();
+            if (overlay != null) {
+                io.Log.log("DEBUG: moveLayerUp - overlay before move: " + System.identityHashCode(overlay) +
+                           " size=" + overlay.getWidth() + "x" + overlay.getHeight());
+            } else {
+                io.Log.log("DEBUG: moveLayerUp - no overlay before move for: " + layer.getName());
+            }
             Collections.swap(layers, index, index - 1);
+            // Mantener selectedLayer referencia exacta
+            if (selectedLayer == layer) {
+                selectedLayer = layer; // explícito para claridad
+            }
+            if (overlay != null && layer.getPaintingOverlay() != overlay) {
+                layer.setPaintingOverlay(overlay);
+            }
+            if (layer.getPaintingOverlay() != null) {
+                BufferedImage after = layer.getPaintingOverlay();
+                io.Log.log("DEBUG: moveLayerUp - overlay after move:  " + System.identityHashCode(after) +
+                           " size=" + after.getWidth() + "x" + after.getHeight());
+            } else {
+                io.Log.log("DEBUG: moveLayerUp - overlay missing after move for: " + layer.getName());
+            }
             io.Log.log("DEBUG: LayerManager - Movida capa hacia arriba: " + layer.getName());
+            // Persist reordering and any current overlays so layers.json stays in sync
+            try { autosaveArtifacts(); } catch (Exception ex) { io.Log.log("WARN: moveLayerUp - autosaveArtifacts fallo: " + ex.getMessage()); }
             return true;
         }
         return false;
@@ -151,8 +206,30 @@ public class LayerManager implements ModelHandler<BrickGraphicsState> {
     public boolean moveLayerDown(Layer layer) {
         int index = layers.indexOf(layer);
         if (index >= 0 && index < layers.size() - 1) {
+            BufferedImage overlay = layer.getPaintingOverlay();
+            if (overlay != null) {
+                io.Log.log("DEBUG: moveLayerDown - overlay before move: " + System.identityHashCode(overlay) +
+                           " size=" + overlay.getWidth() + "x" + overlay.getHeight());
+            } else {
+                io.Log.log("DEBUG: moveLayerDown - no overlay before move for: " + layer.getName());
+            }
             Collections.swap(layers, index, index + 1);
+            if (selectedLayer == layer) {
+                selectedLayer = layer;
+            }
+            if (overlay != null && layer.getPaintingOverlay() != overlay) {
+                layer.setPaintingOverlay(overlay);
+            }
+            if (layer.getPaintingOverlay() != null) {
+                BufferedImage after = layer.getPaintingOverlay();
+                io.Log.log("DEBUG: moveLayerDown - overlay after move:  " + System.identityHashCode(after) +
+                           " size=" + after.getWidth() + "x" + after.getHeight());
+            } else {
+                io.Log.log("DEBUG: moveLayerDown - overlay missing after move for: " + layer.getName());
+            }
             io.Log.log("DEBUG: LayerManager - Movida capa hacia abajo: " + layer.getName());
+            // Persist reordering and any current overlays so layers.json stays in sync
+            try { autosaveArtifacts(); } catch (Exception ex) { io.Log.log("WARN: moveLayerDown - autosaveArtifacts fallo: " + ex.getMessage()); }
             return true;
         }
         return false;
@@ -464,6 +541,11 @@ public class LayerManager implements ModelHandler<BrickGraphicsState> {
             return baseImage;
         }
 
+        // Antes de renderizar, recentrar automáticamente capas totalmente fuera del canvas
+        try {
+            ensureLayersWithinCanvas(baseImage.getWidth(), baseImage.getHeight(), true);
+        } catch (Exception ignore) { /* no bloquear render por esto */ }
+
         BufferedImage result = new BufferedImage(
             baseImage.getWidth(), 
             baseImage.getHeight(), 
@@ -481,6 +563,9 @@ public class LayerManager implements ModelHandler<BrickGraphicsState> {
 			BufferedImage layerImage = layer.applyImageTransforms(layer.getImage());
 			if (layerImage == null)
 				continue;
+
+            // Prepare overlay image if present
+            BufferedImage overlayImage = layer.getPaintingOverlay();
 
 			int originalWidth = layerImage.getWidth();
 			int originalHeight = layerImage.getHeight();
@@ -501,6 +586,16 @@ public class LayerManager implements ModelHandler<BrickGraphicsState> {
 					g.drawImage(layerImage, 0, 0, newWidth, newHeight, null);
 					g.dispose();
 					layerImage = scaledImage;
+
+                    // Scale overlay if present
+                    if (overlayImage != null) {
+                        BufferedImage scaledOverlay = new BufferedImage(newWidth, newHeight, BufferedImage.TYPE_INT_ARGB);
+                        Graphics2D gOv = scaledOverlay.createGraphics();
+                        gOv.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+                        gOv.drawImage(overlayImage, 0, 0, newWidth, newHeight, null);
+                        gOv.dispose();
+                        overlayImage = scaledOverlay;
+                    }
 					
 					// Adjust position to keep center
 					layerX += (originalWidth - newWidth) / 2;
@@ -517,6 +612,11 @@ public class LayerManager implements ModelHandler<BrickGraphicsState> {
 				AlphaComposite ac = AlphaComposite.getInstance(AlphaComposite.SRC_OVER, opacity);
 				g_.setComposite(ac);
 				g_.drawImage(layerImage, layerX, layerY, null);
+
+                // Draw painting overlay on top (same composite), if any
+                if (overlayImage != null) {
+                    g_.drawImage(overlayImage, layerX, layerY, null);
+                }
 			}
 			else {
 				// Manual blending for other modes
@@ -559,11 +659,55 @@ public class LayerManager implements ModelHandler<BrickGraphicsState> {
 						result.setRGB(canvasX, canvasY, finalARGB);
 					}
 				}
+
+                // After manual blend of the base layer image, alpha-composite the overlay on top (NORMAL), if present
+                if (overlayImage != null) {
+                    AlphaComposite ac = AlphaComposite.getInstance(AlphaComposite.SRC_OVER, opacity);
+                    g_.setComposite(ac);
+                    g_.drawImage(overlayImage, layerX, layerY, null);
+                }
 			}
 		}
 		g_.dispose();
 		return result;
 	}
+
+    /**
+     * Reposiciona al centro cualquier capa que esté completamente fuera del canvas.
+     * @param baseW ancho del lienzo base
+     * @param baseH alto del lienzo base
+     * @param onlyFullyOut si es true, solo actúa cuando no hay intersección alguna con el canvas
+     */
+    public void ensureLayersWithinCanvas(int baseW, int baseH, boolean onlyFullyOut) {
+        if (baseW <= 0 || baseH <= 0 || layers.isEmpty()) return;
+        for (Layer layer : layers) {
+            if (!layer.isVisible()) continue;
+            BufferedImage img = layer.getImage();
+            if (img == null) continue;
+            int origW = img.getWidth();
+            int origH = img.getHeight();
+            float s = layer.getScale();
+            int scaledW = Math.max(1, (int) Math.round(origW * s));
+            int scaledH = Math.max(1, (int) Math.round(origH * s));
+            // posición mostrada (tras centrar por escala)
+            int dispX = layer.getX();
+            int dispY = layer.getY();
+            if (Math.abs(s - 1.0f) > 1e-6) {
+                dispX += (origW - scaledW) / 2;
+                dispY += (origH - scaledH) / 2;
+            }
+            boolean intersects = dispX < baseW && dispY < baseH && (dispX + scaledW) > 0 && (dispY + scaledH) > 0;
+            if (!intersects || !onlyFullyOut) {
+                if (!intersects) {
+                    // Recentrar: elegir coordenada de capa sin escalar que produzca centrado visual
+                    int newX = (baseW - origW) / 2;
+                    int newY = (baseH - origH) / 2;
+                    layer.setPosition(newX, newY);
+                    io.Log.log("DEBUG: LayerManager.ensureLayersWithinCanvas - Recentrada capa '" + layer.getName() + "' a (" + newX + "," + newY + ") sobre " + baseW + "x" + baseH);
+                }
+            }
+        }
+    }
     
     /**
      * Limpia todas las capas de la lista
@@ -598,6 +742,96 @@ public class LayerManager implements ModelHandler<BrickGraphicsState> {
             model.set(BrickGraphicsState.LayersEnabled, !layers.isEmpty());
             
             if (!layers.isEmpty()) {
+                // 1. Determinar carpeta companion para las imágenes de capa
+                File companionDir = getCompanionDir();
+                if (!companionDir.exists()) {
+                    companionDir.mkdirs();
+                    io.Log.log("DEBUG: LayerManager.save() - Creada carpeta de capas: " + companionDir.getAbsolutePath());
+                }
+
+                // 2. Exportar cada imagen original de la capa (sin aplanar) a PNG
+                // Guardamos el archivo como <index>_<nombre_normalizado>.png
+                List<String> relativeFiles = new ArrayList<>();
+                List<String> relativePaintFiles = new ArrayList<>();
+                java.util.Map<String, Integer> nameCounts = new java.util.HashMap<>();
+                for (int i = 0; i < layers.size(); i++) {
+                    Layer layer = layers.get(i);
+                    BufferedImage img = layer.getImage(); // Imagen base de la capa
+                    if (img == null) continue;
+
+                    // Si la capa ya apunta a un archivo dentro de la carpeta companion, reutilizarlo
+                    String existingPath = layer.getImageFilePath();
+                    String fileNameToUse = null;
+                    String paintFileNameToUse = null;
+                    if (existingPath != null) {
+                        try {
+                            File existing = new File(existingPath).getAbsoluteFile();
+                            if (existing.getParentFile() != null && existing.getParentFile().equals(companionDir)) {
+                                fileNameToUse = existing.getName();
+                                // Si el archivo no existe (fue movido/limpiado), lo volvemos a escribir
+                                if (!existing.exists()) {
+                                    try {
+                                        ImageIO.write(img, "PNG", existing);
+                                        io.Log.log("DEBUG: LayerManager.save() - (re)creado archivo de capa faltante: " + existing.getAbsolutePath());
+                                    } catch (IOException ex) {
+                                        io.Log.log("ERROR: LayerManager.save() - Falló re-crear archivo: " + existing.getAbsolutePath());
+                                    }
+                                }
+                                // Derivar nombre del overlay a partir del nombre base
+                                paintFileNameToUse = fileNameToUse.replaceFirst("(?i)\\.png$", "_paint.png");
+                            }
+                        } catch (Exception ignore) {}
+                    }
+
+                    if (fileNameToUse == null) {
+                        // Generar nombre estable sin índice; resolver colisiones con contador
+                        String base = normalizeName(layer.getName());
+                        int count = nameCounts.getOrDefault(base, 0);
+                        nameCounts.put(base, count + 1);
+                        if (count > 0) {
+                            fileNameToUse = base + "(" + count + ")" + ".png";
+                        } else {
+                            fileNameToUse = base + ".png";
+                        }
+                        paintFileNameToUse = base + ((count > 0) ? "(" + count + ")" : "") + "_paint.png";
+
+                        File outFile = new File(companionDir, fileNameToUse);
+                        if (!outFile.exists()) {
+                            try {
+                                ImageIO.write(img, "PNG", outFile);
+                                io.Log.log("DEBUG: LayerManager.save() - Guardada imagen de capa: " + outFile.getAbsolutePath());
+                            } catch (IOException ex) {
+                                io.Log.log("ERROR: LayerManager.save() - Falló guardado de capa: " + outFile.getAbsolutePath());
+                                // Fallback: mantener ruta original si existe
+                                relativeFiles.add(layer.getImageFilePath());
+                                relativePaintFiles.add(null);
+                                continue;
+                            }
+                        } else {
+                            // Archivo ya existe: no reescribir para acelerar guardado
+                            io.Log.log("DEBUG: LayerManager.save() - Reutilizando imagen de capa existente: " + outFile.getAbsolutePath());
+                        }
+                    }
+
+                    // Usamos marcador relativo REL: para reconstruir luego
+                    relativeFiles.add("REL:" + fileNameToUse);
+
+                    // 3. Exportar overlay de pintura si existe y no está vacío
+                    BufferedImage overlay = layer.getPaintingOverlay();
+                    String relPaintRef = null;
+                    if (overlay != null && hasNonTransparentPixels(overlay)) {
+                        try {
+                            File paintFile = new File(companionDir, paintFileNameToUse);
+                            ImageIO.write(overlay, "PNG", paintFile);
+                            io.Log.log("DEBUG: LayerManager.save() - Guardado overlay de pintura: " + paintFile.getAbsolutePath());
+                            relPaintRef = "REL:" + paintFileNameToUse;
+                        } catch (IOException ex) {
+                            io.Log.log("ERROR: LayerManager.save() - Falló guardado de overlay: " + paintFileNameToUse);
+                        }
+                    }
+                    relativePaintFiles.add(relPaintRef);
+                }
+
                 StringBuilder layerData = new StringBuilder();
                 
                 for (int i = 0; i < layers.size(); i++) {
@@ -606,7 +840,9 @@ public class LayerManager implements ModelHandler<BrickGraphicsState> {
                     // Serializar datos de la capa en formato JSON simple
                     layerData.append("{");
                     layerData.append("\"name\":\"").append(escapeJson(layer.getName())).append("\",");
-                    layerData.append("\"file\":\"").append(escapeJson(layer.getImageFilePath())).append("\",");
+                    // Sustituimos el campo file por referencia relativa si la exportamos
+                    String relRef = (i < relativeFiles.size()) ? relativeFiles.get(i) : layer.getImageFilePath();
+                    layerData.append("\"file\":\"").append(escapeJson(relRef)).append("\",");
                     layerData.append("\"visible\":").append(layer.isVisible()).append(",");
                     layerData.append("\"x\":").append(layer.getX()).append(",");
                     layerData.append("\"y\":").append(layer.getY()).append(",");
@@ -625,11 +861,14 @@ public class LayerManager implements ModelHandler<BrickGraphicsState> {
                 }
                 
                 model.set(BrickGraphicsState.LayerData, "[" + layerData.toString() + "]");
+
+                // 4. Escribir layers.json (paralelo, con metadatos extendidos)
+                writeLayersJson(companionDir, relativeFiles, relativePaintFiles);
             } else {
                 model.set(BrickGraphicsState.LayerData, "");
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            io.Log.log(e);
             // En caso de error, limpiar los datos
             model.set(BrickGraphicsState.LayersEnabled, false);
             model.set(BrickGraphicsState.LayerData, "");
@@ -642,16 +881,38 @@ public class LayerManager implements ModelHandler<BrickGraphicsState> {
     @Override
     public void handleModelChange(Model<BrickGraphicsState> model) {
         try {
+            // Snapshot current overlays to preserve them across model reloads (e.g., reorder or other updates)
+            java.util.Map<String, BufferedImage> previousOverlays = snapshotOverlaysByKey();
+
             Object layersEnabledObj = model.get(BrickGraphicsState.LayersEnabled);
             Object layerDataObj = model.get(BrickGraphicsState.LayerData);
             
             Boolean layersEnabled = (layersEnabledObj instanceof Boolean) ? (Boolean) layersEnabledObj : false;
             String layerData = (layerDataObj instanceof String) ? (String) layerDataObj : "";
+
+            // Sincronizar el flag interno (si no lo hacemos, aunque carguemos capas no se renderizan)
+            this.layersEnabled = layersEnabled != null ? layersEnabled.booleanValue() : false;
+            io.Log.log("DEBUG: LayerManager.handleModelChange - Flag layersEnabled cargado: " + this.layersEnabled);
             
             // Limpiar capas existentes
             clearLayers();
             
-            if (layersEnabled != null && layersEnabled && layerData != null && !layerData.trim().isEmpty()) {
+            if (layersEnabled != null && layersEnabled) {
+                // Intentar cargar desde layers.json si existe
+                File companionDir = getCompanionDir();
+                File jsonFile = new File(companionDir, "layers.json");
+                boolean loadedFromJson = false;
+                if (jsonFile.exists()) {
+                    try {
+                        loadedFromJson = loadFromLayersJson(jsonFile);
+                        io.Log.log("DEBUG: LayerManager.handleModelChange - Cargado desde layers.json: " + loadedFromJson);
+                    } catch (Exception ex) {
+                        io.Log.log("WARN: LayerManager.handleModelChange - Error al leer layers.json, usando LayerData: " + ex.getMessage());
+                    }
+                }
+
+                // Fallback a LayerData en el KMV si no se pudo cargar desde JSON
+                if (!loadedFromJson && layerData != null && !layerData.trim().isEmpty()) {
                 // Parsear datos de capas (JSON simple)
                 layerData = layerData.trim();
                 if (layerData.startsWith("[") && layerData.endsWith("]")) {
@@ -664,21 +925,397 @@ public class LayerManager implements ModelHandler<BrickGraphicsState> {
                             try {
                                 loadLayerFromJson(entry.trim());
                             } catch (Exception e) {
-                                e.printStackTrace();
+                                io.Log.log(e);
                                 // Continuar con la siguiente capa si hay error
                             }
                         }
                     }
                 }
+                }
+
+                // Re-asignar overlays previos a capas equivalentes si no se cargaron desde JSON
+                if (!previousOverlays.isEmpty() && !layers.isEmpty()) {
+                    int restored = 0;
+                    for (Layer l : layers) {
+                        if (l.getPaintingOverlay() != null) continue; // ya cargado desde paintFile
+                        String key = layerKey(l);
+                        BufferedImage ov = previousOverlays.get(key);
+                        if (ov == null) {
+                            // Intentar por nombre como alternativa
+                            ov = previousOverlays.get("NAME:" + l.getName());
+                        }
+                        if (ov != null) {
+                            // Validar tamaño compatible
+                            if (l.getImage() != null && l.getImage().getWidth() == ov.getWidth() && l.getImage().getHeight() == ov.getHeight()) {
+                                l.setPaintingOverlay(ov);
+                                restored++;
+                            }
+                        }
+                    }
+                    if (restored > 0) {
+                        io.Log.log("DEBUG: LayerManager.handleModelChange - Overlays re-asignados tras recarga: " + restored);
+                    }
+                }
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            io.Log.log(e);
             // En caso de error, mantener lista vacía
             clearLayers();
         }
         
         // Notificar cambios
         notifyLayersChanged();
+
+        // Asegurar una capa seleccionada coherente tras la carga
+        if (!layers.isEmpty() && selectedLayer == null) {
+            setSelectedLayer(layers.get(layers.size() - 1)); // seleccionar la superior
+        }
+        io.Log.log("DEBUG: LayerManager.handleModelChange - Capas cargadas: " + layers.size());
+    }
+
+    /**
+     * Crea un snapshot de los overlays actuales, indexados por una clave estable (ruta absoluta del archivo si existe, si no, nombre).
+     */
+    private java.util.Map<String, BufferedImage> snapshotOverlaysByKey() {
+        java.util.Map<String, BufferedImage> map = new java.util.HashMap<>();
+        if (layers == null || layers.isEmpty()) return map;
+        for (Layer l : layers) {
+            BufferedImage ov = l.getPaintingOverlay();
+            if (ov == null) continue;
+            String key = layerKey(l);
+            map.put(key, ov);
+            // También indexar por nombre como fallback
+            map.put("NAME:" + l.getName(), ov);
+        }
+        return map;
+    }
+
+    /**
+     * Obtiene una clave estable para la capa: ruta absoluta del archivo si está disponible, si no, el nombre.
+     */
+    private String layerKey(Layer l) {
+        try {
+            String path = l.getImageFilePath();
+            if (path != null && !path.isEmpty()) {
+                return new File(path).getAbsoluteFile().getPath();
+            }
+        } catch (Exception ignore) {}
+        return "NAME:" + l.getName();
+    }
+
+    /**
+     * Aplica un trazo de pincel sobre la capa seleccionada, en coordenadas de imagen (pre-escala).
+     * No realiza conversión desde coordenadas de pantalla.
+     */
+    public boolean applyBrushToSelectedLayer(int imageX, int imageY, int radius, Color color) {
+        if (selectedLayer == null) return false;
+        int argb = color.getRGB();
+        io.Log.log("DEBUG: LayerManager.applyBrushToSelectedLayer - layer='" + selectedLayer.getName() + "' point=(" + imageX + "," + imageY + ") r=" + radius + " argb=0x" + Integer.toHexString(argb));
+        boolean modified = selectedLayer.applyBrushStroke(imageX, imageY, radius, argb);
+        if (modified) {
+            // Persist overlay and layers.json without touching the KMV file
+            try {
+                autosaveArtifacts();
+                io.Log.log("DEBUG: LayerManager.applyBrushToSelectedLayer - Autosave artifacts after brush stroke");
+            } catch (Exception ex) {
+                io.Log.log("WARN: LayerManager.applyBrushToSelectedLayer - Autosave artifacts failed: " + ex.getMessage());
+            }
+        }
+        return modified;
+    }
+
+    /**
+     * Guarda solo los artefactos externos (carpeta companion):
+     * - PNGs base de las capas (si faltan o aún no están en la carpeta companion)
+     * - PNGs del overlay de pintura (si existen y tienen píxeles no transparentes)
+     * - layers.json con metadatos extendidos y hashes
+     * No modifica el archivo KMV.
+     */
+    public void autosaveArtifacts() {
+        try {
+            if (layers.isEmpty()) return;
+            File companionDir = getCompanionDir();
+            io.Log.log("DEBUG: LayerManager.autosaveArtifacts - companionDir=" + companionDir.getAbsolutePath());
+            if (!companionDir.exists()) companionDir.mkdirs();
+
+            List<String> relativeFiles = new ArrayList<>();
+            List<String> relativePaintFiles = new ArrayList<>();
+            java.util.Map<String, Integer> nameCounts = new java.util.HashMap<>();
+
+            for (int i = 0; i < layers.size(); i++) {
+                Layer layer = layers.get(i);
+                BufferedImage img = layer.getImage();
+                if (img == null) { relativeFiles.add(null); relativePaintFiles.add(null); continue; }
+
+                String existingPath = layer.getImageFilePath();
+                String fileNameToUse = null;
+                String paintFileNameToUse = null;
+                if (existingPath != null) {
+                    try {
+                        File existing = new File(existingPath).getAbsoluteFile();
+                        if (existing.getParentFile() != null && existing.getParentFile().equals(companionDir)) {
+                            fileNameToUse = existing.getName();
+                            if (!existing.exists()) {
+                                try { ImageIO.write(img, "PNG", existing); } catch (IOException ignore) {}
+                            }
+                            paintFileNameToUse = fileNameToUse.replaceFirst("(?i)\\.png$", "_paint.png");
+                        }
+                    } catch (Exception ignore) {}
+                }
+
+                if (fileNameToUse == null) {
+                    String base = normalizeName(layer.getName());
+                    int count = nameCounts.getOrDefault(base, 0);
+                    nameCounts.put(base, count + 1);
+                    if (count > 0) {
+                        fileNameToUse = base + "(" + count + ")" + ".png";
+                    } else {
+                        fileNameToUse = base + ".png";
+                    }
+                    paintFileNameToUse = base + ((count > 0) ? "(" + count + ")" : "") + "_paint.png";
+
+                    File outFile = new File(companionDir, fileNameToUse);
+                    if (!outFile.exists()) {
+                        try { ImageIO.write(img, "PNG", outFile); } catch (IOException ignore) {}
+                    }
+                }
+
+                relativeFiles.add("REL:" + fileNameToUse);
+
+                BufferedImage overlay = layer.getPaintingOverlay();
+                String relPaintRef = null;
+                if (overlay != null) {
+                    int nonZero = hasNonTransparentPixels(overlay) ? countNonTransparentPixels(overlay) : 0;
+                    if (nonZero > 0) {
+                        String key = layerKey(layer);
+                        Integer prev = lastOverlayPixelCounts.get(key);
+                        if (prev != null && prev == nonZero) {
+                            io.Log.log("DEBUG: LayerManager.autosaveArtifacts - overlay sin cambios para '" + layer.getName() + "' (" + nonZero + " px), se omite escritura");
+                            // Maintain existing relPaintRef if previously written
+                            relPaintRef = "REL:" + paintFileNameToUse; // layers.json seguirá referenciando mismo archivo
+                        } else {
+                            try {
+                                File paintFile = new File(companionDir, paintFileNameToUse);
+                                ImageIO.write(overlay, "PNG", paintFile);
+                                io.Log.log("DEBUG: LayerManager.autosaveArtifacts - escrito overlay '" + paintFile.getName() + "' nonTransparent=" + nonZero);
+                                relPaintRef = "REL:" + paintFileNameToUse;
+                                lastOverlayPixelCounts.put(key, nonZero);
+                            } catch (IOException ioe) {
+                                io.Log.log("WARN: LayerManager.autosaveArtifacts - fallo escribiendo overlay '" + paintFileNameToUse + "': " + ioe.getMessage());
+                            }
+                        }
+                    } else {
+                        io.Log.log("DEBUG: LayerManager.autosaveArtifacts - overlay vacío para capa '" + layer.getName() + "', no se guarda _paint.png");
+                    }
+                } else {
+                    io.Log.log("DEBUG: LayerManager.autosaveArtifacts - capa '" + layer.getName() + "' sin overlay (null), no se guarda _paint.png");
+                }
+                relativePaintFiles.add(relPaintRef);
+            }
+
+            writeLayersJson(companionDir, relativeFiles, relativePaintFiles);
+        } catch (Exception ex) {
+            io.Log.log("WARN: LayerManager.autosaveArtifacts - fallo al persistir artefactos: " + ex.getMessage());
+        }
+    }
+
+    /**
+     * Devuelve un conteo simple de píxeles con alpha > 0 en una imagen (para diagnóstico).
+     */
+    private int countNonTransparentPixels(BufferedImage img) {
+        if (img == null) return 0;
+        int w = img.getWidth();
+        int h = img.getHeight();
+        int count = 0;
+        for (int y = 0; y < h; y++) {
+            for (int x = 0; x < w; x++) {
+                int a = (img.getRGB(x, y) >>> 24) & 0xff;
+                if (a != 0) count++;
+            }
+        }
+        return count;
+    }
+
+    // Cache de conteos de píxeles para evitar escritura redundante de overlays sin cambios
+    private Map<String,Integer> lastOverlayPixelCounts;
+
+    /**
+     * Escribe un archivo layers.json en la carpeta companion con metadatos extendidos.
+     */
+    private void writeLayersJson(File companionDir, List<String> relFiles, List<String> relPaintFiles) {
+        try {
+            StringBuilder sb = new StringBuilder();
+            sb.append("{\n");
+            sb.append("  \"version\": 1,\n");
+            sb.append("  \"layersEnabled\": ").append(this.layersEnabled).append(",\n");
+            sb.append("  \"layers\": [\n");
+            for (int i = 0; i < layers.size(); i++) {
+                Layer layer = layers.get(i);
+                String rel = (i < relFiles.size()) ? relFiles.get(i) : layer.getImageFilePath();
+                String relPaint = (i < relPaintFiles.size()) ? relPaintFiles.get(i) : null;
+                // Calcular hash del archivo base para invalidar overlays obsoletos
+                String fileHash = computeFileHash(resolveRelativeFile(rel));
+                String paintHash = relPaint != null ? computeFileHash(resolveRelativeFile(relPaint)) : null;
+                sb.append("    {");
+                sb.append("\"name\": \"").append(escapeJson(layer.getName())).append("\",");
+                sb.append(" \"file\": \"").append(escapeJson(rel)).append("\",");
+                if (relPaint != null) {
+                    sb.append(" \"paintFile\": \"").append(escapeJson(relPaint)).append("\",");
+                    if (paintHash != null) {
+                        sb.append(" \"paintHash\": \"").append(paintHash).append("\",");
+                    }
+                }
+                if (fileHash != null) {
+                    sb.append(" \"fileHash\": \"").append(fileHash).append("\",");
+                }
+                sb.append(" \"visible\": ").append(layer.isVisible()).append(",");
+                sb.append(" \"x\": ").append(layer.getX()).append(",");
+                sb.append(" \"y\": ").append(layer.getY()).append(",");
+                sb.append(" \"opacity\": ").append(layer.getOpacity()).append(",");
+                sb.append(" \"brightness\": ").append(layer.getBrightness()).append(",");
+                sb.append(" \"contrast\": ").append(layer.getContrast()).append(",");
+                sb.append(" \"saturation\": ").append(layer.getSaturation()).append(",");
+                sb.append(" \"gamma\": ").append(layer.getGamma()).append(",");
+                sb.append(" \"sharpness\": ").append(layer.getSharpness()).append(",");
+                sb.append(" \"scale\": ").append(layer.getScale());
+                sb.append(" }");
+                if (i < layers.size() - 1) sb.append(",");
+                sb.append("\n");
+            }
+            sb.append("  ]\n");
+            sb.append("}\n");
+
+            File jsonFile = new File(companionDir, "layers.json");
+            java.nio.file.Files.writeString(jsonFile.toPath(), sb.toString());
+            io.Log.log("DEBUG: LayerManager.save() - Escrito layers.json en: " + jsonFile.getAbsolutePath());
+        } catch (Exception ex) {
+            io.Log.log("WARN: LayerManager.save() - No se pudo escribir layers.json: " + ex.getMessage());
+        }
+    }
+
+    /**
+     * Carga capas desde layers.json. Devuelve true si al menos una capa fue cargada.
+     */
+    private boolean loadFromLayersJson(File jsonFile) throws Exception {
+        String content = java.nio.file.Files.readString(jsonFile.toPath());
+        if (content == null || content.isEmpty()) return false;
+        // Buscar array de capas
+        int idx = content.indexOf("\"layers\"");
+        if (idx < 0) return false;
+        int startArr = content.indexOf('[', idx);
+        int endArr = content.indexOf(']', startArr);
+        if (startArr < 0 || endArr < 0) return false;
+        String array = content.substring(startArr + 1, endArr);
+        String[] entries = splitJsonArray(array);
+        for (String entry : entries) {
+            if (entry == null || entry.isEmpty()) continue;
+            // Reusar extractor simple
+            String name = extractJsonValue(entry, "name");
+            String file = extractJsonValue(entry, "file");
+            String paintFile = extractJsonValue(entry, "paintFile");
+            String fileHashStored = extractJsonValue(entry, "fileHash");
+            String paintHashStored = extractJsonValue(entry, "paintHash");
+            boolean visible = Boolean.parseBoolean(extractJsonValue(entry, "visible"));
+            int x = Integer.parseInt(extractJsonValue(entry, "x"));
+            int y = Integer.parseInt(extractJsonValue(entry, "y"));
+            float opacity = Float.parseFloat(extractJsonValue(entry, "opacity"));
+            float brightness = Float.parseFloat(extractJsonValue(entry, "brightness"));
+            float contrast = Float.parseFloat(extractJsonValue(entry, "contrast"));
+            float saturation = Float.parseFloat(extractJsonValue(entry, "saturation"));
+            float gamma = Float.parseFloat(extractJsonValue(entry, "gamma"));
+            float sharpness = Float.parseFloat(extractJsonValue(entry, "sharpness"));
+            float scale = Float.parseFloat(extractJsonValue(entry, "scale"));
+
+            // Resolver ruta de imagen
+            File baseImageFile = resolveRelativeFile(file);
+            if (baseImageFile == null || !baseImageFile.exists()) {
+                io.Log.log("WARN: LayerManager.loadFromLayersJson - Archivo base no encontrado: " + file);
+                continue;
+            }
+            // Validar hash del archivo base: si difiere, descartar overlay de pintura
+            String currentFileHash = computeFileHash(baseImageFile);
+            boolean overlayValid = fileHashStored == null || fileHashStored.equals(currentFileHash);
+            Layer layer = addLayerFromFile(baseImageFile.getAbsolutePath(), new Point(x, y));
+            layer.setName(name);
+            layer.setVisible(visible);
+            layer.setOpacity(opacity);
+            layer.setBrightness(brightness);
+            layer.setContrast(contrast);
+            layer.setSaturation(saturation);
+            layer.setGamma(gamma);
+            layer.setSharpness(sharpness);
+            layer.setScale(scale);
+
+            if (overlayValid && paintFile != null && !paintFile.isEmpty()) {
+                File paint = resolveRelativeFile(paintFile);
+                if (paint != null && paint.exists()) {
+                    BufferedImage overlay = ImageIO.read(paint);
+                    if (overlay != null && overlay.getType() != BufferedImage.TYPE_INT_ARGB) {
+                        BufferedImage argb = new BufferedImage(overlay.getWidth(), overlay.getHeight(), BufferedImage.TYPE_INT_ARGB);
+                        Graphics2D g2d = argb.createGraphics();
+                        g2d.drawImage(overlay, 0, 0, null);
+                        g2d.dispose();
+                        overlay = argb;
+                    }
+                    // Validar hash de overlay si está presente
+                    if (paintHashStored != null) {
+                        String currentPaintHash = computeFileHash(paint);
+                        if (!paintHashStored.equals(currentPaintHash)) {
+                            io.Log.log("WARN: LayerManager.loadFromLayersJson - paintHash mismatch, descartando overlay: " + paint.getName());
+                            overlay = null;
+                        }
+                    }
+                    if (overlay != null) {
+                    layer.setPaintingOverlay(overlay);
+                    io.Log.log("DEBUG: LayerManager.loadFromLayersJson - Cargado overlay de pintura: " + paint.getAbsolutePath());
+                    }
+                }
+            }
+        }
+        return !layers.isEmpty();
+    }
+
+    private File resolveRelativeFile(String ref) {
+        if (ref == null || ref.isEmpty()) return null;
+        if (ref.startsWith("REL:")) {
+            File companionDir = getCompanionDir();
+            String name = ref.substring("REL:".length());
+            return new File(companionDir, name);
+        }
+        return new File(ref);
+    }
+
+    /**
+     * Verifica si un overlay tiene al menos un píxel no transparente
+     */
+    private boolean hasNonTransparentPixels(BufferedImage img) {
+        if (img == null) return false;
+        int w = img.getWidth();
+        int h = img.getHeight();
+        for (int y = 0; y < h; y++) {
+            for (int x = 0; x < w; x++) {
+                int a = (img.getRGB(x, y) >>> 24) & 0xff;
+                if (a != 0) return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Calcula hash MD5 de un archivo para validar si ha cambiado.
+     */
+    private String computeFileHash(File f) {
+        if (f == null || !f.exists()) return null;
+        try {
+            java.security.MessageDigest md = java.security.MessageDigest.getInstance("MD5");
+            byte[] data = java.nio.file.Files.readAllBytes(f.toPath());
+            byte[] digest = md.digest(data);
+            StringBuilder sb = new StringBuilder();
+            for (byte b : digest) sb.append(String.format("%02x", b));
+            return sb.toString();
+        } catch (Exception ex) {
+            return null;
+        }
     }
     
     /**
@@ -706,13 +1343,35 @@ public class LayerManager implements ModelHandler<BrickGraphicsState> {
         float scale = Float.parseFloat(extractJsonValue(jsonData, "scale"));
         
         // Verificar que el archivo existe
-        File imageFile = new File(file);
+        File imageFile;
+
+        if (file != null && file.startsWith("REL:")) {
+            // Reconstruir ruta relativa dentro de la carpeta companion
+            File kmvFile;
+            if (this.mosaicFile != null) {
+                kmvFile = this.mosaicFile.getAbsoluteFile();
+            } else {
+                String kmvFileName = mosaic.controllers.MainController.STATE_FILE_NAME;
+                kmvFile = new File(kmvFileName).getAbsoluteFile();
+            }
+            String baseName = kmvFile.getName();
+            int dot = baseName.lastIndexOf('.');
+            if (dot > 0) baseName = baseName.substring(0, dot);
+            File companionDir = new File(kmvFile.getParentFile(), baseName + "_layers");
+            String relativeFileName = file.substring("REL:".length());
+            imageFile = new File(companionDir, relativeFileName);
+        } else {
+            imageFile = new File(file);
+        }
+
         if (!imageFile.exists()) {
-            return; // No cargar si el archivo no existe
+            io.Log.log("WARN: LayerManager.loadLayerFromJson - Archivo de capa no encontrado: " + imageFile.getAbsolutePath());
+            return; // Saltar esta capa si no existe
         }
         
-        // Crear y configurar la capa
-        Layer layer = addLayerFromFile(file, new Point(x, y));
+    // Crear y configurar la capa usando la ruta absoluta resuelta
+    Layer layer = addLayerFromFile(imageFile.getAbsolutePath(), new Point(x, y));
+        io.Log.log("DEBUG: LayerManager.loadLayerFromJson - Capa cargada desde: " + imageFile.getAbsolutePath());
         layer.setName(name);
         layer.setVisible(visible);
         layer.setOpacity(opacity);
@@ -750,14 +1409,19 @@ public class LayerManager implements ModelHandler<BrickGraphicsState> {
                 return "";
             }
         } else {
-            // Valor numérico o boolean
-            endIndex = jsonData.indexOf(',', startIndex);
-            if (endIndex == -1) {
-                endIndex = jsonData.length();
+            // Valor numérico o boolean: detener en coma, llave de cierre o espacio
+            int i = startIndex;
+            while (i < jsonData.length()) {
+                char c = jsonData.charAt(i);
+                if (c == ',' || c == '}' || c == '\n' || c == '\r' || c == '\t' || c == ' ') {
+                    break;
+                }
+                i++;
             }
+            endIndex = i;
         }
         
-        return jsonData.substring(startIndex, endIndex);
+        return jsonData.substring(startIndex, endIndex).trim();
     }
     
     /**
@@ -802,5 +1466,15 @@ public class LayerManager implements ModelHandler<BrickGraphicsState> {
                    .replace("\n", "\\n")
                    .replace("\r", "\\r")
                    .replace("\t", "\\t");
+    }
+
+    /**
+     * Normaliza un nombre de capa para usarlo como parte de un nombre de archivo.
+     * Sustituye espacios y caracteres no alfanuméricos por '_'.
+     */
+    private String normalizeName(String name) {
+        if (name == null || name.isEmpty()) return "layer";
+        // Eliminar acentos simples: podemos dejar tarea futura; por ahora solo reemplazar caracteres no permitidos
+        return name.trim().replaceAll("[^a-zA-Z0-9_-]+", "_");
     }
 }

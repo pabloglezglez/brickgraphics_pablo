@@ -173,7 +173,21 @@ public class MainController implements ModelHandler<BrickGraphicsState> {
 				} catch (Exception e) {
 					Log.log(e);
 				}
-				new MainController();
+				MainController controller = new MainController();
+				// Permitir cargar un archivo pasado por argumento para facilitar pruebas
+				if (args != null && args.length > 0) {
+					try {
+						File f = new File(args[0]);
+						if (f.exists()) {
+							io.Log.log("DEBUG: MainController.main - Abriendo archivo pasado por argumento: " + f.getAbsolutePath());
+							MosaicIO.load(controller, f);
+						} else {
+							io.Log.log("WARN: MainController.main - Archivo pasado por argumento no existe: " + f.getAbsolutePath());
+						}
+					} catch (Exception ex) {
+						Log.log(ex);
+					}
+				}
 			}
 		});
 	}
@@ -259,14 +273,28 @@ public class MainController implements ModelHandler<BrickGraphicsState> {
 	}
 	
 	public void loadMosaicFile(File file) throws IOException {
+		// Establecer primero el archivo del mosaico para que los ModelHandlers (LayerManager)
+		// puedan usar la ruta correcta al cargar las referencias relativas de capas.
+		mosaicFile = file;
+		if(layerManager != null) {
+			layerManager.setMosaicFile(file);
+			io.Log.log("DEBUG: MainController.loadMosaicFile - mosaicFile seteado antes de cargar modelo: " + file.getAbsolutePath());
+		}
 		FileInputStream fis = new FileInputStream(file);
 		BufferedReader br = new BufferedReader(new InputStreamReader(fis));
 		model.loadFrom(br);
 		br.close();
 		fis.close();
 		
-		mosaicFile = file;
-		
+		// Forzar refresco de lista de capas en la UI tras cargar el modelo
+		if (layerPanel != null) {
+			try {
+				layerPanel.refreshLayerList();
+			} catch (Exception ex) {
+				Log.log(ex);
+			}
+		}
+
 		// Add to recent files when opening a mosaic file
 		if (recentFilesManager != null) {
 			recentFilesManager.addRecentFile(file);
@@ -285,6 +313,10 @@ public class MainController implements ModelHandler<BrickGraphicsState> {
 	
 	public void setMosaicFile(File file) {
 		this.mosaicFile = file;
+		if(layerManager != null) {
+			layerManager.setMosaicFile(file);
+			io.Log.log("DEBUG: MainController.setMosaicFile - LayerManager actualizado con archivo mosaico: " + (file!=null?file.getAbsolutePath():"null"));
+		}
 		
 		// Add to recent files when a file is set
 		if (file != null && recentFilesManager != null) {

@@ -14,6 +14,8 @@ import java.awt.Color;
 public class Layer {
     private String name;
     private BufferedImage image;
+    // Overlay de pintura (solo diffs pintados). Se mantiene separado para no modificar la imagen base.
+    private BufferedImage paintingOverlay; // mismo tamaño que image; píxeles transparentes donde no hay pintura
     private Point position;
     private boolean visible;
     private float opacity;
@@ -70,6 +72,7 @@ public class Layer {
     // Getters
     public String getName() { return name; }
     public BufferedImage getImage() { return image; }
+    public BufferedImage getPaintingOverlay() { return paintingOverlay; }
     public Point getPosition() { return new Point(position); }
     public int getX() { return position.x; }
     public int getY() { return position.y; }
@@ -84,6 +87,18 @@ public class Layer {
     
     public void setImage(BufferedImage image) { 
         this.image = image; 
+        // Invalida overlay si el tamaño cambia
+        if (paintingOverlay != null && (paintingOverlay.getWidth() != image.getWidth() || paintingOverlay.getHeight() != image.getHeight())) {
+            paintingOverlay = null; // se recreará lazy cuando se pinte
+        }
+    }
+    public void setPaintingOverlay(BufferedImage overlay) {
+        this.paintingOverlay = overlay;
+        if (overlay != null) {
+            io.Log.log("DEBUG: Layer.setPaintingOverlay - asignado overlay a '" + name + "' size=" + overlay.getWidth() + "x" + overlay.getHeight() + " id=" + System.identityHashCode(overlay));
+        } else {
+            io.Log.log("DEBUG: Layer.setPaintingOverlay - overlay NULL para '" + name + "'");
+        }
     }
     
     public void setPosition(Point position) { 
@@ -127,6 +142,66 @@ public class Layer {
     
     public void setBlendMode(BlendMode blendMode) { 
         this.blendMode = blendMode; 
+    }
+
+    /**
+     * Asegura que exista un overlay de pintura del mismo tamaño que la imagen base.
+     */
+    private void ensurePaintingOverlay() {
+        if (image == null) return;
+        if (paintingOverlay == null) {
+            paintingOverlay = new BufferedImage(image.getWidth(), image.getHeight(), BufferedImage.TYPE_INT_ARGB);
+            io.Log.log("DEBUG: Layer.ensurePaintingOverlay - creado nuevo overlay para '" + name + "' size=" + image.getWidth() + "x" + image.getHeight());
+        }
+    }
+
+    /**
+     * Aplica un trazo circular simple (brush) sobre la capa de pintura.
+     * @param x centro X en coordenadas de imagen (antes de escala)
+     * @param y centro Y en coordenadas de imagen
+     * @param radius radio del pincel
+     * @param color color ARGB del trazo
+     * @return true si se modificó algo
+     */
+    public boolean applyBrushStroke(int x, int y, int radius, int color) {
+        if (image == null) return false;
+        ensurePaintingOverlay();
+        if (paintingOverlay == null) return false;
+        int w = paintingOverlay.getWidth();
+        int h = paintingOverlay.getHeight();
+        int r2 = radius * radius;
+        boolean modified = false;
+        // Recorte de bounding box
+        int minX = Math.max(0, x - radius);
+        int maxX = Math.min(w - 1, x + radius);
+        int minY = Math.max(0, y - radius);
+        int maxY = Math.min(h - 1, y + radius);
+        for (int yy = minY; yy <= maxY; yy++) {
+            int dy = yy - y;
+            for (int xx = minX; xx <= maxX; xx++) {
+                int dx = xx - x;
+                if (dx*dx + dy*dy <= r2) {
+                    paintingOverlay.setRGB(xx, yy, color);
+                    modified = true;
+                }
+            }
+        }
+        if (modified) {
+            io.Log.log("DEBUG: Layer.applyBrushStroke - modificado overlay '" + name + "' centro=(" + x + "," + y + ") radius=" + radius);
+        }
+        return modified;
+    }
+
+    /**
+     * Limpia completamente el overlay de pintura.
+     */
+    public void clearPaintingOverlay() {
+        if (paintingOverlay == null) return;
+        Graphics2D g = paintingOverlay.createGraphics();
+        g.setComposite(AlphaComposite.Clear);
+        g.fillRect(0,0,paintingOverlay.getWidth(), paintingOverlay.getHeight());
+        g.dispose();
+        io.Log.log("DEBUG: Layer.clearPaintingOverlay - overlay limpiado para '" + name + "'");
     }
     
     /**
@@ -200,9 +275,16 @@ public class Layer {
             
             // Dibujar imagen escalada desde el centro
             g.drawImage(processedImage, drawX, drawY, scaledWidth, scaledHeight, null);
+            // Render overlay de pintura escalado si existe
+            if (paintingOverlay != null) {
+                g.drawImage(paintingOverlay, drawX, drawY, scaledWidth, scaledHeight, null);
+            }
         } else {
             // Dibujar imagen sin escalado
             g.drawImage(processedImage, position.x, position.y, null);
+            if (paintingOverlay != null) {
+                g.drawImage(paintingOverlay, position.x, position.y, null);
+            }
         }
         
         g.dispose();
@@ -430,11 +512,28 @@ public class Layer {
             g.drawImage(image, 0, 0, null);
             g.dispose();
         }
-        
+        // Copiar overlay de pintura si existe
+        BufferedImage overlayCopy = null;
+        if (paintingOverlay != null) {
+            overlayCopy = new BufferedImage(paintingOverlay.getWidth(), paintingOverlay.getHeight(), BufferedImage.TYPE_INT_ARGB);
+            Graphics2D g = overlayCopy.createGraphics();
+            g.drawImage(paintingOverlay, 0, 0, null);
+            g.dispose();
+        }
+
         Layer copy = new Layer(name + " (copy)", imageCopy, position, imagePath);
         copy.setOpacity(opacity);
         copy.setVisible(visible);
         copy.setBlendMode(blendMode);
+        copy.setBrightness(brightness);
+        copy.setContrast(contrast);
+        copy.setSaturation(saturation);
+        copy.setGamma(gamma);
+        copy.setSharpness(sharpness);
+        copy.setScale(scale);
+        if (overlayCopy != null) {
+            copy.setPaintingOverlay(overlayCopy);
+        }
         
         return copy;
     }

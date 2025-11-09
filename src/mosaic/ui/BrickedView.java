@@ -1,22 +1,45 @@
 package mosaic.ui;
 
+// IMPORTS REPARADOS: Restaurar importaciones explícitas para tipos Java y del proyecto.
 import transforms.*;
 import transforms.ScaleTransform.ScaleQuality;
 import icon.Icons;
 import io.*;
-import java.awt.*;
-import java.awt.event.*;
-import java.awt.geom.AffineTransform;
+import java.awt.BasicStroke;
+import java.awt.CardLayout;
+import java.awt.BorderLayout;
+import java.awt.Color;
+import java.awt.Component;
+import java.awt.Cursor;
+import java.awt.Dimension;
+import java.awt.Graphics;
+import java.awt.Graphics2D;
+import java.awt.Point;
+import java.awt.Rectangle;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.awt.event.KeyAdapter;
+import java.awt.event.KeyEvent;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.awt.event.MouseMotionAdapter;
+import java.awt.event.MouseWheelEvent;
+import java.awt.event.MouseWheelListener;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.HashMap;
-import javax.swing.*;
-import javax.swing.event.*;
+import javax.swing.JButton;
+import javax.swing.JPanel;
+import javax.swing.SwingUtilities;
+import javax.swing.event.ChangeEvent;
+import javax.swing.event.ChangeListener;
 import colors.*;
 import mosaic.controllers.*;
 import mosaic.controllers.PrintController.ShowPosition;
 import mosaic.io.*;
 import mosaic.layers.LayerManager;
+import mosaic.layers.Layer;
+import java.awt.image.BufferedImage;
 import mosaic.rendering.Pipeline;
 import mosaic.rendering.PipelineMosaicListener;
 import bricks.ToBricksType;
@@ -35,6 +58,10 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 	private StudEditController studEditController;
 	private MosaicZoomController mosaicZoomController;
 	private Dimension shownImageSize;
+	// Gestor de capas para pintura por-overlay
+	private LayerManager layerManager;
+	// Throttle para logs del bounding box
+	private long lastBoundsLogTs = 0L;
 	
 	// Sistema de preservación de modificaciones
 	private ModificationManager modificationManager;
@@ -48,6 +75,7 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 	
 	public BrickedView(MainController mc, Model<BrickGraphicsState> model, Pipeline pipeline) {
 		this.pipeline = pipeline;
+		this.layerManager = mc.getLayerManager();
 		scaler = new ScaleTransform("Constructed view", true, ScaleQuality.RetainColors);
 		magnifierController = mc.getMagnifierController();
 		colorController = mc.getColorController();
@@ -55,8 +83,8 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 		toBricksController = mc.getToBricksController();
 		printController = mc.getPrintController();
 		studEditController = mc.getStudEditController();
-		mosaicZoomController = mc.getMosaicZoomController();
-		System.out.println("BrickedView: MosaicZoomController obtenido: " + (mosaicZoomController != null));
+	mosaicZoomController = mc.getMosaicZoomController();
+	Log.log("BrickedView: MosaicZoomController obtenido: " + (mosaicZoomController != null));
 		
 		// Inicializar modificationManager como null, se establecerá después
 		modificationManager = null;
@@ -216,6 +244,14 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 		if (studEditController.getActiveTool() == EditTool.DEFAULT) {
 			return; // No hacer nada si está en modo navegación
 		}
+
+		// Intentar primero pintar sobre la capa seleccionada (overlay) si procede
+		if (studEditController.getActiveTool() == EditTool.BRUSH && attemptOverlayPaint(clickX, clickY)) {
+			// Se realizó pintura de overlay; no modificar studs
+			io.Log.log("DEBUG: attemptOverlayPaint -> SUCCESS en click");
+			repaint();
+			return;
+		}
 		
 		LEGOColorGrid colorGrid = getColorGrid();
 		if (colorGrid == null) {
@@ -227,7 +263,7 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 		
 		// DEBUG: Mostrar las coordenadas calculadas
 		double zoomFactor = mosaicZoomController.getCurrentZoomFactor();
-		System.out.println("Click en (" + clickX + "," + clickY + ") Zoom=" + zoomFactor + " -> Cursor en (" + hoveredX + "," + hoveredY + ")");
+	Log.log("Click en (" + clickX + "," + clickY + ") Zoom=" + zoomFactor + " -> Cursor en (" + hoveredX + "," + hoveredY + ")");
 		
 		// Usar directamente las coordenadas del cursor visual que ya están calculadas correctamente
 		// Esto garantiza que TODAS las herramientas (BRUSH, EYEDROPPER, RESET) actúen 
@@ -575,6 +611,12 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 		if (!isDragging || (activeTool != EditTool.BRUSH && activeTool != EditTool.RESET)) {
 			return; // Solo ciertas herramientas permiten arrastre continuo
 		}
+
+		// Overlay painting en arrastre (solo BRUSH)
+		if (activeTool == EditTool.BRUSH && attemptOverlayPaint(mouseX, mouseY)) {
+			repaint();
+			return; // Evitar edición de studs si pintamos overlay
+		}
 		
 		LEGOColorGrid colorGrid = getColorGrid();
 		if (colorGrid == null) {
@@ -598,6 +640,106 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 					lastDraggedY = hoveredY;
 				}
 			}
+		}
+	}
+
+	/**
+	 * Intenta aplicar un trazo de pintura al overlay de la capa seleccionada usando
+	 * las coordenadas de pantalla del click/arrastre. Devuelve true si se pintó.
+	 */
+	private boolean attemptOverlayPaint(int screenX, int screenY) {
+		try {
+			if (layerManager == null) return false;
+			Layer selected = layerManager.getSelectedLayer();
+			if (selected == null) {
+				io.Log.log("DEBUG: attemptOverlayPaint -> no selected layer");
+				return false;
+			}
+			LEGOColor legoColor = studEditController.getSelectedColor();
+			if (legoColor == null) {
+				io.Log.log("DEBUG: attemptOverlayPaint -> no selected color");
+				return false;
+			}
+			if (!selected.isVisible()) {
+				io.Log.log("DEBUG: attemptOverlayPaint -> selected layer not visible");
+				return false;
+			}
+
+			// Log de contexto inicial para diagnosticar mapeo de coordenadas
+			BufferedImage dbgImg = selected.getImage();
+			if (dbgImg != null) {
+				io.Log.log("DEBUG: attemptOverlayPaint START layer='" + selected.getName() + "' baseSize=" + dbgImg.getWidth() + "x" + dbgImg.getHeight() + " scale=" + selected.getScale() + " pos=" + selected.getX() + "," + selected.getY() + " mosaicSize=" + (mosaicImageSize != null ? (mosaicImageSize.width + "x" + mosaicImageSize.height) : "null") + " shownSize=" + (shownImageSize != null ? (shownImageSize.width + "x" + shownImageSize.height) : "null") + " screenPoint=" + screenX + "," + screenY);
+			} else {
+				io.Log.log("DEBUG: attemptOverlayPaint START layer='" + selected.getName() + "' (sin imagen base) screenPoint=" + screenX + "," + screenY);
+			}
+
+			// Convertir a coordenadas de mosaico (pixeles de la imagen base compuesta)
+			Point mosaicPoint = screenToMosaic(new Point(screenX, screenY));
+			int mosaicX = mosaicPoint.x;
+			int mosaicY = mosaicPoint.y;
+
+			BufferedImage layerImage = selected.getImage();
+			if (layerImage == null) {
+				io.Log.log("DEBUG: attemptOverlayPaint -> layer has no base image");
+				return false;
+			}
+
+			int originalW = layerImage.getWidth();
+			int originalH = layerImage.getHeight();
+			float scale = selected.getScale();
+			int scaledW = (int)Math.round(originalW * scale);
+			int scaledH = (int)Math.round(originalH * scale);
+
+			// Calcular esquina superior izquierda real tras escalado (centering logic en applyLayersToImage)
+			int displayX = selected.getX();
+			int displayY = selected.getY();
+			if (Math.abs(scale - 1.0f) > 1e-6) {
+				displayX += (originalW - scaledW) / 2;
+				displayY += (originalH - scaledH) / 2;
+			}
+
+			// Verificar si el punto está dentro del área mostrada de la capa
+			if (mosaicX < displayX || mosaicY < displayY || mosaicX >= displayX + scaledW || mosaicY >= displayY + scaledH) {
+				io.Log.log("DEBUG: attemptOverlayPaint -> fuera capa: mosaic=(" + mosaicX + "," + mosaicY + ") bbox=(" + displayX + "," + displayY + "," + scaledW + "x" + scaledH + ") scale=" + scale);
+				return false; // fuera de la capa
+			}
+
+			// Convertir a coordenadas del espacio original (pre-escala)
+			int localScaledX = mosaicX - displayX;
+			int localScaledY = mosaicY - displayY;
+			int localX = scale == 1.0f ? localScaledX : (int)Math.round(localScaledX / scale);
+			int localY = scale == 1.0f ? localScaledY : (int)Math.round(localScaledY / scale);
+
+			if (localX < 0 || localY < 0 || localX >= originalW || localY >= originalH) {
+				io.Log.log("DEBUG: attemptOverlayPaint -> local fuera: local=(" + localX + "," + localY + ") orig=(" + originalW + "x" + originalH + ")");
+				return false;
+			}
+
+			// Mapear tamaño de pincel (studs) a radio en píxeles del espacio local de la capa.
+			int brushUnits = studEditController.getBrushSize().getSize();
+			int radius;
+			LEGOColorGrid grid = getColorGrid();
+			if (mosaicImageSize != null && grid != null && grid.getWidth() > 0 && grid.getHeight() > 0) {
+				int studPxX = Math.max(1, mosaicImageSize.width / grid.getWidth());
+				int studPxY = Math.max(1, mosaicImageSize.height / grid.getHeight());
+				int studPx = Math.min(studPxX, studPxY);
+				// Ajuste suave: usar raíz para que el área crezca más linealmente con el tamaño del pincel
+				float s = (scale == 0f ? 1f : scale);
+				double factor = Math.sqrt(Math.max(1, brushUnits));
+				radius = Math.max(1, (int)Math.ceil((factor * studPx) / s));
+			} else {
+				// Fallback conservador
+				radius = Math.max(1, (int)Math.ceil(Math.sqrt(Math.max(1, brushUnits)) * 2.0));
+			}
+
+			boolean painted = layerManager.applyBrushToSelectedLayer(localX, localY, radius, legoColor.getRGB());
+			if (painted) {
+				io.Log.log("DEBUG: OverlayPaint stroke en capa '" + selected.getName() + "' local=(" + localX + "," + localY + ") radius=" + radius + " color=" + legoColor.getName());
+			}
+			return painted;
+		} catch (Exception ex) {
+			io.Log.log("WARN: attemptOverlayPaint fallo: " + ex.getMessage());
+			return false;
 		}
 	}
 
@@ -713,16 +855,16 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 				public void mouseClicked(MouseEvent e) {
 					if (SwingUtilities.isRightMouseButton(e)) {
 						// Click derecho para zoom in
-						System.out.println("Click derecho para zoom in");
+						Log.log("Click derecho para zoom in");
 						if (mosaicZoomController != null) {
 							Point mosaicPoint = screenToMosaic(new Point(e.getX(), e.getY()));
-							System.out.println("Centering zoom en: " + mosaicPoint);
+							Log.log("Centering zoom en: " + mosaicPoint);
 							mosaicZoomController.centerViewportOn(mosaicPoint);
 							mosaicZoomController.zoomIn();
 						}
 					} else if (SwingUtilities.isMiddleMouseButton(e)) {
 						// Click medio para zoom out
-						System.out.println("Click medio para zoom out");
+						Log.log("Click medio para zoom out");
 						if (mosaicZoomController != null) {
 							mosaicZoomController.zoomOut();
 						}
@@ -748,12 +890,12 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 							lastDraggedX = -1;
 							lastDraggedY = -1;
 							handleMosaicClick(e.getX(), e.getY());
-							System.out.println("Herramienta activada: " + activeTool);
+							Log.log("Herramienta activada: " + activeTool);
 						} else if (e.isControlDown() || isZoomMode) {
 							// Ctrl presionado O modo zoom - activar selección de zoom
 							zoomSelectionStart = new Point(e.getX(), e.getY());
 							mosaicZoomController.startSelection(zoomSelectionStart);
-							System.out.println("Selección de zoom iniciada");
+							Log.log("Selección de zoom iniciada");
 						} else {
 							// Click normal para otras herramientas
 							handleMosaicClick(e.getX(), e.getY());
@@ -764,7 +906,7 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 							isPanning = true;
 							panningStart = new Point(e.getX(), e.getY());
 							setCursor(Cursor.getPredefinedCursor(Cursor.MOVE_CURSOR));
-							System.out.println("Paneo iniciado en: " + panningStart);
+							Log.log("Paneo iniciado en: " + panningStart);
 						}
 					}
 				}
@@ -776,7 +918,7 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 						isPanning = false;
 						panningStart = null;
 						setCursor(Cursor.getDefaultCursor());
-						System.out.println("Paneo terminado");
+						Log.log("Paneo terminado");
 					} else if (zoomSelectionStart != null) {
 						// Terminar selección de zoom
 						mosaicZoomController.endSelection();
@@ -821,7 +963,7 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 						
 						if (mosaicZoomController != null) {
 							mosaicZoomController.panViewport(deltaX, deltaY);
-							System.out.println("Paneo delta: (" + deltaX + ", " + deltaY + ")");
+							Log.log("Paneo delta: (" + deltaX + ", " + deltaY + ")");
 						}
 						
 						// Actualizar punto de inicio para el siguiente arrastre
@@ -830,7 +972,7 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 					} else if (zoomSelectionStart != null) {
 						// Actualizar selección de zoom (solo si se inició zoom)
 						mosaicZoomController.updateSelection(new Point(e.getX(), e.getY()));
-						System.out.println("Actualizando selección de zoom");
+						Log.log("Actualizando selección de zoom");
 					} else if (isDragging) {
 						// Arrastre para herramientas de edición
 						updateHoverCursor(e.getX(), e.getY());
@@ -846,30 +988,30 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 		addMouseWheelListener(new MouseWheelListener() {
 			@Override
 			public void mouseWheelMoved(MouseWheelEvent e) {
-				System.out.println("MouseWheel en MosaicCanvas: Ctrl=" + e.isControlDown() + ", rotation=" + e.getWheelRotation());
+				Log.log("MouseWheel en MosaicCanvas: Ctrl=" + e.isControlDown() + ", rotation=" + e.getWheelRotation());
 				if (e.isControlDown() && mosaicZoomController != null) {
 					// Consumir evento INMEDIATAMENTE para prevenir zoom del sistema
 					e.consume();
 					
 					// Ctrl+Rueda: zoom centrado en cursor
 					Point cursorPos = screenToMosaic(new Point(e.getX(), e.getY()));
-					System.out.println("Zoom en cursor: " + cursorPos);
+					Log.log("Zoom en cursor: " + cursorPos);
 					
 					double currentZoom = mosaicZoomController.getCurrentZoomFactor();
-					System.out.println("Zoom actual: " + currentZoom);
+					Log.log("Zoom actual: " + currentZoom);
 					
 					mosaicZoomController.centerViewportOn(cursorPos);
 					
 					if (e.getWheelRotation() < 0) {
 						mosaicZoomController.zoomIn();
-						System.out.println("Zoom IN ejecutado");
+						Log.log("Zoom IN ejecutado");
 					} else {
 						mosaicZoomController.zoomOut();
-						System.out.println("Zoom OUT ejecutado");
+						Log.log("Zoom OUT ejecutado");
 					}
 					
 					double newZoom = mosaicZoomController.getCurrentZoomFactor();
-					System.out.println("Nuevo zoom: " + newZoom);
+					Log.log("Nuevo zoom: " + newZoom);
 					
 					// Forzar repaint
 					repaint();
@@ -913,48 +1055,48 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 		 * Debe ser llamado desde la ventana principal cuando se detecta Ctrl+rueda.
 		 */
 		public void handleMouseWheelZoom(MouseWheelEvent e, Point relativeToCanvas) {
-			System.out.println("HandleMouseWheelZoom: punto=" + relativeToCanvas + ", rotation=" + e.getWheelRotation());
+			Log.log("HandleMouseWheelZoom: punto=" + relativeToCanvas + ", rotation=" + e.getWheelRotation());
 			
 			if (mosaicZoomController == null) {
-				System.out.println("MosaicZoomController es null!");
+				Log.log("MosaicZoomController es null!");
 				return;
 			}
 			
 			// Verificar que el punto esté dentro del canvas del mosaico
 			Rectangle canvasBounds = getBounds();
-			System.out.println("Canvas bounds: " + canvasBounds);
+			Log.log("Canvas bounds: " + canvasBounds);
 			
 			if (relativeToCanvas.x >= 0 && relativeToCanvas.y >= 0 && 
 				relativeToCanvas.x < canvasBounds.width && relativeToCanvas.y < canvasBounds.height) {
 				
-				System.out.println("Punto dentro del canvas, procesando zoom...");
+				Log.log("Punto dentro del canvas, procesando zoom...");
 				
 				// Ctrl+Rueda: zoom centrado en cursor
 				Point cursorPos = screenToMosaic(relativeToCanvas);
-				System.out.println("Coordenada en mosaico: " + cursorPos);
+				Log.log("Coordenada en mosaico: " + cursorPos);
 				
 				// Obtener nivel de zoom actual
 				double currentZoom = mosaicZoomController.getCurrentZoomFactor();
-				System.out.println("Zoom actual: " + currentZoom);
+				Log.log("Zoom actual: " + currentZoom);
 				
 				mosaicZoomController.centerViewportOn(cursorPos);
 				
 				if (e.getWheelRotation() < 0) {
 					mosaicZoomController.zoomIn();
-					System.out.println("Zoom IN ejecutado");
+					Log.log("Zoom IN ejecutado");
 				} else {
 					mosaicZoomController.zoomOut();
-					System.out.println("Zoom OUT ejecutado");
+					Log.log("Zoom OUT ejecutado");
 				}
 				
 				// Verificar nuevo zoom
 				double newZoom = mosaicZoomController.getCurrentZoomFactor();
-				System.out.println("Nuevo zoom: " + newZoom);
+				Log.log("Nuevo zoom: " + newZoom);
 				
 				// Forzar repaint
 				repaint();
 			} else {
-				System.out.println("Punto fuera del canvas: " + relativeToCanvas + " no está en " + canvasBounds);
+				Log.log("Punto fuera del canvas: " + relativeToCanvas + " no está en " + canvasBounds);
 			}
 		}
 		
@@ -974,7 +1116,7 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 			if (mosaicZoomController != null) {
 				double zoom = mosaicZoomController.getCurrentZoomFactor();
 				if (zoom != 1.0) {
-					System.out.println("PaintComponent: Zoom=" + zoom + ", viewport=" + mosaicZoomController.getViewportBounds());
+					Log.log("PaintComponent: Zoom=" + zoom + ", viewport=" + mosaicZoomController.getViewportBounds());
 				}
 			}
 			magnifierController.setShownImageSize(shownImageSize);
@@ -1005,11 +1147,66 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 				toBricksTransform.drawAll(g2, shownImageSize);
 			}
 			
+			// Ayuda visual: dibujar bounding box de la capa seleccionada para depurar pintura overlay
+			drawSelectedLayerBounds(g2);
+
 			// Dibujar cursor de edición si está activo (siempre en coordenadas de pantalla)
 			drawEditCursor(g2);
 			
 			// Dibujar selección de zoom si está activa
 			drawZoomSelection(g2);
+		}
+
+		/**
+		 * Dibuja un rectángulo alrededor del área visible (post-escala y centrado) de la capa seleccionada.
+		 */
+		private void drawSelectedLayerBounds(Graphics2D g2) {
+			if (layerManager == null) { io.Log.log("DEBUG: drawSelectedLayerBounds skip - layerManager null"); return; }
+			Layer selected = layerManager.getSelectedLayer();
+			if (selected == null) { io.Log.log("DEBUG: drawSelectedLayerBounds skip - no selected layer"); return; }
+			if (!selected.isVisible()) { io.Log.log("DEBUG: drawSelectedLayerBounds skip - layer not visible"); return; }
+			BufferedImage base = selected.getImage();
+			if (base == null) { io.Log.log("DEBUG: drawSelectedLayerBounds skip - layer image null"); return; }
+			int originalW = base.getWidth();
+			int originalH = base.getHeight();
+			float scale = selected.getScale();
+			int scaledW = (int)Math.round(originalW * scale);
+			int scaledH = (int)Math.round(originalH * scale);
+			int displayX = selected.getX();
+			int displayY = selected.getY();
+			if (Math.abs(scale - 1.0f) > 1e-6) {
+				displayX += (originalW - scaledW) / 2;
+				displayY += (originalH - scaledH) / 2;
+			}
+			// Convertir a coordenadas de pantalla si hay zoom activo
+			int screenX, screenY, screenW, screenH;
+			if (mosaicZoomController != null && mosaicZoomController.getCurrentZoomFactor() != 1.0) {
+				Point topLeft = mosaicToScreen(new Point(displayX, displayY));
+				Point bottomRight = mosaicToScreen(new Point(displayX + scaledW, displayY + scaledH));
+				if (topLeft.x < 0 || topLeft.y < 0 || bottomRight.x < 0 || bottomRight.y < 0) {
+					io.Log.log("DEBUG: drawSelectedLayerBounds fuera de viewport - bbox mosaic=(" + displayX + "," + displayY + "," + scaledW + "x" + scaledH + ")");
+					return;
+				}
+				screenX = topLeft.x;
+				screenY = topLeft.y;
+				screenW = bottomRight.x - topLeft.x;
+				screenH = bottomRight.y - topLeft.y;
+			} else {
+				screenX = displayX;
+				screenY = displayY;
+				screenW = scaledW;
+				screenH = scaledH;
+			}
+			g2.setColor(new Color(255,255,0,160));
+			java.awt.Stroke old = g2.getStroke();
+			g2.setStroke(new BasicStroke(2, BasicStroke.CAP_BUTT, BasicStroke.JOIN_BEVEL, 0, new float[]{6,4}, 0));
+			g2.drawRect(screenX, screenY, screenW, screenH);
+			g2.setStroke(old);
+			long now = System.currentTimeMillis();
+			if (now - lastBoundsLogTs > 500) { // limitar spam de logs
+				io.Log.log("DEBUG: drawSelectedLayerBounds screenRect=(" + screenX + "," + screenY + "," + screenW + "x" + screenH + ") mosaicRect=(" + displayX + "," + displayY + "," + scaledW + "x" + scaledH + ") scale=" + scale);
+				lastBoundsLogTs = now;
+			}
 		}
 		
 	/**

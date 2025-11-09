@@ -129,7 +129,7 @@ public class IOActions {
 				} catch (AWTException e1) {
 					String message = "An error ocurred while loading screenshot " + e1.getMessage();
 					JOptionPane.showMessageDialog(parent, message, "Error when loading screenshot", JOptionPane.ERROR_MESSAGE);
-					e1.printStackTrace();
+					io.Log.log(e1);
 				}
 			}
 		};
@@ -170,7 +170,7 @@ public class IOActions {
 					} catch (Exception e1) {
 						String message = "An error ocurred while opening file " + file.getName() + "\n" + e1.getMessage();
 						JOptionPane.showMessageDialog(parent, message, "Error when opening file", JOptionPane.ERROR_MESSAGE);
-						e1.printStackTrace();
+						io.Log.log(e1);
 					}
 				}
 			}
@@ -295,7 +295,7 @@ public class IOActions {
 					} catch (Exception e1) {
 						String message = "An error ocurred while saving file " + file.getName() + "\n" + e1.getMessage();
 						JOptionPane.showMessageDialog(parent, message, "Error when saving file", JOptionPane.ERROR_MESSAGE);
-						e1.printStackTrace();
+						io.Log.log(e1);
 					}
 				}
 			}

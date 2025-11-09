@@ -5,6 +5,7 @@ import java.io.*;
 import java.text.ParseException;
 import colors.ColorIdNamePair;
 import colors.LEGOColor;
+import io.Log;
 
 /**
  * ID, Name, #rgb, |parts|, |sets|, from, to, LEGO names, LDraw IDs, Bricklink IDs, Peeron names
@@ -16,7 +17,7 @@ public class RebrickableColorSheetParser implements ColorSheetParserI {
 		InputStreamReader reader = new InputStreamReader(new FileInputStream(new File("C:\\workspace\\BrickGraphics\\ColorsRebrickable.html"))); // I'm just testing some local stuff on my Windows box.
 		List<String> lines = p.parse(reader);
 		for(String line : lines)
-			System.out.println(line);
+			Log.log(line);
 	}
 	
 	@Override
