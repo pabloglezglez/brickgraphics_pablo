@@ -130,25 +130,43 @@ public class IntegratedImageLayerPanel extends JPanel {
         layerList.setBorder(BorderFactory.createLineBorder(Color.BLUE, 2));
         layerList.setBackground(Color.WHITE);
         
-        // Botones de gestión de capas
-        addLayerButton = new JButton("Añadir Capa");
-    addLayerButton.setToolTipText("Añadir nueva capa desde una imagen (Ctrl+N)");
-        removeLayerButton = new JButton("Eliminar");
-    removeLayerButton.setToolTipText("Eliminar capa seleccionada (Supr/Backspace)");
-        duplicateButton = new JButton("Duplicar");
-    duplicateButton.setToolTipText("Duplicar capa seleccionada (Ctrl+D)");
-        moveUpButton = new JButton("Subir");
-    moveUpButton.setToolTipText("Mover capa seleccionada hacia arriba (Alt+↑)");
-        moveDownButton = new JButton("Bajar");
-    moveDownButton.setToolTipText("Mover capa seleccionada hacia abajo (Alt+↓)");
-        enableLayersCheckBox = new JCheckBox("Capas Habilitadas", true);
-    enableLayersCheckBox.setToolTipText("Activar / Desactivar todas las capas");
+        // Botones de gestión de capas con texto más corto
+        addLayerButton = new JButton("+");
+        addLayerButton.setToolTipText("Añadir nueva capa desde una imagen (Ctrl+N)");
+        removeLayerButton = new JButton("✕");
+        removeLayerButton.setToolTipText("Eliminar capa seleccionada (Supr/Backspace)");
+        duplicateButton = new JButton("⧉");
+        duplicateButton.setToolTipText("Duplicar capa seleccionada (Ctrl+D)");
+        moveUpButton = new JButton("↑");
+        moveUpButton.setToolTipText("Mover capa seleccionada hacia arriba (Alt+↑)");
+        moveDownButton = new JButton("↓");
+        moveDownButton.setToolTipText("Mover capa seleccionada hacia abajo (Alt+↓)");
         
-        // NUEVOS: Controles de Paint Overlay
-        paintOverlayCheckBox = new JCheckBox("Pintura Global", false);
+        // Configurar tamaño uniforme para los botones
+        Dimension buttonSize = new Dimension(32, 28);
+        addLayerButton.setPreferredSize(buttonSize);
+        removeLayerButton.setPreferredSize(buttonSize);
+        duplicateButton.setPreferredSize(buttonSize);
+        moveUpButton.setPreferredSize(buttonSize);
+        moveDownButton.setPreferredSize(buttonSize);
+        
+        // Configurar font para mejor visibilidad
+        Font buttonFont = new Font(Font.SANS_SERIF, Font.BOLD, 14);
+        addLayerButton.setFont(buttonFont);
+        removeLayerButton.setFont(buttonFont);
+        duplicateButton.setFont(buttonFont);
+        moveUpButton.setFont(buttonFont);
+        moveDownButton.setFont(buttonFont);
+        
+        enableLayersCheckBox = new JCheckBox("Capas", true);
+        enableLayersCheckBox.setToolTipText("Activar / Desactivar todas las capas");
+        
+        // NUEVOS: Controles de Paint Overlay mejorados
+        paintOverlayCheckBox = new JCheckBox("Pintura", false);
         paintOverlayCheckBox.setToolTipText("Activar/desactivar pintura sobre el mosaico final");
-        clearPaintButton = new JButton("Limpiar Pintura");
+        clearPaintButton = new JButton("Limpiar");
         clearPaintButton.setToolTipText("Borrar toda la pintura aplicada");
+        clearPaintButton.setPreferredSize(new Dimension(60, 28));
         
         // Información de capas
         layerInfoLabel = new JLabel("No hay capas");
@@ -230,38 +248,48 @@ public class IntegratedImageLayerPanel extends JPanel {
     topPanel = new JPanel();
     topPanel.setLayout(new BoxLayout(topPanel, BoxLayout.Y_AXIS));
 
-    // Barra 1: habilitar capas + añadir/eliminar/duplicar
+    // Barra 1: controles principales
     JToolBar mainBar = new JToolBar();
     mainBar.setFloatable(false);
     mainBar.setRollover(true);
-    mainBar.setBorder(BorderFactory.createEmptyBorder(2, 2, 2, 2));
+    mainBar.setBorder(BorderFactory.createEmptyBorder(4, 4, 4, 4));
+    
+    // Configurar todos los componentes como no focusables
     enableLayersCheckBox.setFocusable(false);
+    paintOverlayCheckBox.setFocusable(false);
+    clearPaintButton.setFocusable(false);
     addLayerButton.setFocusable(false);
     removeLayerButton.setFocusable(false);
     duplicateButton.setFocusable(false);
+    moveUpButton.setFocusable(false);
+    moveDownButton.setFocusable(false);
     
-    // También configurar los nuevos controles de PaintOverlay
-    paintOverlayCheckBox.setFocusable(false);
-    clearPaintButton.setFocusable(false);
-    
+    // Añadir componentes con espaciado adecuado
     mainBar.add(enableLayersCheckBox);
-    mainBar.addSeparator(new Dimension(4, 0));
-    mainBar.add(paintOverlayCheckBox);
-    mainBar.add(clearPaintButton);
     mainBar.addSeparator(new Dimension(8, 0));
+    mainBar.add(paintOverlayCheckBox);
+    mainBar.add(Box.createHorizontalStrut(4));
+    mainBar.add(clearPaintButton);
+    mainBar.addSeparator(new Dimension(12, 0));
+    
+    // Grupo de botones de capa
     mainBar.add(addLayerButton);
+    mainBar.add(Box.createHorizontalStrut(2));
     mainBar.add(removeLayerButton);
+    mainBar.add(Box.createHorizontalStrut(2));
     mainBar.add(duplicateButton);
 
-    // Barra 2: ordenar (subir/bajar)
+    // Barra 2: controles de orden
     JToolBar orderBar = new JToolBar();
     orderBar.setFloatable(false);
     orderBar.setRollover(true);
-    orderBar.setBorder(BorderFactory.createEmptyBorder(0, 2, 2, 2));
-    moveUpButton.setFocusable(false);
-    moveDownButton.setFocusable(false);
+    orderBar.setBorder(BorderFactory.createEmptyBorder(2, 4, 4, 4));
+    
+    orderBar.add(new JLabel("Orden: "));
     orderBar.add(moveUpButton);
+    orderBar.add(Box.createHorizontalStrut(2));
     orderBar.add(moveDownButton);
+    orderBar.add(Box.createHorizontalGlue()); // Empujar a la izquierda
 
     topPanel.add(mainBar);
     topPanel.add(orderBar);
