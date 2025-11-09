@@ -42,6 +42,7 @@ import mosaic.layers.Layer;
 import java.awt.image.BufferedImage;
 import mosaic.rendering.Pipeline;
 import mosaic.rendering.PipelineMosaicListener;
+import mosaic.rendering.PaintOverlay;
 import bricks.ToBricksType;
 
 public class BrickedView extends JPanel implements ChangeListener, PipelineMosaicListener {
@@ -60,6 +61,8 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 	private Dimension shownImageSize;
 	// Gestor de capas para pintura por-overlay
 	private LayerManager layerManager;
+	// Sistema de overlay global de pintura
+	private PaintOverlay paintOverlay;
 	// Throttle para logs del bounding box
 	private long lastBoundsLogTs = 0L;
 	
@@ -644,108 +647,116 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 	}
 
 	/**
-	 * Intenta aplicar un trazo de pintura al overlay de la capa seleccionada usando
-	 * las coordenadas de pantalla del click/arrastre. Devuelve true si se pintó.
+	 * NUEVO: Intenta aplicar pintura al overlay global usando coordenadas directas del mosaico.
+	 * Este enfoque es independiente de las capas y permanece estable cuando estas se mueven.
 	 */
 	private boolean attemptOverlayPaint(int screenX, int screenY) {
 		try {
-			if (layerManager == null) return false;
-			Layer selected = layerManager.getSelectedLayer();
-			if (selected == null) {
-				io.Log.log("DEBUG: attemptOverlayPaint -> no selected layer");
+			// Verificaciones básicas
+			if (paintOverlay == null || !paintOverlay.isEnabled()) {
 				return false;
 			}
+			
 			LEGOColor legoColor = studEditController.getSelectedColor();
 			if (legoColor == null) {
-				io.Log.log("DEBUG: attemptOverlayPaint -> no selected color");
-				return false;
-			}
-			if (!selected.isVisible()) {
-				io.Log.log("DEBUG: attemptOverlayPaint -> selected layer not visible");
+				Log.log("DEBUG: attemptOverlayPaint -> no selected color");
 				return false;
 			}
 
-			// Log de contexto inicial para diagnosticar mapeo de coordenadas
-			BufferedImage dbgImg = selected.getImage();
-			if (dbgImg != null) {
-				io.Log.log("DEBUG: attemptOverlayPaint START layer='" + selected.getName() + "' baseSize=" + dbgImg.getWidth() + "x" + dbgImg.getHeight() + " scale=" + selected.getScale() + " pos=" + selected.getX() + "," + selected.getY() + " mosaicSize=" + (mosaicImageSize != null ? (mosaicImageSize.width + "x" + mosaicImageSize.height) : "null") + " shownSize=" + (shownImageSize != null ? (shownImageSize.width + "x" + shownImageSize.height) : "null") + " screenPoint=" + screenX + "," + screenY);
-			} else {
-				io.Log.log("DEBUG: attemptOverlayPaint START layer='" + selected.getName() + "' (sin imagen base) screenPoint=" + screenX + "," + screenY);
-			}
-
-			// Convertir a coordenadas de mosaico (pixeles de la imagen base compuesta)
+			// SIMPLIFICACIÓN: Convertir directamente de pantalla a coordenadas del mosaico
 			Point mosaicPoint = screenToMosaic(new Point(screenX, screenY));
 			int mosaicX = mosaicPoint.x;
 			int mosaicY = mosaicPoint.y;
 
-			BufferedImage layerImage = selected.getImage();
-			if (layerImage == null) {
-				io.Log.log("DEBUG: attemptOverlayPaint -> layer has no base image");
+			// Verificar límites del mosaico
+			if (mosaicImageSize == null || mosaicX < 0 || mosaicY < 0 || 
+			    mosaicX >= mosaicImageSize.width || mosaicY >= mosaicImageSize.height) {
+				Log.log("DEBUG: attemptOverlayPaint -> fuera del mosaico: (" + mosaicX + "," + mosaicY + 
+				        ") size=" + (mosaicImageSize != null ? (mosaicImageSize.width + "x" + mosaicImageSize.height) : "null"));
 				return false;
 			}
 
-			int originalW = layerImage.getWidth();
-			int originalH = layerImage.getHeight();
-			float scale = selected.getScale();
-			int scaledW = (int)Math.round(originalW * scale);
-			int scaledH = (int)Math.round(originalH * scale);
-
-			// Calcular esquina superior izquierda real tras escalado (centering logic en applyLayersToImage)
-			int displayX = selected.getX();
-			int displayY = selected.getY();
-			if (Math.abs(scale - 1.0f) > 1e-6) {
-				displayX += (originalW - scaledW) / 2;
-				displayY += (originalH - scaledH) / 2;
-			}
-
-			// Verificar si el punto está dentro del área mostrada de la capa
-			if (mosaicX < displayX || mosaicY < displayY || mosaicX >= displayX + scaledW || mosaicY >= displayY + scaledH) {
-				io.Log.log("DEBUG: attemptOverlayPaint -> fuera capa: mosaic=(" + mosaicX + "," + mosaicY + ") bbox=(" + displayX + "," + displayY + "," + scaledW + "x" + scaledH + ") scale=" + scale);
-				return false; // fuera de la capa
-			}
-
-			// Convertir a coordenadas del espacio original (pre-escala)
-			int localScaledX = mosaicX - displayX;
-			int localScaledY = mosaicY - displayY;
-			int localX = scale == 1.0f ? localScaledX : (int)Math.round(localScaledX / scale);
-			int localY = scale == 1.0f ? localScaledY : (int)Math.round(localScaledY / scale);
-
-			if (localX < 0 || localY < 0 || localX >= originalW || localY >= originalH) {
-				io.Log.log("DEBUG: attemptOverlayPaint -> local fuera: local=(" + localX + "," + localY + ") orig=(" + originalW + "x" + originalH + ")");
-				return false;
-			}
-
-			// Mapear tamaño de pincel (studs) a radio en píxeles del espacio local de la capa.
+			// Calcular radio del pincel en píxeles del mosaico
 			int brushUnits = studEditController.getBrushSize().getSize();
-			int radius;
-			LEGOColorGrid grid = getColorGrid();
-			if (mosaicImageSize != null && grid != null && grid.getWidth() > 0 && grid.getHeight() > 0) {
-				int studPxX = Math.max(1, mosaicImageSize.width / grid.getWidth());
-				int studPxY = Math.max(1, mosaicImageSize.height / grid.getHeight());
-				int studPx = Math.min(studPxX, studPxY);
-				// Ajuste suave: usar raíz para que el área crezca más linealmente con el tamaño del pincel
-				float s = (scale == 0f ? 1f : scale);
-				double factor = Math.sqrt(Math.max(1, brushUnits));
-				radius = Math.max(1, (int)Math.ceil((factor * studPx) / s));
-			} else {
-				// Fallback conservador
-				radius = Math.max(1, (int)Math.ceil(Math.sqrt(Math.max(1, brushUnits)) * 2.0));
-			}
+			int radius = calculateBrushRadiusInMosaicPixels(brushUnits);
 
-			boolean painted = layerManager.applyBrushToSelectedLayer(localX, localY, radius, legoColor.getRGB());
+			// NUEVA LÓGICA: Pintar directamente en el overlay global
+			boolean painted = paintOverlay.applyBrushStroke(mosaicX, mosaicY, radius, legoColor.getRGB());
+			
 			if (painted) {
-				io.Log.log("DEBUG: OverlayPaint stroke en capa '" + selected.getName() + "' local=(" + localX + "," + localY + ") radius=" + radius + " color=" + legoColor.getName());
+				Log.log("DEBUG: PaintOverlay stroke aplicado en mosaico (" + mosaicX + "," + mosaicY + 
+				        ") radius=" + radius + " color=" + legoColor.getName());
+				repaint(); // Actualizar vista
 			}
+			
 			return painted;
+			
 		} catch (Exception ex) {
-			io.Log.log("WARN: attemptOverlayPaint fallo: " + ex.getMessage());
+			Log.log("WARN: attemptOverlayPaint falló: " + ex.getMessage());
 			return false;
+		}
+	}
+	
+	/**
+	 * Calcula el radio del pincel en píxeles del mosaico basado en el tamaño en unidades de studs.
+	 */
+	private int calculateBrushRadiusInMosaicPixels(int brushUnits) {
+		LEGOColorGrid grid = getColorGrid();
+		if (mosaicImageSize != null && grid != null && grid.getWidth() > 0 && grid.getHeight() > 0) {
+			// Calcular píxeles por stud
+			int studPixelsX = Math.max(1, mosaicImageSize.width / grid.getWidth());
+			int studPixelsY = Math.max(1, mosaicImageSize.height / grid.getHeight());
+			int studPixels = Math.min(studPixelsX, studPixelsY);
+			
+			// Radio = studs * píxeles_por_stud / 2 (aproximado)
+			return Math.max(1, (brushUnits * studPixels) / 2);
+		} else {
+			// Fallback: radius fijo
+			return Math.max(1, brushUnits * 2);
 		}
 	}
 
 	// Used by CAD exports
 	public Dimension getBrickedSize() {
 		return mosaicImageSize;
+	}
+	
+	// ===== MÉTODOS DEL NUEVO SISTEMA DE PAINT OVERLAY =====
+	
+	/**
+	 * Habilita o deshabilita el overlay de pintura global
+	 */
+	public void setPaintOverlayEnabled(boolean enabled) {
+		if (paintOverlay != null) {
+			paintOverlay.setEnabled(enabled);
+			repaint();
+			Log.log("DEBUG: PaintOverlay " + (enabled ? "habilitado" : "deshabilitado"));
+		}
+	}
+	
+	/**
+	 * Verifica si el overlay de pintura está habilitado
+	 */
+	public boolean isPaintOverlayEnabled() {
+		return paintOverlay != null && paintOverlay.isEnabled();
+	}
+	
+	/**
+	 * Limpia todo el contenido del overlay de pintura
+	 */
+	public void clearPaintOverlay() {
+		if (paintOverlay != null) {
+			paintOverlay.clearOverlay();
+			repaint();
+			Log.log("DEBUG: PaintOverlay limpiado");
+		}
+	}
+	
+	/**
+	 * Verifica si el overlay tiene contenido pintado
+	 */
+	public boolean hasPaintOverlayContent() {
+		return paintOverlay != null && paintOverlay.hasContent();
 	}
 	
 	// ===== MÉTODOS PÚBLICOS DE ZOOM =====
@@ -834,6 +845,15 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 	@Override
 	public void mosaicChanged(Dimension mosaicImageSize) {
 		this.mosaicImageSize = mosaicImageSize;
+		
+		// Inicializar o actualizar el overlay de pintura
+		if (paintOverlay == null) {
+			paintOverlay = new PaintOverlay(mosaicImageSize);
+			Log.log("DEBUG: PaintOverlay inicializado con tamaño " + mosaicImageSize.width + "x" + mosaicImageSize.height);
+		} else {
+			paintOverlay.updateMosaicSize(mosaicImageSize);
+		}
+		
 		repaint();
 	}
 	
@@ -1139,12 +1159,28 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 				// Dibujar con el tamaño del mosaico original
 				toBricksTransform.drawAll(g2, mosaicImageSize);
 				
+				// NUEVO: Renderizar overlay de pintura (en coordenadas del mosaico)
+				if (paintOverlay != null && paintOverlay.isEnabled()) {
+					paintOverlay.render(g2, 0.8f); // 80% de opacidad
+				}
+				
 				// Restaurar transformación para elementos de UI
 				g2.translate(viewport.x, viewport.y);
 				g2.scale(1.0/scaleX, 1.0/scaleY);
 			} else {
 				// Sin zoom, dibujar normalmente
 				toBricksTransform.drawAll(g2, shownImageSize);
+				
+				// NUEVO: Renderizar overlay de pintura (escalado a tamaño mostrado)
+				if (paintOverlay != null && paintOverlay.isEnabled()) {
+					// Escalar overlay de tamaño del mosaico a tamaño mostrado
+					Graphics2D overlayG2 = (Graphics2D) g2.create();
+					double scaleX = (double) shownImageSize.width / mosaicImageSize.width;
+					double scaleY = (double) shownImageSize.height / mosaicImageSize.height;
+					overlayG2.scale(scaleX, scaleY);
+					paintOverlay.render(overlayG2, 0.8f);
+					overlayG2.dispose();
+				}
 			}
 			
 			// Ayuda visual: dibujar bounding box de la capa seleccionada para depurar pintura overlay
