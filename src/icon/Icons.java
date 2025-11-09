@@ -42,20 +42,39 @@ public class Icons {
 	}
 	
 	public static ImageIcon get(int size, String image, String backupName) {
-		String fileName = "icons/" + size + "x" + size + "/" + image + ".png";		
-		ImageIcon icon = new ImageIcon(fileName);
+		String relativePath = "icons/" + size + "x" + size + "/" + image + ".png";
+		// Try three strategies in order:
+		// 1) Load from current working directory (original behavior)
+		// 2) Load from parent directory (useful when app is launched from bin/)
+		// 3) Load from classpath resources (if packaged inside a jar)
+
+		ImageIcon icon = new ImageIcon(relativePath);
+		if (icon.getIconWidth() <= 0) {
+			// Try parent directory (useful if CWD is bin/)
+			String parentPath = "../" + relativePath;
+			icon = new ImageIcon(parentPath);
+		}
+
+		if (icon.getIconWidth() <= 0) {
+			// Try classpath resource
+			java.net.URL url = Icons.class.getClassLoader().getResource(relativePath);
+			if (url != null) {
+				icon = new ImageIcon(url);
+			}
+		}
+
 		if(icon.getIconWidth() <= 0) { // Draw backup image:
-			Log.log("Could not open image file '" + fileName + "'. Creating backup image.");
+			Log.log("Could not open image file '" + relativePath + "'. Creating backup image.");
 			BufferedImage bufferedImage = new BufferedImage(size, size, BufferedImage.TYPE_INT_RGB);
 			Graphics g = bufferedImage.getGraphics();
 			g.setFont(new Font("SansSerif", Font.PLAIN, 8));
 			g.setColor(Color.WHITE);
 			g.fillRect(0,  0, size-1, size-1);
-			
+
 			g.setColor(Color.RED);
 			g.drawLine(0, 1, size-1, 1);
 			g.drawLine(0, size-2, size-1, size-2);
-			
+
 			g.setColor(Color.BLACK);
 			g.drawRect(0,  0, size-1, size-1);
 			g.drawString(backupName, 2, size/2+4);

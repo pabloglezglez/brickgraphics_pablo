@@ -143,7 +143,7 @@ public class Griddy extends JFrame implements ModelHandler<GriddyState>, WindowL
 		catch (IOException e) {
 			openAction.actionPerformed(null);
 		} catch (ClassCastException e) {
-			e.printStackTrace();
+			io.Log.log(e);
 			openAction.actionPerformed(null);
 		}
 		
@@ -208,7 +208,7 @@ public class Griddy extends JFrame implements ModelHandler<GriddyState>, WindowL
 				try {
 					UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
 				} catch (Exception e) {
-					e.printStackTrace();
+					io.Log.log(e);
 				}
 				newWindow();
 			}

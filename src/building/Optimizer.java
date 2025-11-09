@@ -2,6 +2,7 @@ package building;
 
 import java.awt.Point;
 import java.util.*;
+import java.util.Locale;
 
 import colors.LEGOColor;
 
@@ -284,7 +285,7 @@ public class Optimizer {
 				}
 			}
 		}		
-		System.out.printf("Hollowing removed %d / %d bricks: %.2f %%", sumHollow, sumAll, (100*sumHollow/(double)sumAll));
+		io.Log.log("INFO: Hollowing removed " + sumHollow + " / " + sumAll + " bricks: " + String.format(Locale.US, "%.2f", (100*sumHollow/(double)sumAll)) + " %");
 	}
 
 	private void placeRemaining1by1Plates() {

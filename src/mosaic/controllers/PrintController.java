@@ -1230,7 +1230,7 @@ public class PrintController implements Printable, ModelHandler<BrickGraphicsSta
 			return result;
 		} catch (Exception e) {
 			Log.log("Error showing print dialog: " + e.getMessage());
-			e.printStackTrace();
+			Log.log(e);
 			
 			// Fallback: Show a message to user
 			JOptionPane.showMessageDialog(mw,

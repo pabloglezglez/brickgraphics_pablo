@@ -27,8 +27,9 @@ public class MosaicIO {
 	private static String[] IMG_SUFFIXES = null;
 
 	private static void saveMosaic(MainController mc, File file) throws IOException {
-		mc.getModel().saveToFile(file);
+		// Establecer primero el archivo de mosaico para que los ModelHandlers puedan usar su ruta durante el guardado
 		mc.setMosaicFile(file);
+		mc.getModel().saveToFile(file);
 	}
 
 	public static void saveImage(BufferedImage bricked, File file) throws IOException {

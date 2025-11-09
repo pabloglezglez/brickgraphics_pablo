@@ -2,6 +2,7 @@ package mosaic.controllers;
 
 import colors.LEGOColor;
 import java.util.*;
+import io.Log;
 
 /**
  * Utilidad para manejar números personalizados de colores.
@@ -19,7 +20,7 @@ public class CustomColorIDManager {
      * Imprime la lista actual de colores con sus números asignados
      */
     public void printCurrentColorAssignments() {
-        System.out.println("=== ASIGNACIÓN ACTUAL DE NÚMEROS DE COLORES ===");
+    Log.log("=== ASIGNACIÓN ACTUAL DE NÚMEROS DE COLORES ===");
         
         // Obtener colores usados (necesitamos acceso a los colores seleccionados)
         List<LEGOColor> filteredColors = colorController.getFilteredColors();
@@ -30,15 +31,15 @@ public class CustomColorIDManager {
                 String colorName = colorController.getShownName(color);
                 Integer customID = colorController.getCustomColorID(color);
                 
-                System.out.println(String.format("Color: %s | Número actual: %s | Número personalizado: %s", 
+                Log.log(String.format("Color: %s | Número actual: %s | Número personalizado: %s", 
                     colorName != null ? colorName : "Sin nombre", 
                     currentID != null ? currentID : "Sin ID",
                     customID != null ? customID.toString() : "No asignado"));
             }
         } else {
-            System.out.println("No hay colores filtrados disponibles.");
+            Log.log("No hay colores filtrados disponibles.");
         }
-        System.out.println("=============================================");
+        Log.log("=============================================");
     }
     
     /**
@@ -52,13 +53,13 @@ public class CustomColorIDManager {
                 String currentColorName = colorController.getShownName(color);
                 if (currentColorName != null && currentColorName.equalsIgnoreCase(colorName)) {
                     colorController.setCustomColorID(color, customNumber);
-                    System.out.println(String.format("✅ Número %d asignado al color '%s'", customNumber, colorName));
+                    Log.log(String.format("✅ Número %d asignado al color '%s'", customNumber, colorName));
                     return true;
                 }
             }
         }
         
-        System.out.println(String.format("❌ No se encontró el color '%s'", colorName));
+    Log.log(String.format("❌ No se encontró el color '%s'", colorName));
         return false;
     }
     
@@ -73,13 +74,13 @@ public class CustomColorIDManager {
                 String currentColorName = colorController.getShownName(color);
                 if (currentColorName != null && currentColorName.equalsIgnoreCase(colorName)) {
                     colorController.removeCustomColorID(color);
-                    System.out.println(String.format("✅ Número personalizado eliminado del color '%s'", colorName));
+                    Log.log(String.format("✅ Número personalizado eliminado del color '%s'", colorName));
                     return true;
                 }
             }
         }
         
-        System.out.println(String.format("❌ No se encontró el color '%s'", colorName));
+    Log.log(String.format("❌ No se encontró el color '%s'", colorName));
         return false;
     }
     
@@ -88,7 +89,7 @@ public class CustomColorIDManager {
      */
     public void clearAllCustomNumbers() {
         colorController.clearAllCustomColorIDs();
-        System.out.println("✅ Todos los números personalizados han sido eliminados");
+    Log.log("✅ Todos los números personalizados han sido eliminados");
     }
     
     /**
@@ -104,6 +105,6 @@ public class CustomColorIDManager {
         setCustomNumberByColorName("Verde", 6);
         setCustomNumberByColorName("Turrón", 15); // Tu color personalizado
         
-        System.out.println("✅ Números de ejemplo establecidos");
+    Log.log("✅ Números de ejemplo establecidos");
     }
 }

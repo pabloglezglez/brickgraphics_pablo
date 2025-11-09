@@ -32,9 +32,12 @@ public class IntegratedImageLayerPanel extends JPanel {
     
     // Controles de capas
     private JPanel topPanel;
+    private JPanel layerButtonsPanel;
     private JButton addLayerButton;
     private JButton removeLayerButton;
     private JButton duplicateButton;
+    private JButton moveUpButton;
+    private JButton moveDownButton;
     private JCheckBox enableLayersCheckBox;
     private JLabel layerInfoLabel;
     
@@ -89,8 +92,21 @@ public class IntegratedImageLayerPanel extends JPanel {
         initializeComponents();
         setupLayout();
         setupEventHandlers();
+        setupKeyBindings();
         updateUI();
     // construction complete
+    }
+
+    /**
+     * Fuerza a refrescar la lista de capas desde el estado actual del LayerManager.
+     * Útil tras cargar un KMV para que la UI refleje inmediatamente las capas restauradas.
+     */
+    public void refreshLayerList() {
+        SwingUtilities.invokeLater(() -> {
+            updateLayerList();
+            revalidate();
+            repaint();
+        });
     }
     
     /**
@@ -110,9 +126,17 @@ public class IntegratedImageLayerPanel extends JPanel {
         
         // Botones de gestión de capas
         addLayerButton = new JButton("Añadir Capa");
+    addLayerButton.setToolTipText("Añadir nueva capa desde una imagen (Ctrl+N)");
         removeLayerButton = new JButton("Eliminar");
+    removeLayerButton.setToolTipText("Eliminar capa seleccionada (Supr/Backspace)");
         duplicateButton = new JButton("Duplicar");
+    duplicateButton.setToolTipText("Duplicar capa seleccionada (Ctrl+D)");
+        moveUpButton = new JButton("Subir");
+    moveUpButton.setToolTipText("Mover capa seleccionada hacia arriba (Alt+↑)");
+        moveDownButton = new JButton("Bajar");
+    moveDownButton.setToolTipText("Mover capa seleccionada hacia abajo (Alt+↓)");
         enableLayersCheckBox = new JCheckBox("Capas Habilitadas", true);
+    enableLayersCheckBox.setToolTipText("Activar / Desactivar todas las capas");
         
         // Información de capas
         layerInfoLabel = new JLabel("No hay capas");
@@ -190,16 +214,39 @@ public class IntegratedImageLayerPanel extends JPanel {
         setLayout(new BorderLayout());
         setBorder(new TitledBorder("Capas e Imagen"));
         
-        // Panel superior con botón "Añadir Capa" - SIEMPRE VISIBLE
-        topPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 5));
-        topPanel.add(enableLayersCheckBox);
-        topPanel.add(Box.createHorizontalStrut(10));
-        topPanel.add(addLayerButton);
+    // Panel superior como JToolBar (dos barras apiladas)
+    topPanel = new JPanel();
+    topPanel.setLayout(new BoxLayout(topPanel, BoxLayout.Y_AXIS));
+
+    // Barra 1: habilitar capas + añadir/eliminar/duplicar
+    JToolBar mainBar = new JToolBar();
+    mainBar.setFloatable(false);
+    mainBar.setRollover(true);
+    mainBar.setBorder(BorderFactory.createEmptyBorder(2, 2, 2, 2));
+    enableLayersCheckBox.setFocusable(false);
+    addLayerButton.setFocusable(false);
+    removeLayerButton.setFocusable(false);
+    duplicateButton.setFocusable(false);
+    mainBar.add(enableLayersCheckBox);
+    mainBar.addSeparator(new Dimension(8, 0));
+    mainBar.add(addLayerButton);
+    mainBar.add(removeLayerButton);
+    mainBar.add(duplicateButton);
+
+    // Barra 2: ordenar (subir/bajar)
+    JToolBar orderBar = new JToolBar();
+    orderBar.setFloatable(false);
+    orderBar.setRollover(true);
+    orderBar.setBorder(BorderFactory.createEmptyBorder(0, 2, 2, 2));
+    moveUpButton.setFocusable(false);
+    moveDownButton.setFocusable(false);
+    orderBar.add(moveUpButton);
+    orderBar.add(moveDownButton);
+
+    topPanel.add(mainBar);
+    topPanel.add(orderBar);
         
-        // Asegurar dimensiones adecuadas para visibilidad completa del botón
-        topPanel.setPreferredSize(new Dimension(0, 60));
-        topPanel.setMinimumSize(new Dimension(0, 60));
-        topPanel.setMaximumSize(new Dimension(Integer.MAX_VALUE, 60));
+    // Dejar que el layout calcule la altura necesaria (no fijar 60px)
         topPanel.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
         
         // Panel central: lista de capas con scroll adecuado
@@ -214,13 +261,7 @@ public class IntegratedImageLayerPanel extends JPanel {
         layerScrollPane.setBorder(BorderFactory.createLoweredBevelBorder());
         centerPanel.add(layerScrollPane, BorderLayout.CENTER);
         
-    io.Log.log("DEBUG: setupLayout() - ScrollPane creado con tamaño: " + layerScrollPane.getPreferredSize());
-        
-        // Panel de botones de capa
-        JPanel layerButtonsPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 5, 5));
-        layerButtonsPanel.add(removeLayerButton);
-        layerButtonsPanel.add(duplicateButton);
-        centerPanel.add(layerButtonsPanel, BorderLayout.SOUTH);
+        // Ya no añadimos barra de botones abajo; todos van en el topPanel
         
         // Panel inferior: propiedades de capa seleccionada
         layerPropertiesPanel = createLayerPropertiesPanel();
@@ -257,6 +298,18 @@ public class IntegratedImageLayerPanel extends JPanel {
             // Debug: imprimir dimensiones
             io.Log.log("TopPanel size: " + topPanel.getSize());
             io.Log.log("AddLayerButton size: " + addLayerButton.getSize());
+            if (layerButtonsPanel != null) {
+                io.Log.log("LayerButtonsPanel size: " + layerButtonsPanel.getSize());
+                io.Log.log("Btn Subir size: " + moveUpButton.getSize());
+                io.Log.log("Btn Bajar size: " + moveDownButton.getSize());
+                io.Log.log("Btn Eliminar size: " + removeLayerButton.getSize());
+                io.Log.log("Btn Duplicar size: " + duplicateButton.getSize());
+                // Estados de visibilidad/habilitación
+                io.Log.log("Btn Subir visible: " + moveUpButton.isVisible() + ", showing: " + moveUpButton.isShowing() + ", enabled: " + moveUpButton.isEnabled());
+                io.Log.log("Btn Bajar visible: " + moveDownButton.isVisible() + ", showing: " + moveDownButton.isShowing() + ", enabled: " + moveDownButton.isEnabled());
+                io.Log.log("Btn Eliminar visible: " + removeLayerButton.isVisible() + ", showing: " + removeLayerButton.isShowing() + ", enabled: " + removeLayerButton.isEnabled());
+                io.Log.log("Btn Duplicar visible: " + duplicateButton.isVisible() + ", showing: " + duplicateButton.isShowing() + ", enabled: " + duplicateButton.isEnabled());
+            }
         });
     }
     
@@ -608,6 +661,46 @@ public class IntegratedImageLayerPanel extends JPanel {
         removeLayerButton.addActionListener(e -> removeSelectedLayer());
         duplicateButton.addActionListener(e -> duplicateSelectedLayer());
         
+        // Mover capa hacia arriba
+        moveUpButton.addActionListener(e -> {
+            Layer selectedLayer = layerList.getSelectedValue();
+            if (selectedLayer != null) {
+                int oldIndex = layerManager.getLayers().indexOf(selectedLayer);
+                if (layerManager.moveLayerUp(selectedLayer)) {
+                    updateUI();
+                    layerList.setSelectedIndex(oldIndex - 1);
+                    notifyLayersChanged();
+                    // Persist only external artifacts (layers.json + overlays) after move
+                    try {
+                        layerManager.autosaveArtifacts();
+                        io.Log.log("DEBUG: IntegratedImageLayerPanel - Artifacts autosaved after move up");
+                    } catch (Exception ex) {
+                        io.Log.log("WARN: IntegratedImageLayerPanel - Artifacts autosave after move up failed: " + ex.getMessage());
+                    }
+                }
+            }
+        });
+
+        // Mover capa hacia abajo
+        moveDownButton.addActionListener(e -> {
+            Layer selectedLayer = layerList.getSelectedValue();
+            if (selectedLayer != null) {
+                int oldIndex = layerManager.getLayers().indexOf(selectedLayer);
+                if (layerManager.moveLayerDown(selectedLayer)) {
+                    updateUI();
+                    layerList.setSelectedIndex(oldIndex + 1);
+                    notifyLayersChanged();
+                    // Persist only external artifacts (layers.json + overlays) after move
+                    try {
+                        layerManager.autosaveArtifacts();
+                        io.Log.log("DEBUG: IntegratedImageLayerPanel - Artifacts autosaved after move down");
+                    } catch (Exception ex) {
+                        io.Log.log("WARN: IntegratedImageLayerPanel - Artifacts autosave after move down failed: " + ex.getMessage());
+                    }
+                }
+            }
+        });
+        
         // Checkbox global
         enableLayersCheckBox.addActionListener(e -> {
             layerManager.setLayersEnabled(enableLayersCheckBox.isSelected());
@@ -638,6 +731,80 @@ public class IntegratedImageLayerPanel extends JPanel {
         
         // Botón reset
         resetAdjustmentsButton.addActionListener(e -> resetLayerAdjustments());
+    }
+
+    /**
+     * Configura atajos de teclado globales para acciones frecuentes.
+     * Se añaden al InputMap/ActionMap del panel principal para que funcionen
+     * independientemente del foco (mientras el panel sea foco descendiente).
+     */
+    private void setupKeyBindings() {
+        // Usar WHEN_ANCESTOR_OF_FOCUSED_COMPONENT para mayor alcance.
+        InputMap inputMap = this.getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT);
+        ActionMap actionMap = this.getActionMap();
+
+        // Añadir capa (Ctrl+N)
+        KeyStroke ksAdd = KeyStroke.getKeyStroke(KeyEvent.VK_N, InputEvent.CTRL_DOWN_MASK);
+        inputMap.put(ksAdd, "add-layer");
+        actionMap.put("add-layer", new AbstractAction() {
+            @Override public void actionPerformed(ActionEvent e) { if (addLayerButton.isEnabled()) addLayerButton.doClick(); }
+        });
+
+        // Eliminar capa (Delete / Backspace)
+        KeyStroke ksDel = KeyStroke.getKeyStroke(KeyEvent.VK_DELETE, 0);
+        KeyStroke ksBack = KeyStroke.getKeyStroke(KeyEvent.VK_BACK_SPACE, 0);
+        inputMap.put(ksDel, "remove-layer");
+        inputMap.put(ksBack, "remove-layer");
+        actionMap.put("remove-layer", new AbstractAction() {
+            @Override public void actionPerformed(ActionEvent e) { if (removeLayerButton.isEnabled()) removeLayerButton.doClick(); }
+        });
+
+        // Duplicar capa (Ctrl+D)
+        KeyStroke ksDup = KeyStroke.getKeyStroke(KeyEvent.VK_D, InputEvent.CTRL_DOWN_MASK);
+        inputMap.put(ksDup, "duplicate-layer");
+        actionMap.put("duplicate-layer", new AbstractAction() {
+            @Override public void actionPerformed(ActionEvent e) { if (duplicateButton.isEnabled()) duplicateButton.doClick(); }
+        });
+
+        // Subir capa (Alt+Up)
+        KeyStroke ksUp = KeyStroke.getKeyStroke(KeyEvent.VK_UP, InputEvent.ALT_DOWN_MASK);
+        inputMap.put(ksUp, "move-up-layer");
+        actionMap.put("move-up-layer", new AbstractAction() {
+            @Override public void actionPerformed(ActionEvent e) { if (moveUpButton.isEnabled()) moveUpButton.doClick(); }
+        });
+
+        // Bajar capa (Alt+Down)
+        KeyStroke ksDown = KeyStroke.getKeyStroke(KeyEvent.VK_DOWN, InputEvent.ALT_DOWN_MASK);
+        inputMap.put(ksDown, "move-down-layer");
+        actionMap.put("move-down-layer", new AbstractAction() {
+            @Override public void actionPerformed(ActionEvent e) { if (moveDownButton.isEnabled()) moveDownButton.doClick(); }
+        });
+
+        // Toggle visibilidad de capa seleccionada (Space)
+        KeyStroke ksSpace = KeyStroke.getKeyStroke(KeyEvent.VK_SPACE, 0);
+        inputMap.put(ksSpace, "toggle-layer-visibility");
+        actionMap.put("toggle-layer-visibility", new AbstractAction() {
+            @Override public void actionPerformed(ActionEvent e) {
+                Layer selected = layerManager.getSelectedLayer();
+                if (selected != null && visibilityCheckBox.isEnabled()) {
+                    visibilityCheckBox.setSelected(!visibilityCheckBox.isSelected());
+                    updateLayerVisibility();
+                }
+            }
+        });
+
+        // Toggle habilitación global de capas (Ctrl+Space)
+        KeyStroke ksCtrlSpace = KeyStroke.getKeyStroke(KeyEvent.VK_SPACE, InputEvent.CTRL_DOWN_MASK);
+        inputMap.put(ksCtrlSpace, "toggle-global-layers");
+        actionMap.put("toggle-global-layers", new AbstractAction() {
+            @Override public void actionPerformed(ActionEvent e) {
+                if (enableLayersCheckBox.isEnabled()) {
+                    enableLayersCheckBox.setSelected(!enableLayersCheckBox.isSelected());
+                    layerManager.setLayersEnabled(enableLayersCheckBox.isSelected());
+                    notifyLayersChanged();
+                }
+            }
+        });
     }
     
     /**
@@ -906,17 +1073,17 @@ public class IntegratedImageLayerPanel extends JPanel {
      * Actualiza la lista de capas
      */
     private void updateLayerList() {
-    io.Log.log("DEBUG: updateLayerList() - Iniciando actualización de lista");
+        io.Log.log("DEBUG: updateLayerList() - Iniciando actualización de lista");
         if (listModel == null) {
             io.Log.log("DEBUG: updateLayerList() - listModel es null");
             return;
         }
         
-    io.Log.log("DEBUG: updateLayerList() - Limpiando lista existente");
+        io.Log.log("DEBUG: updateLayerList() - Limpiando lista existente");
         listModel.clear();
         
         List<Layer> layers = layerManager.getLayers();
-    io.Log.log("DEBUG: updateLayerList() - Número de capas: " + layers.size());
+        io.Log.log("DEBUG: updateLayerList() - Número de capas: " + layers.size());
         
         for (Layer layer : layers) {
             io.Log.log("DEBUG: updateLayerList() - Añadiendo capa a lista: " + layer.getName());
@@ -930,7 +1097,7 @@ public class IntegratedImageLayerPanel extends JPanel {
             layerList.setSelectedValue(selected, true);
         }
         
-    io.Log.log("DEBUG: updateLayerList() - Lista actualizada, tamaño del modelo: " + listModel.getSize());
+        io.Log.log("DEBUG: updateLayerList() - Lista actualizada, tamaño del modelo: " + listModel.getSize());
         
         // Forzar actualización visual del JList
         SwingUtilities.invokeLater(() -> {
@@ -942,7 +1109,7 @@ public class IntegratedImageLayerPanel extends JPanel {
                 scrollPane.revalidate();
                 scrollPane.repaint();
             }
-                io.Log.log("DEBUG: updateLayerList() - Forzada actualización visual del JList");
+            io.Log.log("DEBUG: updateLayerList() - Forzada actualización visual del JList");
         });
     }
     
@@ -955,7 +1122,7 @@ public class IntegratedImageLayerPanel extends JPanel {
             return; // Skip si no están inicializados
         }
         
-    io.Log.log("DEBUG: updateUI() - Iniciando actualización completa");
+		io.Log.log("DEBUG: updateUI() - Iniciando actualización completa");
         updateLayerList();
         updateLayerControls();
         enableLayersCheckBox.setSelected(layerManager.isLayersEnabled());
@@ -963,13 +1130,7 @@ public class IntegratedImageLayerPanel extends JPanel {
         // Actualizar información
         int layerCount = layerManager.getLayers().size();
         layerInfoLabel.setText("Capas: " + layerCount);
-    io.Log.log("DEBUG: updateUI() - Actualización completa finalizada");
-        
-        // Prueba manual: añadir una entrada de test al modelo
-        if (listModel.getSize() == 0 && layerCount > 0) {
-            io.Log.log("DEBUG: updateUI() - Hay capas pero la lista está vacía. Añadiendo entrada de prueba.");
-            listModel.addElement(new TestLayer("Capa de Prueba"));
-        }
+		io.Log.log("DEBUG: updateUI() - Actualización completa finalizada");
     }
     
     /**

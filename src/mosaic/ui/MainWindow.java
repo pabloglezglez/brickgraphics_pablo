@@ -146,14 +146,14 @@ public class MainWindow extends JFrame implements ChangeListener, ModelHandler<B
 			splitPane.setTransferHandler(new TransferHandler() {
 				@Override
 				public boolean canImport(TransferHandler.TransferSupport info) {
-					System.out.println("canImport");
+					Log.log("canImport");
 					return info.isDrop() && (info.isDataFlavorSupported(DataFlavor.imageFlavor) ||
 							info.isDataFlavorSupported(DataFlavor.javaFileListFlavor));
 				}
 
 				@Override
 				public boolean importData(TransferHandler.TransferSupport info) {
-					System.out.println("import");
+					Log.log("import");
 					if (!canImport(info))
 						return false;
 
@@ -177,7 +177,7 @@ public class MainWindow extends JFrame implements ChangeListener, ModelHandler<B
 						return true;
 					} 
 					catch (Exception e) { 
-						System.out.println("error");
+						Log.log("error");
 						return false; 
 					}
 				}
@@ -191,7 +191,7 @@ public class MainWindow extends JFrame implements ChangeListener, ModelHandler<B
 		addMouseWheelListener(new MouseWheelListener() {
 			@Override
 			public void mouseWheelMoved(MouseWheelEvent e) {
-				System.out.println("MouseWheel en MainWindow: Ctrl=" + e.isControlDown() + ", rotation=" + e.getWheelRotation());
+				Log.log("MouseWheel en MainWindow: Ctrl=" + e.isControlDown() + ", rotation=" + e.getWheelRotation());
 				if (e.isControlDown()) {
 					// IMPORTANTE: Consumir el evento INMEDIATAMENTE para prevenir zoom del sistema
 					e.consume();
@@ -199,23 +199,23 @@ public class MainWindow extends JFrame implements ChangeListener, ModelHandler<B
 					try {
 						// Convertir coordenadas del evento a coordenadas relativas al BrickedView
 						Point eventPoint = e.getPoint();
-						System.out.println("Punto del evento: " + eventPoint);
+						Log.log("Punto del evento: " + eventPoint);
 						
 						// Calcular posición relativa al BrickedView de forma simple
 						Point brickedViewLocation = brickedView.getLocation();
-						System.out.println("Ubicación de BrickedView: " + brickedViewLocation);
+						Log.log("Ubicación de BrickedView: " + brickedViewLocation);
 						
 						// Calcular posición relativa al BrickedView
 						int relativeX = eventPoint.x - brickedViewLocation.x;
 						int relativeY = eventPoint.y - brickedViewLocation.y;
 						Point relativePoint = new Point(relativeX, relativeY);
 						
-						System.out.println("Punto relativo a BrickedView: " + relativePoint);
+						Log.log("Punto relativo a BrickedView: " + relativePoint);
 						// Llamar método de zoom temporalmente simplificado
-						System.out.println("Ejecutando zoom desde MainWindow...");
+						Log.log("Ejecutando zoom desde MainWindow...");
 					} catch (Exception ex) {
-						System.out.println("Error en mouseWheelMoved: " + ex.getMessage());
-						ex.printStackTrace();
+						Log.log("Error en mouseWheelMoved: " + ex.getMessage());
+						Log.log(ex);
 					}
 				}
 			}

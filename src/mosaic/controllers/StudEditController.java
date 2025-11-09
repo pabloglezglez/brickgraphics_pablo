@@ -439,8 +439,8 @@ public class StudEditController implements ModelHandler<BrickGraphicsState> {
                     }
                 }
             } catch (Exception e) {
-                    Log.log("ERROR: StudEditController - Error al cargar modificaciones: " + e.getMessage());
-                e.printStackTrace();
+                Log.log("ERROR: StudEditController - Error al cargar modificaciones: " + e.getMessage());
+                Log.log(e);
             }
         }
     }
