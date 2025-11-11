@@ -1,7 +1,5 @@
 package mosaic.controllers;
 
-import io.*;
-
 import java.awt.image.*;
 import java.io.*;
 import javax.swing.filechooser.FileFilter;
@@ -9,7 +7,9 @@ import java.util.*;
 import javax.imageio.*;
 import javax.swing.*;
 import javax.swing.event.*;
+
 import colors.parsers.*;
+import io.*;
 import mosaic.io.*;
 import mosaic.io.RecentFilesManager;
 import mosaic.rendering.Pipeline;
@@ -19,7 +19,6 @@ import mosaic.ui.dialogs.PrintDialog;
 import mosaic.ui.dialogs.ToBricksTypeFilterDialog;
 import mosaic.ui.panels.IntegratedImageLayerPanel;
 import mosaic.layers.LayerManager;
-import mosaic.ui.panels.LayerPanel;
 
 /**
  * @author LD

@@ -25,7 +25,7 @@ public class MosaicLayer extends Layer {
         super(name, image, position);
         this.useMosaicMode = false;
         this.colorSetName = "Default";
-        this.independentBrickType = ToBricksType.Bricks1x1; // Por defecto 1x1
+        this.independentBrickType = ToBricksType.STUD_FROM_TOP; // Por defecto 1x1
         
         Log.log("MosaicLayer creado: " + name + " - Modo mosaico: " + useMosaicMode);
     }
