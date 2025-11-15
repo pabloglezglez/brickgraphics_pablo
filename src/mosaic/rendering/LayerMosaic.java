@@ -25,9 +25,6 @@ public class LayerMosaic {
     private Dimension mosaicSize;
     private boolean hasTransparency;
     
-    // Sistema de pintado independiente simplificado
-    private PaintOverlay paintOverlay;
-    
     // Transform para convertir a LEGO (compartido desde BrickedView)
     private ToBricksTransform sharedTransform;
     
@@ -44,9 +41,6 @@ public class LayerMosaic {
         
         // Detectar si la capa tiene transparencia
         this.hasTransparency = hasImageTransparency(originalImage);
-        
-        // Inicializar sistema de pintado independiente
-        this.paintOverlay = new PaintOverlay(mosaicSize);
         
         Log.log("LayerMosaic creado para capa '" + layer.getName() + "' - " +
                 "Transparencia: " + hasTransparency + " - Tamaño: " + mosaicSize.width + "x" + mosaicSize.height);
@@ -133,19 +127,17 @@ public class LayerMosaic {
                 tempG2.drawImage(originalImage, 0, 0, renderSize.width, renderSize.height, null);
             }
             
-            // Renderizar overlay de pintado de esta capa si está habilitado
-            if (paintOverlay != null && paintOverlay.isEnabled()) {
-                Graphics2D overlayG2 = (Graphics2D) tempG2.create();
-                
-                // Escalar overlay si es necesario
-                if (!renderSize.equals(mosaicSize)) {
-                    double scaleX = (double) renderSize.width / mosaicSize.width;
-                    double scaleY = (double) renderSize.height / mosaicSize.height;
-                    overlayG2.scale(scaleX, scaleY);
+            // NUEVO: Renderizar modificaciones de pintado de mosaico si existen
+            if (layer.hasPixelModifications()) {
+                try {
+                    // DESHABILITADO: Sistema de renderizado especial de modificaciones removido
+                    // int studPixelSize = Math.max(1, renderSize.width / 100); 
+                    // layer.renderMosaicModifications(tempG2, studPixelSize);
+                    Log.log("DEBUG: LayerMosaic.render - Capa con modificaciones: '" + layer.getName() + "'");
+                    
+                } catch (Exception ex) {
+                    Log.log("ERROR: LayerMosaic.render - Falló renderizado de modificaciones de mosaico: " + ex.getMessage());
                 }
-                
-                paintOverlay.render(overlayG2, 0.8f);
-                overlayG2.dispose();
             }
             
             tempG2.dispose();
@@ -155,60 +147,60 @@ public class LayerMosaic {
         }
     }
     
-    /**
-     * Aplica pintura en este mosaico de capa.
-     * @param x coordenada X en píxeles del mosaico
-     * @param y coordenada Y en píxeles del mosaico  
-     * @param radius radio del pincel
-     * @param color color a aplicar
-     * @return true si se aplicó correctamente
-     */
-    public boolean applyPaint(int x, int y, int radius, Color color) {
-        if (paintOverlay != null) {
-            try {
-                boolean result = paintOverlay.applyBrushStroke(x, y, radius, color);
-                if (result) {
-                    Log.log("LayerMosaic.applyPaint en '" + layer.getName() + 
-                           "' - pos=(" + x + "," + y + ") radius=" + radius);
-                }
-                return result;
-            } catch (Exception ex) {
-                Log.log("ERROR: LayerMosaic.applyPaint falló: " + ex.getMessage());
-                return false;
-            }
-        }
-        return false;
-    }
-    
-    /**
-     * Limpia todo el pintado de esta capa.
-     */
-    public void clearPaint() {
-        if (paintOverlay != null) {
-            paintOverlay.clearOverlay();
-            Log.log("LayerMosaic.clearPaint - pintado limpiado en '" + layer.getName() + "'");
-        }
-    }
-    
-    /**
-     * Habilita/deshabilita el sistema de pintado para esta capa.
-     */
-    public void setPaintEnabled(boolean enabled) {
-        if (paintOverlay != null) {
-            paintOverlay.setEnabled(enabled);
-        }
-    }
-    
-    /**
-     * Verifica si el pintado está habilitado para esta capa.
-     */
-    public boolean isPaintEnabled() {
-        return paintOverlay != null && paintOverlay.isEnabled();
-    }
-    
     // Getters
     public Layer getLayer() { return layer; }
     public boolean hasTransparency() { return hasTransparency; }
     public Dimension getMosaicSize() { return mosaicSize; }
-    public PaintOverlay getPaintOverlay() { return paintOverlay; }
+    
+    /**
+     * NUEVO: Aplica pintura directamente a la capa asociada
+     * @param x Coordenada X en el mosaico
+     * @param y Coordenada Y en el mosaico  
+     * @param radius Radio del pincel
+     * @param color Color a aplicar
+     * @return true si se aplicó la pintura correctamente
+     */
+    public boolean applyPaint(int x, int y, int radius, Color color) {
+        if (layer == null) {
+            Log.log("DEBUG: LayerMosaic.applyPaint - capa es null");
+            return false;
+        }
+        
+        try {
+            // Delegar la pintura a la capa
+            mosaic.layers.PixelModification modification = new mosaic.layers.PixelModification(
+                new Point(x, y), color, System.currentTimeMillis()
+            );
+            
+            layer.addPixelModification(modification);
+            Log.log("DEBUG: LayerMosaic.applyPaint - aplicada modificación en (" + x + "," + y + ") color=" + color);
+            return true;
+            
+        } catch (Exception ex) {
+            Log.log("ERROR: LayerMosaic.applyPaint falló: " + ex.getMessage());
+            return false;
+        }
+    }
+    
+    /**
+     * NUEVO: Habilita o deshabilita la pintura en esta capa
+     * @param enabled true para habilitar, false para deshabilitar
+     */
+    public void setPaintEnabled(boolean enabled) {
+        // Método conservado para compatibilidad pero sin funcionalidad especial
+        Log.log("DEBUG: LayerMosaic.setPaintEnabled=" + enabled + " para capa '" + (layer != null ? layer.getName() : "null") + "'");
+    }
+    
+    /**
+     * NUEVO: Limpia todas las modificaciones de pintura de esta capa
+     */
+    public void clearPaint() {
+        if (layer != null) {
+            layer.clearPixelModifications();
+            Log.log("DEBUG: LayerMosaic.clearPaint - modificaciones limpiadas para capa '" + layer.getName() + "'");
+        }
+    }
+    
+    // ELIMINADO: Métodos de paintOverlay (reemplazados por sistema PixelModification en Layer)
+    // Las capas ahora manejan las modificaciones de píxeles directamente
 }

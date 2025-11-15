@@ -30,6 +30,9 @@ public class LayerManager implements ModelHandler<BrickGraphicsState> {
     private float globalOpacity;
     private Runnable onAllLayersRemovedCallback;
     private File mosaicFile; // archivo .kvm actual para resolver rutas relativas
+    private mosaic.controllers.ModificationManager modificationManager; // Para preservar modificaciones del sistema base
+    private colors.LEGOColorGrid colorGrid; // Para aplicar modificaciones visuales
+    private mosaic.ui.BrickedView brickedView; // Para actualizar la vista después de cambios
     
     /**
      * Constructor del gestor de capas
@@ -46,6 +49,44 @@ public class LayerManager implements ModelHandler<BrickGraphicsState> {
      */
     public void setOnAllLayersRemovedCallback(Runnable callback) {
         this.onAllLayersRemovedCallback = callback;
+    }
+
+    /**
+     * Establece el ModificationManager para preservar modificaciones del sistema base
+     */
+    public void setModificationManager(mosaic.controllers.ModificationManager modificationManager) {
+        this.modificationManager = modificationManager;
+        io.Log.log("DEBUG: LayerManager - ModificationManager establecido: " + (modificationManager != null));
+    }
+    
+    /**
+     * Obtiene el ModificationManager asociado
+     */
+    public mosaic.controllers.ModificationManager getModificationManager() {
+        return this.modificationManager;
+    }
+    
+    /**
+     * Establece el ColorGrid para aplicar modificaciones visuales
+     */
+    public void setColorGrid(colors.LEGOColorGrid colorGrid) {
+        this.colorGrid = colorGrid;
+        io.Log.log("DEBUG: LayerManager - ColorGrid establecido: " + (colorGrid != null));
+    }
+    
+    /**
+     * Obtiene el ColorGrid asociado
+     */
+    public colors.LEGOColorGrid getColorGrid() {
+        return this.colorGrid;
+    }
+    
+    /**
+     * Establece el BrickedView para actualizar la vista después de cambios
+     */
+    public void setBrickedView(mosaic.ui.BrickedView brickedView) {
+        this.brickedView = brickedView;
+        io.Log.log("DEBUG: LayerManager - BrickedView establecido: " + (brickedView != null));
     }
 
     /**
@@ -111,6 +152,49 @@ public class LayerManager implements ModelHandler<BrickGraphicsState> {
     }
     
     /**
+     * NUEVO: Crea una capa de pintado vacía especialmente diseñada para pintar píxeles directamente
+     */
+    public Layer createPaintLayer(String name, Point position) {
+        io.Log.log("DEBUG: LayerManager - Creando capa de pintado: " + name);
+        
+        // Crear una imagen transparente pequeña que será expandida dinámicamente al pintar
+        BufferedImage emptyImage = new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB);
+        // La imagen permanece completamente transparente
+        
+        // Crear la capa con un nombre específico para identificarla como capa de pintado
+        String paintLayerName = name + " (Pintado)";
+        Layer paintLayer = new Layer(paintLayerName, emptyImage, position, null); // Sin archivo fuente
+        
+        // Configurar la capa como una capa de pintado especial
+        // paintLayer.setPaintLayer(true); // REMOVIDO: Sistema de paint layer no utilizado
+        
+        // CORREGIDO: Insertar la capa de pintado inmediatamente después de la capa seleccionada
+        // en lugar de añadirla siempre al final
+        if (selectedLayer != null) {
+            int selectedIndex = layers.indexOf(selectedLayer);
+            if (selectedIndex >= 0) {
+                // Insertar después de la capa seleccionada (índice mayor = más arriba)
+                layers.add(selectedIndex + 1, paintLayer);
+                io.Log.log("DEBUG: LayerManager - Capa de pintado insertada en posición " + (selectedIndex + 1) + " (después de '" + selectedLayer.getName() + "')");
+            } else {
+                // Fallback: añadir al final si no se encuentra la capa seleccionada
+                layers.add(paintLayer);
+                io.Log.log("DEBUG: LayerManager - Capa de pintado añadida al final (fallback)");
+            }
+        } else {
+            // Sin capa seleccionada, añadir al final
+            layers.add(paintLayer);
+            io.Log.log("DEBUG: LayerManager - Capa de pintado añadida al final (sin selección)");
+        }
+        
+        setSelectedLayer(paintLayer);
+        
+        io.Log.log("DEBUG: LayerManager - Capa de pintado creada exitosamente: " + paintLayerName);
+        
+        return paintLayer;
+    }
+    
+    /**
      * Añade una capa existente
      */
     public void addLayer(Layer layer) {
@@ -164,27 +248,96 @@ public class LayerManager implements ModelHandler<BrickGraphicsState> {
     }
     
     /**
-     * Mueve una capa hacia arriba en la pila
+     * Mueve una capa hacia arriba en la pila (visualmente encima)
      */
     public boolean moveLayerUp(Layer layer) {
+        io.Log.log("DEBUG: moveLayerUp - INICIADO para capa: " + layer.getName());
         int index = layers.indexOf(layer);
-        if (index > 0) {
-            // Preserve overlay references explicitly (they should already persist, but guard in case of external listeners)
+        // CORREGIDO: Mover hacia arriba significa índice MAYOR (layers.size()-1 está arriba)
+        if (index >= 0 && index < layers.size() - 1) {
+            // Preserve both old BufferedImage overlay system and new PixelModification system
             BufferedImage overlay = layer.getPaintingOverlay();
-            if (overlay != null) {
-                io.Log.log("DEBUG: moveLayerUp - overlay before move: " + System.identityHashCode(overlay) +
-                           " size=" + overlay.getWidth() + "x" + overlay.getHeight());
-            } else {
-                io.Log.log("DEBUG: moveLayerUp - no overlay before move for: " + layer.getName());
+            java.util.List<mosaic.layers.PixelModification> modifications = null;
+            
+            // Preserve base grid modifications (sistema base)
+            java.util.Map<String, colors.LEGOColor> baseModifications = null;
+            if (modificationManager != null) {
+                baseModifications = new java.util.HashMap<>(modificationManager.getModifications());
+                io.Log.log("DEBUG: moveLayerUp - preserving " + baseModifications.size() + " base grid modifications");
             }
-            Collections.swap(layers, index, index - 1);
+            
+            io.Log.log("DEBUG: moveLayerUp - moviendo capa '" + layer.getName() + "' de índice " + index + " a " + (index + 1));
+            
+            if (layer.hasPixelModifications()) {
+                modifications = new java.util.ArrayList<mosaic.layers.PixelModification>(layer.getPixelModifications().values());
+                io.Log.log("DEBUG: moveLayerUp - preserving " + modifications.size() + " PixelModifications for: " + layer.getName());
+                
+                // DEBUG: Verificar el contenido de las modificaciones
+                if (!modifications.isEmpty()) {
+                    io.Log.log("DEBUG: moveLayerUp - primera modificación: " + modifications.get(0).toString());
+                }
+            }
+            
+            // CORREGIDO: Intercambiar con la capa que está arriba (índice mayor)
+            Collections.swap(layers, index, index + 1);
+            
             // Mantener selectedLayer referencia exacta
             if (selectedLayer == layer) {
                 selectedLayer = layer; // explícito para claridad
             }
+            
+            // Restore old BufferedImage overlay system
             if (overlay != null && layer.getPaintingOverlay() != overlay) {
                 layer.setPaintingOverlay(overlay);
             }
+            
+            // Restore new PixelModification system
+            if (modifications != null && !modifications.isEmpty()) {
+                // CRÍTICO: Limpiar TODAS las modificaciones antes de restaurar
+                layer.clearPixelModifications();
+                
+                // Restaurar cada modificación individualmente
+                for (mosaic.layers.PixelModification mod : modifications) {
+                    layer.addPixelModification(mod);
+                }
+                
+                io.Log.log("DEBUG: moveLayerUp - restored " + modifications.size() + " PixelModifications for: " + layer.getName());
+                
+                // DEBUG: Verificar que se restauraron correctamente
+                io.Log.log("DEBUG: moveLayerUp - layer now has " + layer.getPixelModifications().size() + " PixelModifications");
+                
+                // NUEVO: Verificar contenido después de la restauración
+                if (!layer.getPixelModifications().isEmpty()) {
+                    io.Log.log("DEBUG: moveLayerUp - verificación: primera modificación preservada correctamente");
+                }
+            }
+            
+            // Restore base grid modifications with visual application
+            if (baseModifications != null && modificationManager != null && colorGrid != null) {
+                modificationManager.restoreModificationsFromCopyAndApply(baseModifications, colorGrid);
+                io.Log.log("DEBUG: moveLayerUp - restored and applied " + baseModifications.size() + " base grid modifications");
+                
+                // CRÍTICO: Forzar repaint para actualizar viewport tras aplicar modificaciones directamente
+                if (brickedView != null) {
+                    javax.swing.SwingUtilities.invokeLater(() -> {
+                        brickedView.repaint();
+                        io.Log.log("DEBUG: moveLayerUp - Forzado repaint() del BrickedView (camino directo)");
+                    });
+                }
+            } else if (baseModifications != null && modificationManager != null) {
+                // Fallback: solo restaurar sin aplicación visual
+                modificationManager.restoreModificationsFromCopy(baseModifications);
+                io.Log.log("DEBUG: moveLayerUp - restored " + baseModifications.size() + " base grid modifications (sin aplicación visual)");
+                
+                // NUEVA SOLUCIÓN: Guardar y recargar desde JSON para aplicar visualmente
+                try {
+                    saveAndReloadMosaicModifications();
+                    io.Log.log("DEBUG: moveLayerUp - aplicadas modificaciones vía JSON reload");
+                } catch (Exception ex) {
+                    io.Log.log("WARN: moveLayerUp - fallo JSON reload: " + ex.getMessage());
+                }
+            }
+            
             if (layer.getPaintingOverlay() != null) {
                 BufferedImage after = layer.getPaintingOverlay();
                 io.Log.log("DEBUG: moveLayerUp - overlay after move:  " + System.identityHashCode(after) +
@@ -204,22 +357,97 @@ public class LayerManager implements ModelHandler<BrickGraphicsState> {
      * Mueve una capa hacia abajo en la pila
      */
     public boolean moveLayerDown(Layer layer) {
+        io.Log.log("DEBUG: moveLayerDown - INICIADO para capa: " + layer.getName());
         int index = layers.indexOf(layer);
-        if (index >= 0 && index < layers.size() - 1) {
+        if (index > 0) {
+            // Preserve both old BufferedImage overlay system and new PixelModification system
             BufferedImage overlay = layer.getPaintingOverlay();
+            java.util.List<mosaic.layers.PixelModification> modifications = null;
+            
+            // Preserve base grid modifications (sistema base)
+            java.util.Map<String, colors.LEGOColor> baseModifications = null;
+            if (modificationManager != null) {
+                baseModifications = new java.util.HashMap<>(modificationManager.getModifications());
+                io.Log.log("DEBUG: moveLayerDown - preserving " + baseModifications.size() + " base grid modifications");
+            }
+            
+            io.Log.log("DEBUG: moveLayerDown - moviendo capa '" + layer.getName() + "' de índice " + index + " a " + (index - 1));
+            
+            if (layer.hasPixelModifications()) {
+                modifications = new java.util.ArrayList<mosaic.layers.PixelModification>(layer.getPixelModifications().values());
+                io.Log.log("DEBUG: moveLayerDown - preserving " + modifications.size() + " PixelModifications for: " + layer.getName());
+                
+                // DEBUG: Verificar el contenido de las modificaciones
+                if (!modifications.isEmpty()) {
+                    io.Log.log("DEBUG: moveLayerDown - primera modificación: " + modifications.get(0).toString());
+                }
+            }
+            
             if (overlay != null) {
                 io.Log.log("DEBUG: moveLayerDown - overlay before move: " + System.identityHashCode(overlay) +
                            " size=" + overlay.getWidth() + "x" + overlay.getHeight());
             } else {
                 io.Log.log("DEBUG: moveLayerDown - no overlay before move for: " + layer.getName());
             }
-            Collections.swap(layers, index, index + 1);
+            
+            Collections.swap(layers, index, index - 1);
+            
             if (selectedLayer == layer) {
                 selectedLayer = layer;
             }
+            
+            // Restore old BufferedImage overlay system
             if (overlay != null && layer.getPaintingOverlay() != overlay) {
                 layer.setPaintingOverlay(overlay);
             }
+            
+            // Restore new PixelModification system
+            if (modifications != null && !modifications.isEmpty()) {
+                // CRÍTICO: Limpiar TODAS las modificaciones antes de restaurar
+                layer.clearPixelModifications();
+                
+                // Restaurar cada modificación individualmente
+                for (mosaic.layers.PixelModification mod : modifications) {
+                    layer.addPixelModification(mod);
+                }
+                
+                io.Log.log("DEBUG: moveLayerDown - restored " + modifications.size() + " PixelModifications for: " + layer.getName());
+                
+                // DEBUG: Verificar que se restauraron correctamente
+                io.Log.log("DEBUG: moveLayerDown - layer now has " + layer.getPixelModifications().size() + " PixelModifications");
+                
+                // NUEVO: Verificar contenido después de la restauración
+                if (!layer.getPixelModifications().isEmpty()) {
+                    io.Log.log("DEBUG: moveLayerDown - verificación: primera modificación preservada correctamente");
+                }
+            }
+            
+            // Restore base grid modifications with visual application
+            if (baseModifications != null && modificationManager != null && colorGrid != null) {
+                modificationManager.restoreModificationsFromCopyAndApply(baseModifications, colorGrid);
+                io.Log.log("DEBUG: moveLayerDown - restored and applied " + baseModifications.size() + " base grid modifications");
+                
+                // CRÍTICO: Forzar repaint para actualizar viewport tras aplicar modificaciones directamente
+                if (brickedView != null) {
+                    javax.swing.SwingUtilities.invokeLater(() -> {
+                        brickedView.repaint();
+                        io.Log.log("DEBUG: moveLayerDown - Forzado repaint() del BrickedView (camino directo)");
+                    });
+                }
+            } else if (baseModifications != null && modificationManager != null) {
+                // Fallback: solo restaurar sin aplicación visual
+                modificationManager.restoreModificationsFromCopy(baseModifications);
+                io.Log.log("DEBUG: moveLayerDown - restored " + baseModifications.size() + " base grid modifications (sin aplicación visual)");
+                
+                // NUEVA SOLUCIÓN: Guardar y recargar desde JSON para aplicar visualmente
+                try {
+                    saveAndReloadMosaicModifications();
+                    io.Log.log("DEBUG: moveLayerDown - aplicadas modificaciones vía JSON reload");
+                } catch (Exception ex) {
+                    io.Log.log("WARN: moveLayerDown - fallo JSON reload: " + ex.getMessage());
+                }
+            }
+            
             if (layer.getPaintingOverlay() != null) {
                 BufferedImage after = layer.getPaintingOverlay();
                 io.Log.log("DEBUG: moveLayerDown - overlay after move:  " + System.identityHashCode(after) +
@@ -254,14 +482,39 @@ public class LayerManager implements ModelHandler<BrickGraphicsState> {
      * Renderiza todas las capas visibles sobre el gráfico dado
      */
     public void renderLayers(Graphics2D g2d) {
+        renderLayers(g2d, 1); // Tamaño por defecto de 1 píxel por stud
+    }
+    
+    /**
+     * NUEVO: Renderiza capas con tamaño de stud específico para alineación correcta
+     */
+    public void renderLayers(Graphics2D g2d, int studPixelSize) {
         if (!layersEnabled) return;
         
         Graphics2D g = (Graphics2D) g2d.create();
         
-        // Renderizar capas de abajo hacia arriba
-        for (int i = layers.size() - 1; i >= 0; i--) {
+        System.out.println("DEBUG: LayerManager.renderLayers - Renderizando " + layers.size() + " capas, studPixelSize=" + studPixelSize);
+        
+        // DEBUG: Mostrar orden de capas antes de renderizar
+        for (int i = 0; i < layers.size(); i++) {
             Layer layer = layers.get(i);
-            layer.render(g, globalOpacity);
+            System.out.println("DEBUG: Orden capas[" + i + "]: '" + layer.getName() + "' visible=" + layer.isVisible());
+        }
+        
+        // Renderizar capas de abajo hacia arriba (índice mayor = encima)
+        // Lista: [capa_fondo=0, capa_media=1, capa_superior=2]
+        // Orden de renderizado: 0 -> 1 -> 2 (cada una encima de la anterior)
+        for (int i = 0; i < layers.size(); i++) {
+            Layer layer = layers.get(i);
+            System.out.println("DEBUG: Renderizando capa[" + i + "]: '" + layer.getName() + "' visible=" + layer.isVisible());
+            
+            if (layer.isVisible()) {
+                System.out.println("DEBUG: -> Usando render() para capa de imagen");
+                // Renderizar capa normalmente
+                layer.render(g, globalOpacity);
+            } else {
+                System.out.println("DEBUG: -> Capa no visible, saltando");
+            }
         }
         
         g.dispose();
@@ -500,9 +753,10 @@ public class LayerManager implements ModelHandler<BrickGraphicsState> {
                                                                  float sharpness) {
         if (baseImage == null) return null;
         
-    io.Log.log("DEBUG: Aplicando transformaciones de fondo - Brillo: " + brightness + 
-              ", Contraste: " + contrast + ", Saturación: " + saturation + 
-              ", Gamma: " + gamma + ", Nitidez: " + sharpness);
+        // DEBUG log comentado para rendimiento:
+        // io.Log.log("DEBUG: Aplicando transformaciones de fondo - Brillo: " + brightness + 
+        //           ", Contraste: " + contrast + ", Saturación: " + saturation + 
+        //           ", Gamma: " + gamma + ", Nitidez: " + sharpness);
         
         // Verificar si hay transformaciones que aplicar
         boolean hasTransformations = brightness != 1.0f || contrast != 1.0f || 
@@ -515,16 +769,16 @@ public class LayerManager implements ModelHandler<BrickGraphicsState> {
                                                           brightness, contrast, 
                                                           saturation, gamma, 
                                                           sharpness);
-            io.Log.log("DEBUG: Transformaciones aplicadas a imagen de fondo");
+            // io.Log.log("DEBUG: Transformaciones aplicadas a imagen de fondo"); // COMENTADO PARA RENDIMIENTO
         } else {
             // Si no hay transformaciones, usar imagen original
             transformedBase = baseImage;
-            io.Log.log("DEBUG: No hay transformaciones, usando imagen original");
+            // io.Log.log("DEBUG: No hay transformaciones, usando imagen original"); // COMENTADO PARA RENDIMIENTO
         }
         
         // Luego aplicar las capas sobre la imagen de fondo transformada
         BufferedImage result = applyLayersToImage(transformedBase);
-    io.Log.log("DEBUG: Capas aplicadas sobre imagen transformada");
+        // io.Log.log("DEBUG: Capas aplicadas sobre imagen transformada"); // COMENTADO PARA RENDIMIENTO
         return result;
     }
 
@@ -925,6 +1179,15 @@ public class LayerManager implements ModelHandler<BrickGraphicsState> {
             this.layersEnabled = layersEnabled != null ? layersEnabled.booleanValue() : false;
             io.Log.log("DEBUG: LayerManager.handleModelChange - Flag layersEnabled cargado: " + this.layersEnabled);
             
+            // IMPORTANTE: Guardar modificaciones actuales antes de limpiar las capas
+            // Esto evita que se pierdan las modificaciones del pincel cuando se recarga el modelo
+            try {
+                autosaveArtifacts();
+                io.Log.log("DEBUG: LayerManager.handleModelChange - Guardado automático antes de recargar capas");
+            } catch (Exception ex) {
+                io.Log.log("WARN: LayerManager.handleModelChange - Error en guardado automático: " + ex.getMessage());
+            }
+            
             // Limpiar capas existentes
             clearLayers();
             
@@ -1116,6 +1379,12 @@ public class LayerManager implements ModelHandler<BrickGraphicsState> {
                 // Guardar modificaciones de píxeles como JSON primero (nuevo sistema)
                 Map<Point, PixelModification> pixelModifications = layer.getPixelModifications();
                 String relPaintRef = null;
+                
+                // DEBUG: Agregar información detallada sobre modificaciones
+                io.Log.log("DEBUG: LayerManager.autosaveArtifacts - capa '" + layer.getName() + "'");
+                io.Log.log("DEBUG: LayerManager.autosaveArtifacts - pixelModifications null=" + (pixelModifications == null) + 
+                          " size=" + (pixelModifications != null ? pixelModifications.size() : "N/A"));
+                
                 if (pixelModifications != null && !pixelModifications.isEmpty()) {
                     String key = layerKey(layer);
                     Integer prev = lastOverlayPixelCounts.get(key);
@@ -1632,5 +1901,59 @@ public class LayerManager implements ModelHandler<BrickGraphicsState> {
         if (name == null || name.isEmpty()) return "layer";
         // Eliminar acentos simples: podemos dejar tarea futura; por ahora solo reemplazar caracteres no permitidos
         return name.trim().replaceAll("[^a-zA-Z0-9_-]+", "_");
+    }
+    
+    /**
+     * NUEVA SOLUCIÓN: Guarda las modificaciones del mosaico y fuerza su reaplicación
+     * para preservar pintura cuando colorGrid no está disponible.
+     */
+    private void saveAndReloadMosaicModifications() throws Exception {
+        io.Log.log("DEBUG: saveAndReloadMosaicModifications - INICIADO");
+        if (modificationManager == null) {
+            io.Log.log("DEBUG: saveAndReloadMosaicModifications - ModificationManager es null, no hay nada que hacer");
+            return;
+        }
+        
+        // 1. Obtener las modificaciones actuales del mosaico base
+        java.util.Map<String, colors.LEGOColor> baseModifications = new java.util.HashMap<>(modificationManager.getModifications());
+        if (baseModifications.isEmpty()) {
+            io.Log.log("DEBUG: saveAndReloadMosaicModifications - No hay modificaciones para guardar");
+            return;
+        }
+        
+        io.Log.log("DEBUG: saveAndReloadMosaicModifications - Obtenidas " + baseModifications.size() + " modificaciones");
+        
+        // 2. Obtener ColorGrid del BrickedView directamente si está disponible
+        colors.LEGOColorGrid currentColorGrid = null;
+        if (brickedView != null) {
+            currentColorGrid = brickedView.getColorGrid();
+            io.Log.log("DEBUG: saveAndReloadMosaicModifications - ColorGrid obtenido del BrickedView: " + (currentColorGrid != null ? "disponible" : "NULL"));
+        }
+        
+        // 3. Aplicar las modificaciones al ColorGrid disponible usando el método correcto
+        if (currentColorGrid != null) {
+            modificationManager.restoreModificationsFromCopyAndApply(baseModifications, currentColorGrid);
+            io.Log.log("DEBUG: saveAndReloadMosaicModifications - Aplicadas " + baseModifications.size() + " modificaciones al ColorGrid via restoreFromCopy");
+        } else {
+            io.Log.log("DEBUG: saveAndReloadMosaicModifications - ColorGrid no disponible, no se pueden aplicar modificaciones");
+        }
+        
+        // 4. Forzar actualización visual del viewport con delay para asegurar que terminen todos los procesos
+        if (brickedView != null) {
+            javax.swing.SwingUtilities.invokeLater(() -> {
+                // Primer repaint inmediato
+                brickedView.repaint();
+                // Segundo repaint con delay para asegurar consistency
+                javax.swing.Timer timer = new javax.swing.Timer(50, e -> {
+                    brickedView.repaint();
+                    io.Log.log("DEBUG: saveAndReloadMosaicModifications - Ejecutado repaint() con delay");
+                });
+                timer.setRepeats(false);
+                timer.start();
+                io.Log.log("DEBUG: saveAndReloadMosaicModifications - Forzado repaint() inmediato y programado repaint con delay");
+            });
+        } else {
+            io.Log.log("DEBUG: saveAndReloadMosaicModifications - BrickedView null, no se puede actualizar vista");
+        }
     }
 }

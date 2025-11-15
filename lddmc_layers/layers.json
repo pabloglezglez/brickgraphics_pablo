@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "layersEnabled": true,
+  "layers": [
+    {"name": "pn (Pintado)", "file": "REL:pn_Pintado_.png", "fileHash": "56abe4cbc175363da0810882244b34ff", "visible": true, "x": 0, "y": 680, "opacity": 1.0, "brightness": 1.0, "contrast": 1.0, "saturation": 1.0, "gamma": 1.0, "sharpness": 1.0, "scale": 1.0 },
+    {"name": "mural_Pazo_niño", "file": "REL:mural_Pazo_ni_o.png", "fileHash": "63d09b924413887f0eb922b4c5a79ef2", "visible": true, "x": 0, "y": 0, "opacity": 1.0, "brightness": 1.0, "contrast": 1.0, "saturation": 1.0, "gamma": 1.0, "sharpness": 1.0, "scale": 1.0 },
+    {"name": "mural_Pazo_tiovivo", "file": "REL:mural_Pazo_tiovivo.png", "fileHash": "0b69a033f855c62137c1039595ef3c17", "visible": true, "x": 430, "y": 130, "opacity": 1.0, "brightness": 1.0, "contrast": 1.0, "saturation": 1.0, "gamma": 1.0, "sharpness": 1.0, "scale": 1.0 }
+  ]
+}

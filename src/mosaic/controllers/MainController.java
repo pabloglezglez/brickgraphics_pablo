@@ -61,6 +61,7 @@ public class MainController implements ModelHandler<BrickGraphicsState> {
 	private DataFile imageDataFile;
 	private BufferedImage originalImage; // Imagen base sin capas aplicadas
 	private File mosaicFile;
+	private File mainImageDirectory; // NUEVO: Directorio de la imagen principal para usar en diálogos de capas
 
 	private MainController() {		
 		listeners = new ArrayList<ChangeListener>();		
@@ -119,6 +120,22 @@ public class MainController implements ModelHandler<BrickGraphicsState> {
 		
 		// Establecer la referencia al BrickedView después de crear MainWindow
 		studEditController.setBrickedView(mw.getBrickedView());
+		
+		// Conectar el ModificationManager del StudEditController con el LayerManager
+		// para preservar modificaciones del sistema base cuando se mueven capas
+		layerManager.setModificationManager(studEditController.getModificationManager());
+		
+		// Conectar el ColorGrid del BrickedView con el LayerManager
+		// para aplicar modificaciones visuales cuando se mueven capas
+		Log.log("DEBUG: MainController - Intentando obtener BrickedView: " + mw.getBrickedView());
+		if (mw.getBrickedView() != null) {
+			Log.log("DEBUG: MainController - Intentando obtener ColorGrid: " + mw.getBrickedView().getColorGrid());
+			layerManager.setColorGrid(mw.getBrickedView().getColorGrid());
+			layerManager.setBrickedView(mw.getBrickedView());
+			Log.log("DEBUG: MainController - ColorGrid y BrickedView establecidos exitosamente");
+		} else {
+			Log.log("DEBUG: MainController - ERROR: BrickedView es null");
+		}
 		
 		// Crear ColorLegend después de tener StudEditController completamente inicializado
 		legend = new ColorLegend(this, pipeline);
@@ -202,10 +219,13 @@ public class MainController implements ModelHandler<BrickGraphicsState> {
 		if(imageFile == null) {
 			imageDataFile = new DataFile(image);
 			imageFileName = "New Image";
+			mainImageDirectory = null; // NUEVO: No hay directorio si no hay archivo
 		}
 		else {
 			imageDataFile = new DataFile(imageFile);		
 			imageFileName = imageFile.getCanonicalPath();
+			mainImageDirectory = imageFile.getParentFile(); // NUEVO: Guardar directorio de imagen principal
+			io.Log.log("DEBUG: MainController - mainImageDirectory establecido: " + (mainImageDirectory != null ? mainImageDirectory.getAbsolutePath() : "null"));
 			
 			// Add to recent files when opening an image
 			if (recentFilesManager != null) {
@@ -227,14 +247,14 @@ public class MainController implements ModelHandler<BrickGraphicsState> {
 	 * Aplica las capas sobre la imagen original y actualiza el pipeline
 	 */
 	public void updateImageWithLayers() {
-		io.Log.log("DEBUG: MainController - updateImageWithLayers() llamado");
+		// io.Log.log("DEBUG: MainController - updateImageWithLayers() llamado"); // COMENTADO PARA RENDIMIENTO
 		if (originalImage == null || layerManager == null) {
-			io.Log.log("DEBUG: MainController - Skipping, originalImage o layerManager es null");
+			// io.Log.log("DEBUG: MainController - Skipping, originalImage o layerManager es null"); // COMENTADO PARA RENDIMIENTO
 			return; // Skip si no están inicializados aún
 		}
 		
 		// Aplicar transformaciones de imagen de fondo y capas sobre la imagen original
-		io.Log.log("DEBUG: MainController - Aplicando capas a imagen original...");
+		// io.Log.log("DEBUG: MainController - Aplicando capas a imagen original..."); // COMENTADO PARA RENDIMIENTO
 		BufferedImage imageWithLayers;
 		
 		// Verificar si hay transformaciones de imagen de fondo configuradas
@@ -245,9 +265,10 @@ public class MainController implements ModelHandler<BrickGraphicsState> {
 			float gamma = layerPanel.getBackgroundGamma();
 			float sharpness = layerPanel.getBackgroundSharpness();
 			
-			io.Log.log("DEBUG: MainController - Llamando applyBackgroundTransformationsAndLayers con valores: " +
-							  "brightness=" + brightness + ", contrast=" + contrast + ", saturation=" + saturation + 
-							  ", gamma=" + gamma + ", sharpness=" + sharpness);
+			// DEBUG log comentado para rendimiento:
+			// io.Log.log("DEBUG: MainController - Llamando applyBackgroundTransformationsAndLayers con valores: " + 
+			//			  "brightness=" + brightness + ", contrast=" + contrast + ", saturation=" + saturation + 
+			//			  ", gamma=" + gamma + ", sharpness=" + sharpness);
 			
 			// Usar método que aplica transformaciones de fondo y luego capas
 			imageWithLayers = layerManager.applyBackgroundTransformationsAndLayers(
@@ -258,16 +279,16 @@ public class MainController implements ModelHandler<BrickGraphicsState> {
 			// Fallback al método original si no hay panel de transformaciones
 			imageWithLayers = layerManager.applyLayersToImage(originalImage);
 		}
-		io.Log.log("DEBUG: MainController - Imagen con capas creada");
+		// io.Log.log("DEBUG: MainController - Imagen con capas creada"); // COMENTADO PARA RENDIMIENTO
 		
 		// Establecer la imagen procesada en el pipeline
 		pipeline.setStartImage(imageWithLayers);
-		io.Log.log("DEBUG: MainController - Pipeline actualizado con imagen+capas");
+		// io.Log.log("DEBUG: MainController - Pipeline actualizado con imagen+capas"); // COMENTADO PARA RENDIMIENTO
 		
 		// Repintar la vista para mostrar los cambios
 		if (mw != null && mw.getBrickedView() != null) {
 					mw.getBrickedView().repaint();
-					io.Log.log("DEBUG: MainController - BrickedView repintada");
+					// io.Log.log("DEBUG: MainController - BrickedView repintada"); // COMENTADO PARA RENDIMIENTO
 		}
 	}
 	
@@ -310,6 +331,11 @@ public class MainController implements ModelHandler<BrickGraphicsState> {
 		return mosaicFile;
 	}
 	
+	// NUEVO: Obtener directorio de imagen principal para diálogos de capas
+	public File getMainImageDirectory() {
+		return mainImageDirectory;
+	}
+	
 	public void setMosaicFile(File file) {
 		this.mosaicFile = file;
 		if(layerManager != null) {
@@ -328,6 +354,11 @@ public class MainController implements ModelHandler<BrickGraphicsState> {
 	}
 	
 	public File showSaveDialog(String saveMessage, FileFilter... filters) {		
+		// NUEVO: Establecer directorio inicial basado en la imagen principal
+		if (mainImageDirectory != null && mainImageDirectory.exists()) {
+			saveDialog.setParentFolder(mainImageDirectory);
+			io.Log.log("DEBUG: MainController - Directorio de guardar establecido: " + mainImageDirectory.getAbsolutePath());
+		}
 		return saveDialog.showSaveDialog(saveMessage, filters);
 	}
 	

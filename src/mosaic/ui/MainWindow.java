@@ -108,7 +108,7 @@ public class MainWindow extends JFrame implements ChangeListener, ModelHandler<B
 			
 			// Crear panel integrado que combina capas e imagen
 			integratedPanel = new IntegratedImageLayerPanel(
-				mc.getLayerManager(), imagePreparingView, model, brickedView);
+				mc.getLayerManager(), imagePreparingView, model, brickedView, mc);
 			
 			// Configurar callback para cambios de capas
 			integratedPanel.setOnLayersChangedCallback(() -> {
@@ -191,7 +191,7 @@ public class MainWindow extends JFrame implements ChangeListener, ModelHandler<B
 		addMouseWheelListener(new MouseWheelListener() {
 			@Override
 			public void mouseWheelMoved(MouseWheelEvent e) {
-				Log.log("MouseWheel en MainWindow: Ctrl=" + e.isControlDown() + ", rotation=" + e.getWheelRotation());
+				// OPTIMIZACIÓN: Solo log en caso de error para evitar spam
 				if (e.isControlDown()) {
 					// IMPORTANTE: Consumir el evento INMEDIATAMENTE para prevenir zoom del sistema
 					e.consume();
@@ -199,20 +199,16 @@ public class MainWindow extends JFrame implements ChangeListener, ModelHandler<B
 					try {
 						// Convertir coordenadas del evento a coordenadas relativas al BrickedView
 						Point eventPoint = e.getPoint();
-						Log.log("Punto del evento: " + eventPoint);
 						
 						// Calcular posición relativa al BrickedView de forma simple
 						Point brickedViewLocation = brickedView.getLocation();
-						Log.log("Ubicación de BrickedView: " + brickedViewLocation);
 						
 						// Calcular posición relativa al BrickedView
 						int relativeX = eventPoint.x - brickedViewLocation.x;
 						int relativeY = eventPoint.y - brickedViewLocation.y;
 						Point relativePoint = new Point(relativeX, relativeY);
 						
-						Log.log("Punto relativo a BrickedView: " + relativePoint);
-						// Llamar método de zoom temporalmente simplificado
-						Log.log("Ejecutando zoom desde MainWindow...");
+						// Llamar método de zoom (logs eliminados para rendimiento)
 					} catch (Exception ex) {
 						Log.log("Error en mouseWheelMoved: " + ex.getMessage());
 						Log.log(ex);

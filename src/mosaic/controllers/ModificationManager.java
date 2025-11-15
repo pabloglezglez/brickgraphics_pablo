@@ -15,6 +15,7 @@ import colors.LEGOColorGrid;
 public class ModificationManager {
     // Mapa que guarda las modificaciones: coordenada -> color modificado
     private Map<String, LEGOColor> modifications = new HashMap<>();
+    private Map<String, LEGOColor> backupModifications = new HashMap<>(); // Backup para operaciones críticas
     private LEGOColorGrid originalGrid = null;
     private ColorController colorController; // Referencia para convertir IDs a colores
     
@@ -100,16 +101,80 @@ public class ModificationManager {
      * Limpia todas las modificaciones registradas.
      */
     public void clearModifications() {
-    modifications.clear();
-    originalGrid = null;
-    io.Log.log("DEBUG: ModificationManager - Todas las modificaciones limpiadas");
+        modifications.clear();
     }
     
     /**
+     * Aplica todas las modificaciones guardadas al ColorGrid especificado.
+     * Esto asegura que las modificaciones sean visibles después de operaciones de capas.
+     */
+    public void applyAllModificationsToGrid(LEGOColorGrid colorGrid) {
+        if (colorGrid == null) {
+            io.Log.log("WARNING: ModificationManager - ColorGrid es null, no se pueden aplicar modificaciones");
+            return;
+        }
+        
+        int applied = 0;
+        for (Map.Entry<String, LEGOColor> entry : modifications.entrySet()) {
+            try {
+                String[] coords = entry.getKey().split(",");
+                if (coords.length == 2) {
+                    int x = Integer.parseInt(coords[0]);
+                    int y = Integer.parseInt(coords[1]);
+                    LEGOColor color = entry.getValue();
+                    
+                    // Verificar límites del grid
+                    if (x >= 0 && y >= 0 && x < colorGrid.getWidth() && y < colorGrid.getHeight()) {
+                        colorGrid.setColorAt(x, y, color);
+                        applied++;
+                    }
+                }
+            } catch (NumberFormatException ex) {
+                // Ignorar coordenadas malformadas silenciosamente
+            }
+        }
+        
+        io.Log.log("DEBUG: ModificationManager - Aplicadas " + applied + " de " + modifications.size() + " modificaciones al grid");
+    }    /**
      * Obtiene el color modificado en una coordenada específica, o null si no hay modificación.
      */
     public LEGOColor getModificationAt(int x, int y) {
         return modifications.get(x + "," + y);
+    }
+    
+    /**
+     * Obtiene una copia de todas las modificaciones actuales.
+     * Usado para preservar modificaciones durante operaciones de capa.
+     */
+    public Map<String, LEGOColor> getModifications() {
+        return new HashMap<>(modifications);
+    }
+    
+    /**
+     * Restaura modificaciones desde una copia previamente guardada.
+     * Usado para restaurar modificaciones durante operaciones de capa.
+     */
+    public void restoreModificationsFromCopy(Map<String, LEGOColor> modificationsCopy) {
+        if (modificationsCopy != null) {
+            modifications.clear();
+            modifications.putAll(modificationsCopy);
+            io.Log.log("DEBUG: ModificationManager - Restored " + modifications.size() + " modifications from copy");
+        }
+    }
+    
+    /**
+     * Restaura modificaciones desde una copia y las aplica inmediatamente al grid.
+     * Versión optimizada para operaciones de capas que requieren aplicación visual inmediata.
+     */
+    public void restoreModificationsFromCopyAndApply(Map<String, LEGOColor> modificationsCopy, LEGOColorGrid colorGrid) {
+        // Restaurar primero
+        restoreModificationsFromCopy(modificationsCopy);
+        
+        // Aplicar inmediatamente al grid para visibilidad
+        if (colorGrid != null && !modifications.isEmpty()) {
+            applyAllModificationsToGrid(colorGrid);
+            io.Log.log("DEBUG: ModificationManager - Restored and applied " + modifications.size() + " modifications");
+        }
     }
     
     /**
@@ -189,5 +254,44 @@ public class ModificationManager {
                 io.Log.log("WARNING: ModificationManager - Color con ID " + colorID + " no encontrado");
             }
         }
+    }
+    
+    /**
+     * Crea un backup de las modificaciones actuales antes de una operación crítica.
+     */
+    public void createBackupBeforeOperation() {
+        backupModifications.clear();
+        backupModifications.putAll(modifications);
+        io.Log.log("DEBUG: ModificationManager - Backup creado con " + modifications.size() + " modificaciones");
+    }
+    
+    /**
+     * Restaura las modificaciones desde el backup y las aplica al grid actual.
+     */
+    public void restoreModificationsFromBackup() {
+        if (backupModifications.isEmpty()) {
+            io.Log.log("DEBUG: ModificationManager - No hay backup para restaurar");
+            return;
+        }
+        
+        // Restaurar las modificaciones desde el backup
+        modifications.clear();
+        modifications.putAll(backupModifications);
+        
+        // Aplicar las modificaciones al grid actual si existe
+        if (originalGrid != null) {
+            restoreModifications(originalGrid);
+        }
+        
+        io.Log.log("DEBUG: ModificationManager - Restauradas " + modifications.size() + " modificaciones desde backup");
+    }
+    
+    /**
+     * Obtiene una copia de todas las modificaciones actuales.
+     */
+    public Map<String, LEGOColor> getAllModifications() {
+        Map<String, LEGOColor> copy = new HashMap<>();
+        copy.putAll(modifications);
+        return copy;
     }
 }

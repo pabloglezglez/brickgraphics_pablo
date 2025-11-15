@@ -42,7 +42,7 @@ import mosaic.layers.Layer;
 import java.awt.image.BufferedImage;
 import mosaic.rendering.Pipeline;
 import mosaic.rendering.PipelineMosaicListener;
-import mosaic.rendering.PaintOverlay;
+// import mosaic.rendering.PaintOverlay;
 import bricks.ToBricksType;
 
 public class BrickedView extends JPanel implements ChangeListener, PipelineMosaicListener {
@@ -58,11 +58,12 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 	private PrintController printController;
 	private StudEditController studEditController;
 	private MosaicZoomController mosaicZoomController;
+	private MainController mainController; // Referencia al controlador principal
 	private Dimension shownImageSize;
 	// Gestor de capas para pintura por-overlay
 	private LayerManager layerManager;
 	// Sistema de overlay global de pintura
-	private PaintOverlay paintOverlay;
+	// private PaintOverlay paintOverlay;
 	// Throttle para logs del bounding box
 	private long lastBoundsLogTs = 0L;
 	
@@ -78,6 +79,7 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 	
 	public BrickedView(MainController mc, Model<BrickGraphicsState> model, Pipeline pipeline) {
 		this.pipeline = pipeline;
+		this.mainController = mc; // Almacenar referencia al controlador principal
 		this.layerManager = mc.getLayerManager();
 		scaler = new ScaleTransform("Constructed view", true, ScaleQuality.RetainColors);
 		magnifierController = mc.getMagnifierController();
@@ -216,6 +218,8 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 
 	@Override
 	public void stateChanged(ChangeEvent e) {
+		LEGOColorGrid oldGrid = getColorGrid(); // Capturar el grid antes del cambio
+		
 		if(e != null && e.getSource() instanceof ToBricksController) {
 			updateTransform((ToBricksController)e.getSource());
 		}
@@ -228,6 +232,13 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 			else
 				cardLayout.show(this, MOSAIC);
 		}		
+
+		// Detectar cambios en el ColorGrid y actualizar LayerManager
+		LEGOColorGrid newGrid = getColorGrid();
+		if (oldGrid != newGrid && layerManager != null) {
+			layerManager.setColorGrid(newGrid);
+			Log.log("DEBUG: BrickedView - ColorGrid actualizado en LayerManager después de stateChanged");
+		}
 
 		repaint();
 	}
@@ -582,12 +593,12 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 		Point mosaicPoint = screenToMosaic(new Point(mouseX, mouseY));
 		
 		// Convertir coordenadas del mosaico directamente a coordenadas del grid
-		int newHoveredX = (mosaicPoint.x * colorGrid.getWidth()) / mosaicImageSize.width;
-		int newHoveredY = (mosaicPoint.y * colorGrid.getHeight()) / mosaicImageSize.height;
+		// MEJORADO: Usar Math.max para evitar coordenadas negativas en zona superior izquierda
+		int newHoveredX = Math.max(0, (mosaicPoint.x * colorGrid.getWidth()) / mosaicImageSize.width);
+		int newHoveredY = Math.max(0, (mosaicPoint.y * colorGrid.getHeight()) / mosaicImageSize.height);
 		
-		// Verificar que esté dentro del rango válido
-		if (newHoveredX >= 0 && newHoveredX < colorGrid.getWidth() && 
-			newHoveredY >= 0 && newHoveredY < colorGrid.getHeight()) {
+		// Verificar que esté dentro del rango válido (ya no necesitamos validar >= 0)
+		if (newHoveredX < colorGrid.getWidth() && newHoveredY < colorGrid.getHeight()) {
 			
 			if (newHoveredX != hoveredX || newHoveredY != hoveredY) {
 				hoveredX = newHoveredX;
@@ -652,12 +663,12 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 	 */
 	private boolean attemptOverlayPaint(int screenX, int screenY) {
 		try {
-			// Verificaciones básicas
-			if (paintOverlay == null || !paintOverlay.isEnabled()) {
-				return false;
-			}
-			
-			LEGOColor legoColor = studEditController.getSelectedColor();
+		// Verificaciones básicas
+		// if (paintOverlay == null || !paintOverlay.isEnabled()) {
+		// 	return false;
+		// }
+		
+		LEGOColor legoColor = studEditController.getSelectedColor();
 			if (legoColor == null) {
 				Log.log("DEBUG: attemptOverlayPaint -> no selected color");
 				return false;
@@ -681,7 +692,8 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 			int radius = calculateBrushRadiusInMosaicPixels(brushUnits);
 
 			// NUEVA LÓGICA: Pintar directamente en el overlay global
-			boolean painted = paintOverlay.applyBrushStroke(mosaicX, mosaicY, radius, legoColor.getRGB());
+			// boolean painted = paintOverlay.applyBrushStroke(mosaicX, mosaicY, radius, legoColor.getRGB());
+			boolean painted = false; // TEMPORAL: paintOverlay deshabilitado
 			
 			if (painted) {
 				Log.log("DEBUG: PaintOverlay stroke aplicado en mosaico (" + mosaicX + "," + mosaicY + 
@@ -727,36 +739,38 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 	 * Habilita o deshabilita el overlay de pintura global
 	 */
 	public void setPaintOverlayEnabled(boolean enabled) {
-		if (paintOverlay != null) {
-			paintOverlay.setEnabled(enabled);
-			repaint();
-			Log.log("DEBUG: PaintOverlay " + (enabled ? "habilitado" : "deshabilitado"));
-		}
+		// if (paintOverlay != null) {
+		// 	paintOverlay.setEnabled(enabled);
+		// 	repaint();
+		// 	Log.log("DEBUG: PaintOverlay " + (enabled ? "habilitado" : "deshabilitado"));
+		// }
 	}
 	
 	/**
 	 * Verifica si el overlay de pintura está habilitado
 	 */
 	public boolean isPaintOverlayEnabled() {
-		return paintOverlay != null && paintOverlay.isEnabled();
+		// return paintOverlay != null && paintOverlay.isEnabled();
+		return false; // TEMPORAL: paintOverlay deshabilitado
 	}
 	
 	/**
 	 * Limpia todo el contenido del overlay de pintura
 	 */
 	public void clearPaintOverlay() {
-		if (paintOverlay != null) {
-			paintOverlay.clearOverlay();
-			repaint();
-			Log.log("DEBUG: PaintOverlay limpiado");
-		}
+		// if (paintOverlay != null) {
+		// 	paintOverlay.clearOverlay();
+		// 	repaint();
+		// 	Log.log("DEBUG: PaintOverlay limpiado");
+		// }
 	}
 	
 	/**
 	 * Verifica si el overlay tiene contenido pintado
 	 */
 	public boolean hasPaintOverlayContent() {
-		return paintOverlay != null && paintOverlay.hasContent();
+		// return paintOverlay != null && paintOverlay.hasContent();
+		return false; // TEMPORAL: paintOverlay deshabilitado
 	}
 	
 	// ===== MÉTODOS PÚBLICOS DE ZOOM =====
@@ -847,11 +861,56 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 		this.mosaicImageSize = mosaicImageSize;
 		
 		// Inicializar o actualizar el overlay de pintura
-		if (paintOverlay == null) {
-			paintOverlay = new PaintOverlay(mosaicImageSize);
-			Log.log("DEBUG: PaintOverlay inicializado con tamaño " + mosaicImageSize.width + "x" + mosaicImageSize.height);
-		} else {
-			paintOverlay.updateMosaicSize(mosaicImageSize);
+		// if (paintOverlay == null) {
+		// 	paintOverlay = new PaintOverlay(mosaicImageSize);
+		// 	Log.log("DEBUG: PaintOverlay inicializado con tamaño " + mosaicImageSize.width + "x" + mosaicImageSize.height);
+		// } else {
+		// 	paintOverlay.updateMosaicSize(mosaicImageSize);
+		// }
+		
+		// PRESERVAR MODIFICACIONES DEL USUARIO DESPUÉS DE REGENERACIÓN DEL PIPELINE
+		if (mainController != null && mainController.getLayerManager() != null && mainController.getLayerManager().getModificationManager() != null) {
+			// Usar un timer para aplicar después de que el pipeline complete totalmente
+			javax.swing.Timer preserveTimer = new javax.swing.Timer(100, e -> {
+				try {
+					ModificationManager modMgr = mainController.getLayerManager().getModificationManager();
+					LEGOColorGrid colorGrid = getColorGrid();
+					
+					if (colorGrid != null && modMgr.hasModifications()) {
+						Map<String, LEGOColor> modifications = modMgr.getAllModifications();
+						int restored = 0;
+						
+						for (Map.Entry<String, LEGOColor> entry : modifications.entrySet()) {
+							String[] coords = entry.getKey().split(",");
+							int x = Integer.parseInt(coords[0]);
+							int y = Integer.parseInt(coords[1]);
+							LEGOColor color = entry.getValue();
+							
+							if (x >= 0 && x < colorGrid.getWidth() && y >= 0 && y < colorGrid.getHeight()) {
+								if (colorGrid.setColorAt(x, y, color)) {
+									restored++;
+								}
+							}
+						}
+						
+						if (restored > 0) {
+							io.Log.log("DEBUG: BrickedView.mosaicChanged - Restauradas " + restored + " modificaciones tras regeneración del pipeline");
+							// Double repaint para asegurar visualización
+							SwingUtilities.invokeLater(() -> {
+								repaint();
+								javax.swing.Timer delayedRepaint = new javax.swing.Timer(50, ev -> repaint());
+								delayedRepaint.setRepeats(false);
+								delayedRepaint.start();
+							});
+						}
+					}
+				} catch (Exception ex) {
+					io.Log.log("ERROR: En preservación de modificaciones: " + ex.getMessage());
+					ex.printStackTrace();
+				}
+			});
+			preserveTimer.setRepeats(false);
+			preserveTimer.start();
 		}
 		
 		repaint();
@@ -1160,9 +1219,9 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 				toBricksTransform.drawAll(g2, mosaicImageSize);
 				
 				// NUEVO: Renderizar overlay de pintura (en coordenadas del mosaico)
-				if (paintOverlay != null && paintOverlay.isEnabled()) {
-					paintOverlay.render(g2, 0.8f); // 80% de opacidad
-				}
+				// if (paintOverlay != null && paintOverlay.isEnabled()) {
+				// 	paintOverlay.render(g2, 0.8f); // 80% de opacidad
+				// }
 				
 				// Restaurar transformación para elementos de UI
 				g2.translate(viewport.x, viewport.y);
@@ -1172,19 +1231,20 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 				toBricksTransform.drawAll(g2, shownImageSize);
 				
 				// NUEVO: Renderizar overlay de pintura (escalado a tamaño mostrado)
-				if (paintOverlay != null && paintOverlay.isEnabled()) {
-					// Escalar overlay de tamaño del mosaico a tamaño mostrado
-					Graphics2D overlayG2 = (Graphics2D) g2.create();
-					double scaleX = (double) shownImageSize.width / mosaicImageSize.width;
-					double scaleY = (double) shownImageSize.height / mosaicImageSize.height;
-					overlayG2.scale(scaleX, scaleY);
-					paintOverlay.render(overlayG2, 0.8f);
-					overlayG2.dispose();
-				}
+				// if (paintOverlay != null && paintOverlay.isEnabled()) {
+				// 	// Escalar overlay de tamaño del mosaico a tamaño mostrado
+				// 	Graphics2D overlayG2 = (Graphics2D) g2.create();
+				// 	double scaleX = (double) shownImageSize.width / mosaicImageSize.width;
+				// 	double scaleY = (double) shownImageSize.height / mosaicImageSize.height;
+				// 	overlayG2.scale(scaleX, scaleY);
+				// 	paintOverlay.render(overlayG2, 0.8f);
+				// 	overlayG2.dispose();
+				// }
 			}
 			
 			// Ayuda visual: dibujar bounding box de la capa seleccionada para depurar pintura overlay
-			drawSelectedLayerBounds(g2);
+			// DESHABILITADO: Causa confusión visual con cuadrado amarillo fantasma
+			// drawSelectedLayerBounds(g2);
 
 			// Dibujar cursor de edición si está activo (siempre en coordenadas de pantalla)
 			drawEditCursor(g2);

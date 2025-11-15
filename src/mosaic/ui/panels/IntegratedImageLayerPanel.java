@@ -2,6 +2,8 @@ package mosaic.ui.panels;
 
 import java.awt.*;
 import java.awt.event.*;
+import java.awt.datatransfer.*;
+import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
@@ -25,6 +27,7 @@ public class IntegratedImageLayerPanel extends JPanel {
     private ImagePreparingView imagePreparingView;
     private Model<BrickGraphicsState> model;
     private mosaic.ui.BrickedView brickedView; // Referencia para controles de PaintOverlay
+    private mosaic.controllers.MainController mainController; // NUEVO: Referencia para acceder al directorio de imagen principal
     
     // Componentes de UI
     private JList<Layer> layerList;
@@ -35,16 +38,13 @@ public class IntegratedImageLayerPanel extends JPanel {
     private JPanel topPanel;
     private JPanel layerButtonsPanel;
     private JButton addLayerButton;
+    private JButton addPaintLayerButton;  // NUEVO: Botón para crear capa de pintado
     private JButton removeLayerButton;
     private JButton duplicateButton;
     private JButton moveUpButton;
     private JButton moveDownButton;
     private JCheckBox enableLayersCheckBox;
     private JLabel layerInfoLabel;
-    
-    // NUEVOS: Controles de Paint Overlay
-    private JCheckBox paintOverlayCheckBox;
-    private JButton clearPaintButton;
     
     // Panel de propiedades de capa seleccionada
     private JPanel layerPropertiesPanel;
@@ -64,6 +64,13 @@ public class IntegratedImageLayerPanel extends JPanel {
     private volatile float backgroundSaturation = 1.0f;
     private volatile float backgroundGamma = 1.0f;
     private volatile float backgroundSharpness = 1.0f;
+    
+    // Spinners para controles de imagen de fondo
+    private JSpinner backgroundBrightnessSpinner;
+    private JSpinner backgroundContrastSpinner;
+    private JSpinner backgroundSaturationSpinner;
+    private JSpinner backgroundGammaSpinner;
+    private JSpinner backgroundSharpnessSpinner;
     private JSlider gammaSlider;
     private JSlider sharpnessSlider;
     private JSlider scaleSlider;
@@ -75,8 +82,15 @@ public class IntegratedImageLayerPanel extends JPanel {
     private JLabel saturationLabel;
     private JLabel gammaLabel;
     private JLabel sharpnessLabel;
-    private JLabel scaleLabel;
+    private JSpinner scaleSpinner; // CAMBIADO: de JTextField a JSpinner como posición X/Y
     private JLabel opacityLabel;
+    
+    // Spinners para entrada directa de valores
+    private JSpinner brightnessSpinner;
+    private JSpinner contrastSpinner;
+    private JSpinner saturationSpinner;
+    private JSpinner gammaSpinner;
+    private JSpinner sharpnessSpinner;
     
     // Controles de posición
     private JSpinner positionXSpinner;
@@ -84,21 +98,30 @@ public class IntegratedImageLayerPanel extends JPanel {
     
     // Callbacks
     private Runnable onLayersChangedCallback;
+    
+    // Sistema de debounce para optimizar rendimiento
+    private Timer debounceTimer;
+    private Timer backgroundDebounceTimer;
+    private boolean pendingLayerUpdate = false;
+    private boolean pendingBackgroundUpdate = false;
+    private static final int DEBOUNCE_DELAY_MS = 10; // Reducido a 10ms para máxima respuesta
     private boolean updatingControls = false;
     
     /**
      * Constructor del panel integrado
      */
-    public IntegratedImageLayerPanel(LayerManager layerManager, ImagePreparingView imagePreparingView, Model<BrickGraphicsState> model, mosaic.ui.BrickedView brickedView) {
+    public IntegratedImageLayerPanel(LayerManager layerManager, ImagePreparingView imagePreparingView, Model<BrickGraphicsState> model, mosaic.ui.BrickedView brickedView, mosaic.controllers.MainController mainController) {
         this.layerManager = layerManager;
         this.imagePreparingView = imagePreparingView;
         this.model = model;
         this.brickedView = brickedView;
+        this.mainController = mainController; // NUEVO: Guardar referencia al MainController
         
         initializeComponents();
         setupLayout();
         setupEventHandlers();
         setupKeyBindings();
+        setupZoomListener(); // NUEVO: Configurar listener para cambios de zoom
         updateUI();
     // construction complete
     }
@@ -126,6 +149,11 @@ public class IntegratedImageLayerPanel extends JPanel {
         cellRenderer = new LayerListCellRenderer();
         layerList.setCellRenderer(cellRenderer);
         
+        // Habilitar drag and drop para reordenar capas
+        layerList.setDragEnabled(true);
+        layerList.setDropMode(DropMode.INSERT);
+        layerList.setTransferHandler(new LayerTransferHandler());
+        
         // Hacer la lista más visible para debug
         layerList.setBorder(BorderFactory.createLineBorder(Color.BLUE, 2));
         layerList.setBackground(Color.WHITE);
@@ -133,6 +161,8 @@ public class IntegratedImageLayerPanel extends JPanel {
         // Botones de gestión de capas con texto más corto
         addLayerButton = new JButton("+");
         addLayerButton.setToolTipText("Añadir nueva capa desde una imagen (Ctrl+N)");
+        addPaintLayerButton = new JButton("🎨");  // NUEVO: Botón para capa de pintado
+        addPaintLayerButton.setToolTipText("Crear nueva capa de pintado vacía");
         removeLayerButton = new JButton("✕");
         removeLayerButton.setToolTipText("Eliminar capa seleccionada (Supr/Backspace)");
         duplicateButton = new JButton("⧉");
@@ -145,6 +175,7 @@ public class IntegratedImageLayerPanel extends JPanel {
         // Configurar tamaño uniforme para los botones
         Dimension buttonSize = new Dimension(32, 28);
         addLayerButton.setPreferredSize(buttonSize);
+        addPaintLayerButton.setPreferredSize(buttonSize);  // NUEVO
         removeLayerButton.setPreferredSize(buttonSize);
         duplicateButton.setPreferredSize(buttonSize);
         moveUpButton.setPreferredSize(buttonSize);
@@ -153,6 +184,7 @@ public class IntegratedImageLayerPanel extends JPanel {
         // Configurar font para mejor visibilidad
         Font buttonFont = new Font(Font.SANS_SERIF, Font.BOLD, 14);
         addLayerButton.setFont(buttonFont);
+        addPaintLayerButton.setFont(buttonFont);  // NUEVO
         removeLayerButton.setFont(buttonFont);
         duplicateButton.setFont(buttonFont);
         moveUpButton.setFont(buttonFont);
@@ -160,13 +192,6 @@ public class IntegratedImageLayerPanel extends JPanel {
         
         enableLayersCheckBox = new JCheckBox("Capas", true);
         enableLayersCheckBox.setToolTipText("Activar / Desactivar todas las capas");
-        
-        // NUEVOS: Controles de Paint Overlay mejorados
-        paintOverlayCheckBox = new JCheckBox("Pintura", false);
-        paintOverlayCheckBox.setToolTipText("Activar/desactivar pintura sobre el mosaico final");
-        clearPaintButton = new JButton("Limpiar");
-        clearPaintButton.setToolTipText("Borrar toda la pintura aplicada");
-        clearPaintButton.setPreferredSize(new Dimension(60, 28));
         
         // Información de capas
         layerInfoLabel = new JLabel("No hay capas");
@@ -178,22 +203,40 @@ public class IntegratedImageLayerPanel extends JPanel {
         visibilityCheckBox = new JCheckBox("Visible", true);
         blendModeCombo = new JComboBox<>(Layer.BlendMode.values());
         
-        // Controles de transformaciones de imagen
-        brightnessSlider = createImageSlider("Brillo", 0, 200, 100);
-        contrastSlider = createImageSlider("Contraste", 0, 200, 100);
-        saturationSlider = createImageSlider("Saturación", 0, 200, 100);
-        gammaSlider = createImageSlider("Gamma", 50, 200, 100);
-        sharpnessSlider = createImageSlider("Nitidez", 50, 150, 100);
-        scaleSlider = createImageSlider("Escala", 10, 300, 100); // 10% a 300%, defecto 100%
+        // Controles de transformaciones de imagen (rango -100 a 100, neutro en 0)
+        brightnessSlider = createImageSlider("Brillo", -100, 100, 0);
+        contrastSlider = createImageSlider("Contraste", -100, 100, 0);
+        saturationSlider = createImageSlider("Saturación", -100, 100, 0);
+        gammaSlider = createImageSlider("Gamma", 50, 200, 100); // 0.5 a 2.0 (x100), neutro en 100
+        sharpnessSlider = createImageSlider("Nitidez", -100, 100, 0);
+    // Permitir escalados hasta 300% (3x)
+    scaleSlider = createImageSlider("Escala", 1, 300, 100); // 1% a 300%, defecto 100%
         
         // Etiquetas para mostrar valores numéricos
         opacityLabel = new JLabel("100%");
-        brightnessLabel = new JLabel("100%");
-        contrastLabel = new JLabel("100%");
-        saturationLabel = new JLabel("100%");
+        brightnessLabel = new JLabel("0%");
+        contrastLabel = new JLabel("0%");
+        saturationLabel = new JLabel("0%");
         gammaLabel = new JLabel("1.00");
-        sharpnessLabel = new JLabel("100%");
-        scaleLabel = new JLabel("100%");
+        sharpnessLabel = new JLabel("0%");
+        scaleSpinner = new JSpinner(new SpinnerNumberModel(100, 1, 300, 5)); // Spinner para escala: 1%-300%, step 5%
+        scaleSpinner.setToolTipText("Escala de la capa (1%-300%, 5% por paso - usar Shift x10 o Ctrl x100)");
+        
+        // Spinners para los demás controles de transformación
+        brightnessSpinner = new JSpinner(new SpinnerNumberModel(0, -100, 100, 5)); // -100% a +100%, neutro en 0
+        brightnessSpinner.setToolTipText("Brillo de la capa (-100% a +100%, 5% por paso)");
+        
+        contrastSpinner = new JSpinner(new SpinnerNumberModel(0, -100, 100, 5)); // -100% a +100%, neutro en 0
+        contrastSpinner.setToolTipText("Contraste de la capa (-100% a +100%, 5% por paso)");
+        
+        saturationSpinner = new JSpinner(new SpinnerNumberModel(0, -100, 100, 5)); // -100% a +100%, neutro en 0
+        saturationSpinner.setToolTipText("Saturación de la capa (-100% a +100%, 5% por paso)");
+        
+        gammaSpinner = new JSpinner(new SpinnerNumberModel(1.0, 0.5, 2.0, 0.1)); // 0.5-2.0, neutro en 1.0
+        gammaSpinner.setToolTipText("Gamma de la capa (0.5-2.0, 0.1 por paso)");
+        
+        sharpnessSpinner = new JSpinner(new SpinnerNumberModel(0, -100, 100, 5)); // -100% a +100%, neutro en 0
+        sharpnessSpinner.setToolTipText("Nitidez de la capa (-100% a +100%, 5% por paso)");
         
         // Configurar ancho mínimo para las etiquetas para alineación
         int labelWidth = 50;
@@ -203,7 +246,14 @@ public class IntegratedImageLayerPanel extends JPanel {
         saturationLabel.setPreferredSize(new Dimension(labelWidth, saturationLabel.getPreferredSize().height));
         gammaLabel.setPreferredSize(new Dimension(labelWidth, gammaLabel.getPreferredSize().height));
         sharpnessLabel.setPreferredSize(new Dimension(labelWidth, sharpnessLabel.getPreferredSize().height));
-        scaleLabel.setPreferredSize(new Dimension(labelWidth, scaleLabel.getPreferredSize().height));
+        scaleSpinner.setPreferredSize(new Dimension(80, scaleSpinner.getPreferredSize().height)); // Spinner más ancho
+        
+        // Configurar ancho de los nuevos spinners
+        brightnessSpinner.setPreferredSize(new Dimension(80, brightnessSpinner.getPreferredSize().height));
+        contrastSpinner.setPreferredSize(new Dimension(80, contrastSpinner.getPreferredSize().height));
+        saturationSpinner.setPreferredSize(new Dimension(80, saturationSpinner.getPreferredSize().height));
+        gammaSpinner.setPreferredSize(new Dimension(80, gammaSpinner.getPreferredSize().height));
+        sharpnessSpinner.setPreferredSize(new Dimension(80, sharpnessSpinner.getPreferredSize().height));
         
         // Alinear texto a la derecha para mejor apariencia
         opacityLabel.setHorizontalAlignment(SwingConstants.RIGHT);
@@ -212,17 +262,19 @@ public class IntegratedImageLayerPanel extends JPanel {
         saturationLabel.setHorizontalAlignment(SwingConstants.RIGHT);
         gammaLabel.setHorizontalAlignment(SwingConstants.RIGHT);
         sharpnessLabel.setHorizontalAlignment(SwingConstants.RIGHT);
-        scaleLabel.setHorizontalAlignment(SwingConstants.RIGHT);
+        // scaleSpinner ya está configurado en su inicialización
         
         // Botón reset para ajustes
         resetAdjustmentsButton = new JButton("Reset Ajustes");
         resetAdjustmentsButton.setToolTipText("Restablecer todos los ajustes de capa a valores por defecto");
         
         // Spinners de posición
-        positionXSpinner = new JSpinner(new SpinnerNumberModel(0, -2000, 2000, 1));
-        positionYSpinner = new JSpinner(new SpinnerNumberModel(0, -2000, 2000, 1));
-        positionXSpinner.setToolTipText("Posición X de la capa");
-        positionYSpinner.setToolTipText("Posición Y de la capa");
+    // Ampliar rango de movimiento de las capas para permitir desplazamientos grandes
+    positionXSpinner = new JSpinner(new SpinnerNumberModel(0, -99999, 99999, 5)); // CAMBIADO: step de 1 a 5 píxeles
+        positionXSpinner = new JSpinner(new SpinnerNumberModel(0, -99999, 99999, 5)); // CAMBIADO: step de 1 a 5 píxeles
+        positionYSpinner = new JSpinner(new SpinnerNumberModel(0, -99999, 99999, 5)); // CAMBIADO: step de 1 a 5 píxeles
+        positionXSpinner.setToolTipText("Posición X de la capa (5 píxeles por paso - usar Shift x10 o Ctrl x100)");
+        positionYSpinner.setToolTipText("Posición Y de la capa (5 píxeles por paso - usar Shift x10 o Ctrl x100)");
     }
     
     /**
@@ -256,8 +308,6 @@ public class IntegratedImageLayerPanel extends JPanel {
     
     // Configurar todos los componentes como no focusables
     enableLayersCheckBox.setFocusable(false);
-    paintOverlayCheckBox.setFocusable(false);
-    clearPaintButton.setFocusable(false);
     addLayerButton.setFocusable(false);
     removeLayerButton.setFocusable(false);
     duplicateButton.setFocusable(false);
@@ -267,13 +317,11 @@ public class IntegratedImageLayerPanel extends JPanel {
     // Añadir componentes con espaciado adecuado
     mainBar.add(enableLayersCheckBox);
     mainBar.addSeparator(new Dimension(8, 0));
-    mainBar.add(paintOverlayCheckBox);
-    mainBar.add(Box.createHorizontalStrut(4));
-    mainBar.add(clearPaintButton);
-    mainBar.addSeparator(new Dimension(12, 0));
     
     // Grupo de botones de capa
     mainBar.add(addLayerButton);
+    mainBar.add(Box.createHorizontalStrut(2));
+    mainBar.add(addPaintLayerButton);  // Botón de capa de pintado
     mainBar.add(Box.createHorizontalStrut(2));
     mainBar.add(removeLayerButton);
     mainBar.add(Box.createHorizontalStrut(2));
@@ -402,60 +450,66 @@ public class IntegratedImageLayerPanel extends JPanel {
         JPanel panel = new JPanel();
         panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
         
-        // Crear sliders para ajustes específicos de imagen de fondo
+        // Crear controles para imagen de fondo con spinners
         JPanel slidersGrid = new JPanel(new GridBagLayout());
         GridBagConstraints gbc = new GridBagConstraints();
-        gbc.insets = new Insets(1, 2, 1, 2); // Espaciado compacto
+        gbc.insets = new Insets(1, 2, 1, 2);
         gbc.anchor = GridBagConstraints.WEST;
         
-        // Sliders para imagen de fondo usando los métodos de ImagePreparingView
+        // Crear spinners para controles de imagen de fondo (todos empiezan en valor neutro)
+        backgroundBrightnessSpinner = new JSpinner(new SpinnerNumberModel(0, -100, 100, 5)); // Neutro en 0
+        backgroundContrastSpinner = new JSpinner(new SpinnerNumberModel(0, -100, 100, 5)); // Neutro en 0  
+        backgroundSaturationSpinner = new JSpinner(new SpinnerNumberModel(0, -100, 100, 5)); // Neutro en 0
+        backgroundGammaSpinner = new JSpinner(new SpinnerNumberModel(1.0, 0.1, 3.0, 0.1)); // Neutro en 1.0
+        backgroundSharpnessSpinner = new JSpinner(new SpinnerNumberModel(0, -100, 100, 5)); // Neutro en 0
+        
+        // Configurar formato de los spinners
+        JSpinner.NumberEditor bgGammaEditor = new JSpinner.NumberEditor(backgroundGammaSpinner, "0.0");
+        backgroundGammaSpinner.setEditor(bgGammaEditor);
+        
+        // Sliders para imagen de fondo usando addImageTransformControl con spinners
         
         // Fila 0: Brillo de fondo
-        JSlider bgBrightness = new JSlider(0, 400, 100); // 0.0 a 4.0
-        JLabel bgBrightnessLabel = new JLabel("1.0");
-        addCompactImageControl(slidersGrid, "Brillo:", bgBrightness, bgBrightnessLabel, gbc, 0);
+        JSlider bgBrightness = new JSlider(-100, 100, 0);
+        addImageTransformControl(slidersGrid, "Brillo:", bgBrightness, backgroundBrightnessSpinner, gbc, 0);
         
         // Fila 1: Contraste de fondo  
-        JSlider bgContrast = new JSlider(-100, 400, 100); // -1.0 a 4.0
-        JLabel bgContrastLabel = new JLabel("1.0");
-        addCompactImageControl(slidersGrid, "Contraste:", bgContrast, bgContrastLabel, gbc, 1);
+        JSlider bgContrast = new JSlider(-100, 100, 0);
+        addImageTransformControl(slidersGrid, "Contraste:", bgContrast, backgroundContrastSpinner, gbc, 1);
         
         // Fila 2: Saturación de fondo
-        JSlider bgSaturation = new JSlider(0, 400, 100); // 0.0 a 4.0
-        JLabel bgSaturationLabel = new JLabel("1.0");
-        addCompactImageControl(slidersGrid, "Saturación:", bgSaturation, bgSaturationLabel, gbc, 2);
+        JSlider bgSaturation = new JSlider(-100, 100, 0);
+        addImageTransformControl(slidersGrid, "Saturación:", bgSaturation, backgroundSaturationSpinner, gbc, 2);
         
         // Fila 3: Gamma de fondo
-        JSlider bgGamma = new JSlider(5, 600, 100); // 0.05 a 6.0
-        JLabel bgGammaLabel = new JLabel("1.0");
-        addCompactImageControl(slidersGrid, "Gamma:", bgGamma, bgGammaLabel, gbc, 3);
+        JSlider bgGamma = new JSlider(10, 300, 100); // 0.1 a 3.0
+        addImageTransformControl(slidersGrid, "Gamma:", bgGamma, backgroundGammaSpinner, gbc, 3);
         
         // Fila 4: Nitidez de fondo
-        JSlider bgSharpness = new JSlider(50, 150, 100); // 0.5 a 1.5
-        JLabel bgSharpnessLabel = new JLabel("1.0");
-        addCompactImageControl(slidersGrid, "Nitidez:", bgSharpness, bgSharpnessLabel, gbc, 4);
+        JSlider bgSharpness = new JSlider(-100, 100, 0);
+        addImageTransformControl(slidersGrid, "Nitidez:", bgSharpness, backgroundSharpnessSpinner, gbc, 4);
         
         // Botón reset compacto
-        gbc.gridx = 0; gbc.gridy = 5; gbc.gridwidth = 3; 
+        gbc.gridx = 0; gbc.gridy = 5; gbc.gridwidth = 4; 
         gbc.fill = GridBagConstraints.HORIZONTAL; gbc.insets = new Insets(3, 2, 1, 2);
         JButton resetBgButton = new JButton("Reset Imagen de Fondo");
         resetBgButton.setPreferredSize(new Dimension(150, 22));
         slidersGrid.add(resetBgButton, gbc);
         
-    // Configurar listeners funcionales para imagen de fondo
-        setupBackgroundSliderListeners(bgBrightness, bgBrightnessLabel, 
-                                     bgContrast, bgContrastLabel,
-                                     bgSaturation, bgSaturationLabel,
-                                     bgGamma, bgGammaLabel,
-                                     bgSharpness, bgSharpnessLabel,
+        // Configurar listeners funcionales para imagen de fondo
+        setupBackgroundSliderListeners(bgBrightness, backgroundBrightnessSpinner, 
+                                     bgContrast, backgroundContrastSpinner,
+                                     bgSaturation, backgroundSaturationSpinner,
+                                     bgGamma, backgroundGammaSpinner,
+                                     bgSharpness, backgroundSharpnessSpinner,
                                      resetBgButton);
         
         // Sincronizar con valores actuales del modelo
-        syncBackgroundControlsWithModel(bgBrightness, bgBrightnessLabel, 
-                                      bgContrast, bgContrastLabel,
-                                      bgSaturation, bgSaturationLabel,
-                                      bgGamma, bgGammaLabel,
-                                      bgSharpness, bgSharpnessLabel);
+        syncBackgroundControlsWithModel(bgBrightness, backgroundBrightnessSpinner, 
+                                      bgContrast, backgroundContrastSpinner,
+                                      bgSaturation, backgroundSaturationSpinner,
+                                      bgGamma, backgroundGammaSpinner,
+                                      bgSharpness, backgroundSharpnessSpinner);
         
         panel.add(slidersGrid);
         return panel;
@@ -464,11 +518,11 @@ public class IntegratedImageLayerPanel extends JPanel {
     /**
      * Sincroniza los controles con los valores actuales del modelo
      */
-    private void syncBackgroundControlsWithModel(JSlider brightness, JLabel brightnessLabel,
-                                                JSlider contrast, JLabel contrastLabel,
-                                                JSlider saturation, JLabel saturationLabel,
-                                                JSlider gamma, JLabel gammaLabel,
-                                                JSlider sharpness, JLabel sharpnessLabel) {
+    private void syncBackgroundControlsWithModel(JSlider brightness, JSpinner brightnessSpinner,
+                                                JSlider contrast, JSpinner contrastSpinner,
+                                                JSlider saturation, JSpinner saturationSpinner,
+                                                JSlider gamma, JSpinner gammaSpinner,
+                                                JSlider sharpness, JSpinner sharpnessSpinner) {
         if (model == null) return;
         
         updatingControls = true;
@@ -477,36 +531,40 @@ public class IntegratedImageLayerPanel extends JPanel {
         Object brightnessObj = model.get(BrickGraphicsState.PrepareBrightness);
         if (brightnessObj instanceof Float) {
             Float brightnessValue = (Float) brightnessObj;
-            brightness.setValue((int)(brightnessValue * 100));
-            brightnessLabel.setText(String.format("%.2f", brightnessValue));
+            int sliderValue = (int)((brightnessValue - 1.0f) * 100); // Convertir de rango 0.0-4.0 a -100-100
+            brightness.setValue(sliderValue);
+            brightnessSpinner.setValue(sliderValue);
         }
         
         Object contrastObj = model.get(BrickGraphicsState.PrepareContrast);
         if (contrastObj instanceof Float) {
             Float contrastValue = (Float) contrastObj;
-            contrast.setValue((int)(contrastValue * 100));
-            contrastLabel.setText(String.format("%.2f", contrastValue));
+            int sliderValue = (int)((contrastValue - 1.0f) * 100);
+            contrast.setValue(sliderValue);
+            contrastSpinner.setValue(sliderValue);
         }
         
         Object saturationObj = model.get(BrickGraphicsState.PrepareSaturation);
         if (saturationObj instanceof Float) {
             Float saturationValue = (Float) saturationObj;
-            saturation.setValue((int)(saturationValue * 100));
-            saturationLabel.setText(String.format("%.2f", saturationValue));
+            int sliderValue = (int)((saturationValue - 1.0f) * 100);
+            saturation.setValue(sliderValue);
+            saturationSpinner.setValue(sliderValue);
         }
         
         Object gammaObj = model.get(BrickGraphicsState.PrepareGamma);
         if (gammaObj instanceof Float) {
             Float gammaValue = (Float) gammaObj;
             gamma.setValue((int)(gammaValue * 100));
-            gammaLabel.setText(String.format("%.2f", gammaValue));
+            gammaSpinner.setValue(gammaValue);
         }
         
         Object sharpnessObj = model.get(BrickGraphicsState.PrepareSharpness);
         if (sharpnessObj instanceof Float) {
             Float sharpnessValue = (Float) sharpnessObj;
-            sharpness.setValue((int)(sharpnessValue * 100));
-            sharpnessLabel.setText(String.format("%.2f", sharpnessValue));
+            int sliderValue = (int)((sharpnessValue - 1.0f) * 100);
+            sharpness.setValue(sliderValue);
+            sharpnessSpinner.setValue(sliderValue);
         }
         
         updatingControls = false;
@@ -515,72 +573,161 @@ public class IntegratedImageLayerPanel extends JPanel {
     /**
      * Configura los listeners funcionales para modificar solo la imagen de fondo
      */
-    private void setupBackgroundSliderListeners(JSlider brightness, JLabel brightnessLabel,
-                                               JSlider contrast, JLabel contrastLabel,
-                                               JSlider saturation, JLabel saturationLabel,
-                                               JSlider gamma, JLabel gammaLabel,
-                                               JSlider sharpness, JLabel sharpnessLabel,
+    private void setupBackgroundSliderListeners(JSlider brightness, JSpinner brightnessSpinner,
+                                               JSlider contrast, JSpinner contrastSpinner,
+                                               JSlider saturation, JSpinner saturationSpinner,
+                                               JSlider gamma, JSpinner gammaSpinner,
+                                               JSlider sharpness, JSpinner sharpnessSpinner,
                                                JButton resetButton) {
         
-        // Brightness listener - modifica SOLO la imagen de fondo
+        // Brightness listeners - bidireccional entre slider y spinner (con debounce)
         brightness.addChangeListener(e -> {
             if (updatingControls) return;
-            io.Log.log("DEBUG: Listener - brightness.getValue() = " + brightness.getValue());
-            backgroundBrightness = brightness.getValue() / 100.0f;
-            io.Log.log("DEBUG: Listener - backgroundBrightness ANTES = " + backgroundBrightness);
-            brightnessLabel.setText(String.format("%.2f", backgroundBrightness));
-            io.Log.log("DEBUG: Listener - backgroundBrightness DESPUÉS = " + backgroundBrightness);
-            io.Log.log("DEBUG: Slider de fondo - Brillo cambiado a: " + backgroundBrightness);
-            notifyLayersChanged(); // Aplicar transformación a imagen de fondo
+            int value = brightness.getValue();
+            backgroundBrightness = 1.0f + (value / 100.0f);
+            updatingControls = true;
+            brightnessSpinner.setValue(value);
+            updatingControls = false;
+            
+            // Usar debounce para mejor rendimiento
+            pendingBackgroundUpdate = true;
+            backgroundDebounceTimer.restart();
         });
         
-        // Contrast listener - modifica SOLO la imagen de fondo
+        brightnessSpinner.addChangeListener(e -> {
+            if (updatingControls) return;
+            int value = (Integer) brightnessSpinner.getValue();
+            backgroundBrightness = 1.0f + (value / 100.0f);
+            updatingControls = true;
+            brightness.setValue(value);
+            updatingControls = false;
+            
+            // Usar debounce para mejor rendimiento
+            pendingBackgroundUpdate = true;
+            backgroundDebounceTimer.restart();
+        });
+        
+        // Contrast listeners - bidireccional entre slider y spinner (con debounce)
         contrast.addChangeListener(e -> {
             if (updatingControls) return;
-            backgroundContrast = contrast.getValue() / 100.0f;
-            contrastLabel.setText(String.format("%.2f", backgroundContrast));
-            io.Log.log("DEBUG: Slider de fondo - Contraste cambiado a: " + backgroundContrast);
-            notifyLayersChanged(); // Aplicar transformación a imagen de fondo
+            int value = contrast.getValue();
+            backgroundContrast = 1.0f + (value / 100.0f);
+            updatingControls = true;
+            contrastSpinner.setValue(value);
+            updatingControls = false;
+            
+            // Usar debounce para mejor rendimiento
+            pendingBackgroundUpdate = true;
+            backgroundDebounceTimer.restart();
         });
         
-        // Saturation listener - modifica SOLO la imagen de fondo
+        contrastSpinner.addChangeListener(e -> {
+            if (updatingControls) return;
+            int value = (Integer) contrastSpinner.getValue();
+            backgroundContrast = 1.0f + (value / 100.0f);
+            updatingControls = true;
+            contrast.setValue(value);
+            updatingControls = false;
+            
+            // Usar debounce para mejor rendimiento
+            pendingBackgroundUpdate = true;
+            backgroundDebounceTimer.restart();
+        });
+        
+        // Saturation listeners - bidireccional entre slider y spinner (con debounce)
         saturation.addChangeListener(e -> {
             if (updatingControls) return;
-            backgroundSaturation = saturation.getValue() / 100.0f;
-            saturationLabel.setText(String.format("%.2f", backgroundSaturation));
-            io.Log.log("DEBUG: Slider de fondo - Saturación cambiada a: " + backgroundSaturation);
-            notifyLayersChanged(); // Aplicar transformación a imagen de fondo
+            int value = saturation.getValue();
+            backgroundSaturation = 1.0f + (value / 100.0f);
+            updatingControls = true;
+            saturationSpinner.setValue(value);
+            updatingControls = false;
+            
+            // Usar debounce para mejor rendimiento
+            pendingBackgroundUpdate = true;
+            backgroundDebounceTimer.restart();
         });
         
-        // Gamma listener - modifica SOLO la imagen de fondo
+        saturationSpinner.addChangeListener(e -> {
+            if (updatingControls) return;
+            int value = (Integer) saturationSpinner.getValue();
+            backgroundSaturation = 1.0f + (value / 100.0f);
+            updatingControls = true;
+            saturation.setValue(value);
+            updatingControls = false;
+            
+            // Usar debounce para mejor rendimiento
+            pendingBackgroundUpdate = true;
+            backgroundDebounceTimer.restart();
+        });
+        
+        // Gamma listeners - bidireccional entre slider y spinner (con debounce)
         gamma.addChangeListener(e -> {
             if (updatingControls) return;
-            backgroundGamma = gamma.getValue() / 100.0f;
-            gammaLabel.setText(String.format("%.2f", backgroundGamma));
-            notifyLayersChanged(); // Aplicar transformación a imagen de fondo
+            float value = gamma.getValue() / 100.0f;
+            backgroundGamma = value;
+            updatingControls = true;
+            gammaSpinner.setValue((double)value);
+            updatingControls = false;
+            
+            // Usar debounce para mejor rendimiento
+            pendingBackgroundUpdate = true;
+            backgroundDebounceTimer.restart();
         });
         
-        // Sharpness listener - modifica SOLO la imagen de fondo
+        gammaSpinner.addChangeListener(e -> {
+            if (updatingControls) return;
+            double value = (Double) gammaSpinner.getValue();
+            backgroundGamma = (float) value;
+            updatingControls = true;
+            gamma.setValue((int)(value * 100));
+            updatingControls = false;
+            
+            // Usar debounce para mejor rendimiento
+            pendingBackgroundUpdate = true;
+            backgroundDebounceTimer.restart();
+        });
+        
+        // Sharpness listeners - bidireccional entre slider y spinner (con debounce)
         sharpness.addChangeListener(e -> {
             if (updatingControls) return;
-            backgroundSharpness = sharpness.getValue() / 100.0f;
-            sharpnessLabel.setText(String.format("%.2f", backgroundSharpness));
-            notifyLayersChanged(); // Aplicar transformación a imagen de fondo
+            int value = sharpness.getValue();
+            backgroundSharpness = 1.0f + (value / 100.0f);
+            updatingControls = true;
+            sharpnessSpinner.setValue(value);
+            updatingControls = false;
+            
+            // Usar debounce para mejor rendimiento
+            pendingBackgroundUpdate = true;
+            backgroundDebounceTimer.restart();
+        });
+        
+        sharpnessSpinner.addChangeListener(e -> {
+            if (updatingControls) return;
+            int value = (Integer) sharpnessSpinner.getValue();
+            backgroundSharpness = 1.0f + (value / 100.0f);
+            updatingControls = true;
+            sharpness.setValue(value);
+            updatingControls = false;
+            
+            // Usar debounce para mejor rendimiento
+            pendingBackgroundUpdate = true;
+            backgroundDebounceTimer.restart();
         });
         
         // Reset button - resetea SOLO la imagen de fondo
         resetButton.addActionListener(e -> {
             updatingControls = true;
-            brightness.setValue(100);
-            contrast.setValue(100);
-            saturation.setValue(100);
+            brightness.setValue(0);
+            contrast.setValue(0);
+            saturation.setValue(0);
             gamma.setValue(100);
-            sharpness.setValue(100);
-            brightnessLabel.setText("1.0");
-            contrastLabel.setText("1.0");
-            saturationLabel.setText("1.0");
-            gammaLabel.setText("1.0");
-            sharpnessLabel.setText("1.0");
+            sharpness.setValue(0);
+            brightnessSpinner.setValue(0);
+            contrastSpinner.setValue(0);
+            saturationSpinner.setValue(0);
+            gammaSpinner.setValue(1.0);
+            sharpnessSpinner.setValue(0);
             updatingControls = false;
             
             // Reset valores de imagen de fondo
@@ -589,7 +736,8 @@ public class IntegratedImageLayerPanel extends JPanel {
             backgroundSaturation = 1.0f;
             backgroundGamma = 1.0f;
             backgroundSharpness = 1.0f;
-            notifyLayersChanged(); // Aplicar reset a imagen de fondo
+            
+            notifyLayersChanged();
         });
     }
     
@@ -660,12 +808,12 @@ public class IntegratedImageLayerPanel extends JPanel {
         
         // Añadir controles de transformación
         addImageTransformControl(imageTransformsPanel, "Opacidad:", opacitySlider, opacityLabel, igbc, 0);
-        addImageTransformControl(imageTransformsPanel, "Brillo:", brightnessSlider, brightnessLabel, igbc, 1);
-        addImageTransformControl(imageTransformsPanel, "Contraste:", contrastSlider, contrastLabel, igbc, 2);
-        addImageTransformControl(imageTransformsPanel, "Saturación:", saturationSlider, saturationLabel, igbc, 3);
-        addImageTransformControl(imageTransformsPanel, "Gamma:", gammaSlider, gammaLabel, igbc, 4);
-        addImageTransformControl(imageTransformsPanel, "Nitidez:", sharpnessSlider, sharpnessLabel, igbc, 5);
-        addImageTransformControl(imageTransformsPanel, "Escala:", scaleSlider, scaleLabel, igbc, 6);
+        addImageTransformControl(imageTransformsPanel, "Brillo:", brightnessSlider, brightnessSpinner, igbc, 1); // CAMBIADO: brightnessLabel -> brightnessSpinner
+        addImageTransformControl(imageTransformsPanel, "Contraste:", contrastSlider, contrastSpinner, igbc, 2); // CAMBIADO: contrastLabel -> contrastSpinner
+        addImageTransformControl(imageTransformsPanel, "Saturación:", saturationSlider, saturationSpinner, igbc, 3); // CAMBIADO: saturationLabel -> saturationSpinner
+        addImageTransformControl(imageTransformsPanel, "Gamma:", gammaSlider, gammaSpinner, igbc, 4); // CAMBIADO: gammaLabel -> gammaSpinner
+        addImageTransformControl(imageTransformsPanel, "Nitidez:", sharpnessSlider, sharpnessSpinner, igbc, 5); // CAMBIADO: sharpnessLabel -> sharpnessSpinner
+        addImageTransformControl(imageTransformsPanel, "Escala:", scaleSlider, scaleSpinner, igbc, 6); // CAMBIADO: scaleField -> scaleSpinner
         
         // Fila para botón reset
         igbc.gridx = 0; igbc.gridy = 7; igbc.gridwidth = 2; igbc.fill = GridBagConstraints.HORIZONTAL;
@@ -680,13 +828,13 @@ public class IntegratedImageLayerPanel extends JPanel {
     /**
      * Añade un control de transformación de imagen al panel
      */
-    private void addImageTransformControl(JPanel panel, String label, JSlider slider, JLabel valueLabel, GridBagConstraints gbc, int row) {
+    private void addImageTransformControl(JPanel panel, String label, JSlider slider, Component valueComponent, GridBagConstraints gbc, int row) {
         gbc.gridx = 0; gbc.gridy = row; gbc.fill = GridBagConstraints.NONE; gbc.weightx = 0.0;
         panel.add(new JLabel(label), gbc);
         gbc.gridx = 1; gbc.fill = GridBagConstraints.HORIZONTAL; gbc.weightx = 1.0;
         panel.add(slider, gbc);
         gbc.gridx = 2; gbc.fill = GridBagConstraints.NONE; gbc.weightx = 0.0;
-        panel.add(valueLabel, gbc);
+        panel.add(valueComponent, gbc); // CAMBIADO: de valueLabel a valueComponent para soportar JTextField
     }
     
     /**
@@ -706,6 +854,7 @@ public class IntegratedImageLayerPanel extends JPanel {
         
         // Botones
         addLayerButton.addActionListener(e -> addLayer());
+        addPaintLayerButton.addActionListener(e -> addPaintLayer());  // NUEVO
         removeLayerButton.addActionListener(e -> removeSelectedLayer());
         duplicateButton.addActionListener(e -> duplicateSelectedLayer());
         
@@ -713,11 +862,18 @@ public class IntegratedImageLayerPanel extends JPanel {
         moveUpButton.addActionListener(e -> {
             Layer selectedLayer = layerList.getSelectedValue();
             if (selectedLayer != null) {
-                int oldIndex = layerManager.getLayers().indexOf(selectedLayer);
                 if (layerManager.moveLayerUp(selectedLayer)) {
                     updateUI();
-                    layerList.setSelectedIndex(oldIndex - 1);
+                    // Lista invertida: subir en renderizado = subir en lista visual (menor índice visual)
+                    int newVisualIndex = getVisualIndexForLayer(selectedLayer);
+                    if (newVisualIndex >= 0) {
+                        layerList.setSelectedIndex(newVisualIndex);
+                    }
                     notifyLayersChanged();
+                    // Forzar repintado de la vista principal
+                    if (getParent() != null) {
+                        getParent().repaint();
+                    }
                     // Persist only external artifacts (layers.json + overlays) after move
                     try {
                         layerManager.autosaveArtifacts();
@@ -733,11 +889,18 @@ public class IntegratedImageLayerPanel extends JPanel {
         moveDownButton.addActionListener(e -> {
             Layer selectedLayer = layerList.getSelectedValue();
             if (selectedLayer != null) {
-                int oldIndex = layerManager.getLayers().indexOf(selectedLayer);
                 if (layerManager.moveLayerDown(selectedLayer)) {
                     updateUI();
-                    layerList.setSelectedIndex(oldIndex + 1);
+                    // Lista invertida: bajar en renderizado = bajar en lista visual (mayor índice visual)
+                    int newVisualIndex = getVisualIndexForLayer(selectedLayer);
+                    if (newVisualIndex >= 0) {
+                        layerList.setSelectedIndex(newVisualIndex);
+                    }
                     notifyLayersChanged();
+                    // Forzar repintado de la vista principal
+                    if (getParent() != null) {
+                        getParent().repaint();
+                    }
                     // Persist only external artifacts (layers.json + overlays) after move
                     try {
                         layerManager.autosaveArtifacts();
@@ -755,21 +918,6 @@ public class IntegratedImageLayerPanel extends JPanel {
             notifyLayersChanged();
         });
         
-        // NUEVOS: Controles de Paint Overlay
-        paintOverlayCheckBox.addActionListener(e -> {
-            if (brickedView != null) {
-                brickedView.setPaintOverlayEnabled(paintOverlayCheckBox.isSelected());
-                brickedView.repaint();
-            }
-        });
-        
-        clearPaintButton.addActionListener(e -> {
-            if (brickedView != null) {
-                brickedView.clearPaintOverlay();
-                brickedView.repaint();
-            }
-        });
-        
         // Controles de capa
         opacitySlider.addChangeListener(e -> updateLayerOpacity());
         visibilityCheckBox.addActionListener(e -> updateLayerVisibility());
@@ -783,14 +931,110 @@ public class IntegratedImageLayerPanel extends JPanel {
         addWheelListenerToSpinner(positionXSpinner);
         addWheelListenerToSpinner(positionYSpinner);
         
-        // Controles de transformaciones de imagen
-        ChangeListener imageTransformListener = e -> updateLayerImageTransforms();
+        // Inicializar timers de debounce para optimizar rendimiento
+        debounceTimer = new Timer(DEBOUNCE_DELAY_MS, e -> {
+            if (pendingLayerUpdate) {
+                updateLayerImageTransforms();
+                pendingLayerUpdate = false;
+            }
+        });
+        debounceTimer.setRepeats(false);
+        
+        backgroundDebounceTimer = new Timer(DEBOUNCE_DELAY_MS, e -> {
+            if (pendingBackgroundUpdate) {
+                notifyLayersChanged();
+                pendingBackgroundUpdate = false;
+            }
+        });
+        backgroundDebounceTimer.setRepeats(false);
+        
+        // Controles de transformaciones de imagen (con debounce para mejor rendimiento)
+        ChangeListener imageTransformListener = e -> {
+            pendingLayerUpdate = true;
+            debounceTimer.restart();
+        };
         brightnessSlider.addChangeListener(imageTransformListener);
         contrastSlider.addChangeListener(imageTransformListener);
         saturationSlider.addChangeListener(imageTransformListener);
         gammaSlider.addChangeListener(imageTransformListener);
         sharpnessSlider.addChangeListener(imageTransformListener);
         scaleSlider.addChangeListener(imageTransformListener);
+        
+        // Listener para entrada directa en spinner de escala
+        scaleSpinner.addChangeListener(e -> {
+            if (updatingControls) return;
+            int value = ((Integer) scaleSpinner.getValue()).intValue();
+            value = Math.max(1, Math.min(300, value)); // Limitar entre 1% y 300%
+            scaleSlider.setValue(value);
+        });
+        
+        // Listeners para entrada directa en los demás spinners (nuevos rangos -100..100)
+        brightnessSpinner.addChangeListener(e -> {
+            if (updatingControls) return;
+            int value = ((Integer) brightnessSpinner.getValue()).intValue();
+            value = Math.max(-100, Math.min(100, value)); // Limitar entre -100% y 100%
+            brightnessSlider.setValue(value);
+        });
+        
+        contrastSpinner.addChangeListener(e -> {
+            if (updatingControls) return;
+            int value = ((Integer) contrastSpinner.getValue()).intValue();
+            value = Math.max(-100, Math.min(100, value)); // Limitar entre -100% y 100%
+            contrastSlider.setValue(value);
+        });
+        
+        saturationSpinner.addChangeListener(e -> {
+            if (updatingControls) return;
+            int value = ((Integer) saturationSpinner.getValue()).intValue();
+            value = Math.max(-100, Math.min(100, value)); // Limitar entre -100% y 100%
+            saturationSlider.setValue(value);
+        });
+        
+        gammaSpinner.addChangeListener(e -> {
+            if (updatingControls) return;
+            double value = ((Double) gammaSpinner.getValue()).doubleValue();
+            value = Math.max(0.5, Math.min(2.0, value)); // Limitar entre 0.5 y 2.0
+            // Convertir a valor de slider (50-200)
+            int sliderValue = (int)(value * 100);
+            gammaSlider.setValue(sliderValue);
+        });
+        
+        sharpnessSpinner.addChangeListener(e -> {
+            if (updatingControls) return;
+            int value = ((Integer) sharpnessSpinner.getValue()).intValue();
+            value = Math.max(-100, Math.min(100, value)); // Limitar entre -100% y 100%
+            sharpnessSlider.setValue(value);
+        });
+        
+        // Añadir listener de rueda de ratón para el spinner de escala
+        scaleSpinner.addMouseWheelListener(e -> {
+            if (!scaleSpinner.isEnabled()) return;
+            
+            // Obtener el modelo del spinner
+            SpinnerNumberModel model = (SpinnerNumberModel) scaleSpinner.getModel();
+            int currentValue = (Integer) model.getValue();
+            int stepSize = model.getStepSize().intValue();
+            
+            // Calcular nuevo valor basado en la dirección de la rueda
+            int multiplier = 1;
+            if (e.isShiftDown()) multiplier = 10; // mover más rápido con Shift
+            if (e.isControlDown()) multiplier = 100; // muy rápido con Ctrl
+            int delta = e.getWheelRotation() * stepSize * -1 * multiplier; // Invertir para que sea más intuitivo
+            int newValue = currentValue + delta;
+            
+            // Verificar que esté dentro de los límites
+            Integer min = (Integer) model.getMinimum();
+            Integer max = (Integer) model.getMaximum();
+            
+            if (min != null && newValue < min) {
+                newValue = min;
+            }
+            if (max != null && newValue > max) {
+                newValue = max;
+            }
+            
+            model.setValue(newValue);
+        });
         
         // Botón reset
         resetAdjustmentsButton.addActionListener(e -> resetLayerAdjustments());
@@ -871,11 +1115,66 @@ public class IntegratedImageLayerPanel extends JPanel {
     }
     
     /**
+     * NUEVO: Configura listener para actualizar spinners cuando cambie el zoom
+     */
+    private void setupZoomListener() {
+        try {
+            if (brickedView != null && brickedView.getMosaicZoomController() != null) {
+                // Añadir listener para cambios de zoom
+                brickedView.getMosaicZoomController().addZoomListener(new mosaic.controllers.MosaicZoomController.MosaicZoomListener() {
+                    @Override
+                    public void zoomChanged(double zoomFactor, int zoomIndex) {
+                        // Actualizar los spinners de posición para reflejar el nuevo zoom
+                        SwingUtilities.invokeLater(() -> {
+                            if (!updatingControls) {
+                                updateLayerControls(); // Recalcular posiciones en pantalla
+                            }
+                        });
+                    }
+                });
+            }
+        } catch (Exception ex) {
+            io.Log.log("WARN: Error configurando listener de zoom: " + ex.getMessage());
+        }
+    }
+    
+    /**
      * Añade una nueva capa desde un archivo
      */
     private void addLayer() {
     io.Log.log("DEBUG: IntegratedImageLayerPanel - Iniciando addLayer()");
         JFileChooser fileChooser = new JFileChooser();
+        
+        // MEJORADO: Establecer directorio inicial basado en capas existentes o imagen principal
+        File initialDirectory = null;
+        
+        // 1. Intentar usar el directorio de las capas ya cargadas
+        if (layerManager.getLayers().size() > 0) {
+            Layer firstLayer = layerManager.getLayers().get(0);
+            if (firstLayer.getImageFilePath() != null) {
+                File layerFile = new File(firstLayer.getImageFilePath());
+                File layerDir = layerFile.getParentFile();
+                if (layerDir != null && layerDir.exists()) {
+                    initialDirectory = layerDir;
+                    io.Log.log("DEBUG: IntegratedImageLayerPanel - Directorio inicial establecido desde capas: " + layerDir.getAbsolutePath());
+                }
+            }
+        }
+        
+        // 2. Si no hay capas, usar el directorio de la imagen principal
+        if (initialDirectory == null) {
+            File mainImageDir = mainController.getMainImageDirectory();
+            if (mainImageDir != null && mainImageDir.exists()) {
+                initialDirectory = mainImageDir;
+                io.Log.log("DEBUG: IntegratedImageLayerPanel - Directorio inicial establecido desde imagen principal: " + mainImageDir.getAbsolutePath());
+            }
+        }
+        
+        // Aplicar el directorio inicial encontrado
+        if (initialDirectory != null) {
+            fileChooser.setCurrentDirectory(initialDirectory);
+        }
+        
         fileChooser.setFileFilter(new javax.swing.filechooser.FileNameExtensionFilter(
             "Imágenes (PNG, JPG, GIF)", "png", "jpg", "jpeg", "gif"));
         
@@ -898,6 +1197,49 @@ public class IntegratedImageLayerPanel extends JPanel {
                 io.Log.log("DEBUG: IntegratedImageLayerPanel - Error: " + ex.getMessage());
                 JOptionPane.showMessageDialog(this, 
                     "Error al cargar la imagen: " + ex.getMessage(), 
+                    "Error", JOptionPane.ERROR_MESSAGE);
+            }
+        }
+    }
+    
+    /**
+     * NUEVO: Crea una capa de pintado vacía para pintar píxeles directamente
+     */
+    private void addPaintLayer() {
+        io.Log.log("DEBUG: IntegratedImageLayerPanel - Iniciando addPaintLayer()");
+        
+        // Solicitar nombre para la capa de pintado
+        String layerName = JOptionPane.showInputDialog(this,
+            "Nombre para la nueva capa de pintado:",
+            "Nueva Capa de Pintado",
+            JOptionPane.QUESTION_MESSAGE);
+        
+        if (layerName != null && !layerName.trim().isEmpty()) {
+            try {
+                // Crear una capa de pintado especial sin imagen base
+                Layer paintLayer = layerManager.createPaintLayer(layerName.trim(), new Point(0, 0));
+                io.Log.log("DEBUG: IntegratedImageLayerPanel - Capa de pintado creada: " + paintLayer.getName());
+                
+                layerManager.setSelectedLayer(paintLayer);
+                io.Log.log("DEBUG: IntegratedImageLayerPanel - Capa de pintado seleccionada");
+                
+                updateUI();
+                io.Log.log("DEBUG: IntegratedImageLayerPanel - UI actualizada");
+                
+                notifyLayersChanged();
+                io.Log.log("DEBUG: IntegratedImageLayerPanel - Notificación enviada");
+                
+                // Opcional: Mostrar mensaje informativo
+                JOptionPane.showMessageDialog(this,
+                    "Capa de pintado '" + layerName + "' creada.\n" +
+                    "Selecciona la herramienta de pincel y pinta directamente sobre el mosaico.",
+                    "Capa Creada",
+                    JOptionPane.INFORMATION_MESSAGE);
+                    
+            } catch (Exception ex) {
+                io.Log.log("DEBUG: IntegratedImageLayerPanel - Error creando capa de pintado: " + ex.getMessage());
+                JOptionPane.showMessageDialog(this,
+                    "Error al crear la capa de pintado: " + ex.getMessage(),
                     "Error", JOptionPane.ERROR_MESSAGE);
             }
         }
@@ -971,17 +1313,95 @@ public class IntegratedImageLayerPanel extends JPanel {
     
     /**
      * Actualiza la posición de la capa seleccionada
+     * NUEVO: Convierte desde coordenadas de pantalla a coordenadas de mosaico
      */
     private void updateLayerPosition() {
         if (updatingControls) return;
         
         Layer selected = layerManager.getSelectedLayer();
         if (selected != null) {
-            int x = (Integer) positionXSpinner.getValue();
-            int y = (Integer) positionYSpinner.getValue();
-            selected.setPosition(new Point(x, y));
+            io.Log.log("DEBUG: updateLayerPosition - INICIADO para capa: " + selected.getName());
+            
+            // PRESERVAR MODIFICACIONES DEL USUARIO ANTES DEL MOVIMIENTO
+            java.util.List<mosaic.controllers.ModificationManager.Modification> baseModifications = null;
+            if (layerManager.getModificationManager() != null) {
+                baseModifications = layerManager.getModificationManager().getAllModifications();
+                io.Log.log("DEBUG: updateLayerPosition - preserving " + baseModifications.size() + " base grid modifications");
+            }
+            
+            // Obtener valores de spinner (coordenadas de pantalla)
+            int screenX = (Integer) positionXSpinner.getValue();
+            int screenY = (Integer) positionYSpinner.getValue();
+            
+            // Convertir a coordenadas de mosaico usando el zoom actual
+            Point mosaicPosition = screenToMosaicCoordinates(screenX, screenY);
+            
+            selected.setPosition(mosaicPosition);
+            
+            // RESTAURAR MODIFICACIONES DESPUÉS DEL CAMBIO
+            if (baseModifications != null && layerManager.getModificationManager() != null) {
+                colors.LEGOColorGrid colorGrid = layerManager.getColorGrid();
+                if (colorGrid != null) {
+                    // Camino directo: aplicar modificaciones directamente al ColorGrid
+                    layerManager.getModificationManager().restoreModificationsFromCopyAndApply(baseModifications, colorGrid);
+                    io.Log.log("DEBUG: updateLayerPosition - restored and applied " + baseModifications.size() + " base grid modifications (directo)");
+                    
+                    // Forzar actualización visual inmediata
+                    if (brickedView != null) {
+                        javax.swing.SwingUtilities.invokeLater(() -> {
+                            brickedView.repaint();
+                            io.Log.log("DEBUG: updateLayerPosition - Forzado repaint() del BrickedView (camino directo)");
+                        });
+                    }
+                } else {
+                    // Camino fallback: usar el método saveAndReloadMosaicModifications del LayerManager
+                    io.Log.log("DEBUG: updateLayerPosition - ColorGrid null, usando camino fallback");
+                    layerManager.saveAndReloadMosaicModifications();
+                }
+            }
+            
             notifyLayersChanged();
         }
+    }
+    
+    /**
+     * Convierte coordenadas de pantalla a coordenadas de mosaico considerando el zoom
+     */
+    private Point screenToMosaicCoordinates(int screenX, int screenY) {
+        try {
+            if (brickedView != null && brickedView.getMosaicZoomController() != null) {
+                double zoomFactor = brickedView.getMosaicZoomController().getCurrentZoomFactor();
+                // Para convertir de pantalla a mosaico: dividir por zoom
+                int mosaicX = (int) Math.round(screenX / zoomFactor);
+                int mosaicY = (int) Math.round(screenY / zoomFactor);
+                return new Point(mosaicX, mosaicY);
+            }
+        } catch (Exception ex) {
+            io.Log.log("WARN: Error convirtiendo coordenadas de pantalla: " + ex.getMessage());
+        }
+        
+        // Fallback: asumir zoom 1.0 (sin conversión)
+        return new Point(screenX, screenY);
+    }
+    
+    /**
+     * Convierte coordenadas de mosaico a coordenadas de pantalla considerando el zoom
+     */
+    private Point mosaicToScreenCoordinates(int mosaicX, int mosaicY) {
+        try {
+            if (brickedView != null && brickedView.getMosaicZoomController() != null) {
+                double zoomFactor = brickedView.getMosaicZoomController().getCurrentZoomFactor();
+                // Para convertir de mosaico a pantalla: multiplicar por zoom
+                int screenX = (int) Math.round(mosaicX * zoomFactor);
+                int screenY = (int) Math.round(mosaicY * zoomFactor);
+                return new Point(screenX, screenY);
+            }
+        } catch (Exception ex) {
+            io.Log.log("WARN: Error convirtiendo coordenadas de mosaico: " + ex.getMessage());
+        }
+        
+        // Fallback: asumir zoom 1.0 (sin conversión)
+        return new Point(mosaicX, mosaicY);
     }
     
     /**
@@ -992,33 +1412,45 @@ public class IntegratedImageLayerPanel extends JPanel {
         
         Layer selected = layerManager.getSelectedLayer();
         if (selected != null) {
-            // Convertir valores de slider (0-200) a factores (0.0-2.0)
-            float brightness = brightnessSlider.getValue() / 100.0f;
-            float contrast = contrastSlider.getValue() / 100.0f;
-            float saturation = saturationSlider.getValue() / 100.0f;
-            float gamma = gammaSlider.getValue() / 100.0f;
-            float sharpness = sharpnessSlider.getValue() / 100.0f;
+            // Convertir valores de slider (-100 a 100) a factores apropiados
+            float brightness = (brightnessSlider.getValue() + 100) / 100.0f; // -100..100 -> 0.0..2.0
+            float contrast = (contrastSlider.getValue() + 100) / 100.0f; // -100..100 -> 0.0..2.0
+            float saturation = (saturationSlider.getValue() + 100) / 100.0f; // -100..100 -> 0.0..2.0
+            float gamma = gammaSlider.getValue() / 100.0f; // 50..200 -> 0.5..2.0 (sin cambio)
+            float sharpness = (sharpnessSlider.getValue() + 100) / 100.0f; // -100..100 -> 0.0..2.0
             float scale = scaleSlider.getValue() / 100.0f;
             
-            // Actualizar etiquetas de valores
-            brightnessLabel.setText(String.format("%.0f%%", brightness * 100));
-            contrastLabel.setText(String.format("%.0f%%", contrast * 100));
-            saturationLabel.setText(String.format("%.0f%%", saturation * 100));
-            gammaLabel.setText(String.format("%.2f", gamma));
-            sharpnessLabel.setText(String.format("%.0f%%", sharpness * 100));
-            scaleLabel.setText(String.format("%.0f%%", scale * 100));
-            
-            io.Log.log("DEBUG: Aplicando transformaciones - Brillo: " + brightness + 
-                             ", Contraste: " + contrast + ", Saturación: " + saturation + 
-                             ", Gamma: " + gamma + ", Nitidez: " + sharpness + 
-                             ", Escala: " + scale);
-            
+            // Aplicar transformaciones de forma batch para mejor rendimiento
             selected.setBrightness(brightness);
             selected.setContrast(contrast);
             selected.setSaturation(saturation);
             selected.setGamma(gamma);
             selected.setSharpness(sharpness);
             selected.setScale(scale);
+            
+            // Actualizar etiquetas de valores (optimizado)
+            SwingUtilities.invokeLater(() -> {
+                if (!updatingControls) {
+                    brightnessLabel.setText(String.format("%d%%", brightnessSlider.getValue()));
+                    contrastLabel.setText(String.format("%d%%", contrastSlider.getValue()));
+                    saturationLabel.setText(String.format("%d%%", saturationSlider.getValue()));
+                    gammaLabel.setText(String.format("%.2f", gamma));
+                    sharpnessLabel.setText(String.format("%d%%", sharpnessSlider.getValue()));
+                    
+                    // Actualizar spinners para mantener sincronización (sin causar eventos)
+                    updatingControls = true;
+                    try {
+                        brightnessSpinner.setValue(brightnessSlider.getValue());
+                        contrastSpinner.setValue(contrastSlider.getValue());
+                        saturationSpinner.setValue(saturationSlider.getValue());
+                        gammaSpinner.setValue((double) gamma); // Convertir float a double
+                        sharpnessSpinner.setValue(sharpnessSlider.getValue());
+                        scaleSpinner.setValue(scaleSlider.getValue());
+                    } finally {
+                        updatingControls = false;
+                    }
+                }
+            });
             
             notifyLayersChanged();
         }
@@ -1036,25 +1468,32 @@ public class IntegratedImageLayerPanel extends JPanel {
             
             updatingControls = true;
             try {
-                // Restablecer valores por defecto (NO incluir posición ni escala)
+                // Restablecer valores por defecto (valores neutros - 0 para la mayoría)
                 opacitySlider.setValue(100);
                 // NO resetear: positionXSpinner.setValue(0);
                 // NO resetear: positionYSpinner.setValue(0);
-                brightnessSlider.setValue(100);
-                contrastSlider.setValue(100);
-                saturationSlider.setValue(100);
-                gammaSlider.setValue(100);
-                sharpnessSlider.setValue(100);
+                brightnessSlider.setValue(0); // Valor neutro: 0
+                contrastSlider.setValue(0); // Valor neutro: 0
+                saturationSlider.setValue(0); // Valor neutro: 0
+                gammaSlider.setValue(100); // Valor neutro: 100 (representa 1.0)
+                sharpnessSlider.setValue(0); // Valor neutro: 0
                 // NO resetear: scaleSlider.setValue(100);
                 
-                // Restablecer etiquetas a valores por defecto (mantener escala actual)
+                // Resetear también los spinners
+                brightnessSpinner.setValue(0); // Valor neutro: 0
+                contrastSpinner.setValue(0); // Valor neutro: 0
+                saturationSpinner.setValue(0); // Valor neutro: 0
+                gammaSpinner.setValue(1.0); // Valor neutro: 1.0
+                sharpnessSpinner.setValue(0); // Valor neutro: 0
+                
+                // Restablecer etiquetas a valores por defecto (valores neutros)
                 opacityLabel.setText("100%");
-                brightnessLabel.setText("100%");
-                contrastLabel.setText("100%");
-                saturationLabel.setText("100%");
+                brightnessLabel.setText("0%");
+                contrastLabel.setText("0%");
+                saturationLabel.setText("0%");
                 gammaLabel.setText("1.00");
-                sharpnessLabel.setText("100%");
-                scaleLabel.setText(String.format("%.0f%%", currentScale * 100)); // Mantener escala actual
+                sharpnessLabel.setText("0%");
+                scaleSpinner.setValue((int) Math.round(currentScale * 100)); // CAMBIADO: scaleField -> scaleSpinner, Mantener escala actual
                 
                 // Aplicar valores por defecto a la capa (mantener posición y escala actuales)
                 selected.setOpacity(1.0f);
@@ -1096,36 +1535,55 @@ public class IntegratedImageLayerPanel extends JPanel {
             gammaSlider.setEnabled(hasSelection);
             sharpnessSlider.setEnabled(hasSelection);
             scaleSlider.setEnabled(hasSelection);
+            // Habilitar/deshabilitar spinners también
+            brightnessSpinner.setEnabled(hasSelection);
+            contrastSpinner.setEnabled(hasSelection);
+            saturationSpinner.setEnabled(hasSelection);
+            gammaSpinner.setEnabled(hasSelection);
+            sharpnessSpinner.setEnabled(hasSelection);
             resetAdjustmentsButton.setEnabled(hasSelection);
             removeLayerButton.setEnabled(hasSelection);
             duplicateButton.setEnabled(hasSelection);
-            
+            // Habilitar/deshabilitar flechas según posición
             if (hasSelection) {
+                int idx = layerManager.getLayers().indexOf(selected);
+                int lastIdx = layerManager.getLayers().size() - 1;
+                moveUpButton.setEnabled(idx < lastIdx);
+                moveDownButton.setEnabled(idx > 0);
                 // Actualizar valores de controles
                 opacitySlider.setValue((int) (selected.getOpacity() * 100));
                 visibilityCheckBox.setSelected(selected.isVisible());
                 blendModeCombo.setSelectedItem(selected.getBlendMode());
                 
-                // Actualizar valores de posición
-                positionXSpinner.setValue(selected.getPosition().x);
-                positionYSpinner.setValue(selected.getPosition().y);
+                // NUEVO: Actualizar valores de posición convertidos a coordenadas de pantalla
+                Point mosaicPos = selected.getPosition();
+                Point screenPos = mosaicToScreenCoordinates(mosaicPos.x, mosaicPos.y);
+                positionXSpinner.setValue(screenPos.x);
+                positionYSpinner.setValue(screenPos.y);
                 
-                // Actualizar controles de transformación de imagen
-                brightnessSlider.setValue((int) (selected.getBrightness() * 100));
-                contrastSlider.setValue((int) (selected.getContrast() * 100));
-                saturationSlider.setValue((int) (selected.getSaturation() * 100));
-                gammaSlider.setValue((int) (selected.getGamma() * 100));
-                sharpnessSlider.setValue((int) (selected.getSharpness() * 100));
+                // Actualizar controles de transformación de imagen (convertir 0.0-2.0 a rango -100..100)
+                brightnessSlider.setValue((int) (selected.getBrightness() * 100 - 100)); // 0.0-2.0 -> -100..100
+                contrastSlider.setValue((int) (selected.getContrast() * 100 - 100)); // 0.0-2.0 -> -100..100
+                saturationSlider.setValue((int) (selected.getSaturation() * 100 - 100)); // 0.0-2.0 -> -100..100
+                gammaSlider.setValue((int) (selected.getGamma() * 100)); // 0.5-2.0 -> 50..200 (sin cambio)
+                sharpnessSlider.setValue((int) (selected.getSharpness() * 100 - 100)); // 0.0-2.0 -> -100..100
                 scaleSlider.setValue((int) (selected.getScale() * 100));
                 
-                // Actualizar etiquetas con valores actuales
+                // Actualizar spinners con valores actuales (mismo rango -100..100)
+                brightnessSpinner.setValue((int) (selected.getBrightness() * 100 - 100));
+                contrastSpinner.setValue((int) (selected.getContrast() * 100 - 100));
+                saturationSpinner.setValue((int) (selected.getSaturation() * 100 - 100));
+                gammaSpinner.setValue((double) selected.getGamma()); // Convertir float a double
+                sharpnessSpinner.setValue((int) (selected.getSharpness() * 100 - 100));
+                
+                // Actualizar etiquetas con valores de los sliders (mostrar -100..100)
                 opacityLabel.setText(String.format("%.0f%%", selected.getOpacity() * 100));
-                brightnessLabel.setText(String.format("%.0f%%", selected.getBrightness() * 100));
-                contrastLabel.setText(String.format("%.0f%%", selected.getContrast() * 100));
-                saturationLabel.setText(String.format("%.0f%%", selected.getSaturation() * 100));
+                brightnessLabel.setText(String.format("%d%%", brightnessSlider.getValue()));
+                contrastLabel.setText(String.format("%d%%", contrastSlider.getValue()));
+                saturationLabel.setText(String.format("%d%%", saturationSlider.getValue()));
                 gammaLabel.setText(String.format("%.2f", selected.getGamma()));
-                sharpnessLabel.setText(String.format("%.0f%%", selected.getSharpness() * 100));
-                scaleLabel.setText(String.format("%.0f%%", selected.getScale() * 100));
+                sharpnessLabel.setText(String.format("%d%%", sharpnessSlider.getValue()));
+                scaleSpinner.setValue((int) Math.round(selected.getScale() * 100)); // CAMBIADO: scaleField -> scaleSpinner
             }
         } finally {
             updatingControls = false;
@@ -1133,34 +1591,40 @@ public class IntegratedImageLayerPanel extends JPanel {
     }
     
     /**
+     * Obtiene el índice visual de una capa en la lista invertida
+     */
+    private int getVisualIndexForLayer(Layer layer) {
+        List<Layer> layers = layerManager.getLayers();
+        int realIndex = layers.indexOf(layer);
+        if (realIndex == -1) return -1;
+        // En lista invertida: índice visual = (size - 1) - índice real
+        return layers.size() - 1 - realIndex;
+    }
+    
+    /**
      * Actualiza la lista de capas
      */
     private void updateLayerList() {
-        io.Log.log("DEBUG: updateLayerList() - Iniciando actualización de lista");
+        // OPTIMIZACIÓN: Solo log si hay error, eliminar logs de operación normal
         if (listModel == null) {
-            io.Log.log("DEBUG: updateLayerList() - listModel es null");
+            io.Log.log("ERROR: updateLayerList() - listModel es null");
             return;
         }
         
-        io.Log.log("DEBUG: updateLayerList() - Limpiando lista existente");
         listModel.clear();
         
         List<Layer> layers = layerManager.getLayers();
-        io.Log.log("DEBUG: updateLayerList() - Número de capas: " + layers.size());
         
-        for (Layer layer : layers) {
-            io.Log.log("DEBUG: updateLayerList() - Añadiendo capa a lista: " + layer.getName());
-            listModel.addElement(layer);
+        // Mostrar capas en orden invertido: índice más alto arriba
+        for (int i = layers.size() - 1; i >= 0; i--) {
+            listModel.addElement(layers.get(i));
         }
         
         // Mantener selección
         Layer selected = layerManager.getSelectedLayer();
         if (selected != null) {
-            io.Log.log("DEBUG: updateLayerList() - Seleccionando capa: " + selected.getName());
             layerList.setSelectedValue(selected, true);
         }
-        
-        io.Log.log("DEBUG: updateLayerList() - Lista actualizada, tamaño del modelo: " + listModel.getSize());
         
         // Forzar actualización visual del JList
         SwingUtilities.invokeLater(() -> {
@@ -1210,10 +1674,11 @@ public class IntegratedImageLayerPanel extends JPanel {
      */
     private void notifyLayersChanged() {
     // notifyLayersChanged called
+        
         if (onLayersChangedCallback != null) {
-            io.Log.log("DEBUG: IntegratedImageLayerPanel - Ejecutando callback");
+            // io.Log.log("DEBUG: IntegratedImageLayerPanel - Ejecutando callback"); // COMENTADO PARA RENDIMIENTO
             onLayersChangedCallback.run();
-            io.Log.log("DEBUG: IntegratedImageLayerPanel - Callback ejecutado");
+            // io.Log.log("DEBUG: IntegratedImageLayerPanel - Callback ejecutado"); // COMENTADO PARA RENDIMIENTO
         } else {
             io.Log.log("DEBUG: IntegratedImageLayerPanel - WARNING: Callback es null!");
         }
@@ -1223,27 +1688,27 @@ public class IntegratedImageLayerPanel extends JPanel {
      * Obtiene los valores actuales de transformación de imagen de fondo
      */
     public float getBackgroundBrightness() {
-        io.Log.log("DEBUG: IntegratedImageLayerPanel - getBackgroundBrightness() devuelve: " + backgroundBrightness);
+        // io.Log.log("DEBUG: IntegratedImageLayerPanel - getBackgroundBrightness() devuelve: " + backgroundBrightness); // COMENTADO PARA RENDIMIENTO
         return backgroundBrightness;
     }
     
     public float getBackgroundContrast() {
-        io.Log.log("DEBUG: IntegratedImageLayerPanel - getBackgroundContrast() devuelve: " + backgroundContrast);
+        // io.Log.log("DEBUG: IntegratedImageLayerPanel - getBackgroundContrast() devuelve: " + backgroundContrast); // COMENTADO PARA RENDIMIENTO
         return backgroundContrast;
     }
     
     public float getBackgroundSaturation() {
-        io.Log.log("DEBUG: IntegratedImageLayerPanel - getBackgroundSaturation() devuelve: " + backgroundSaturation);
+        // io.Log.log("DEBUG: IntegratedImageLayerPanel - getBackgroundSaturation() devuelve: " + backgroundSaturation); // COMENTADO PARA RENDIMIENTO
         return backgroundSaturation;
     }
     
     public float getBackgroundGamma() {
-        io.Log.log("DEBUG: IntegratedImageLayerPanel - getBackgroundGamma() devuelve: " + backgroundGamma);
+        // io.Log.log("DEBUG: IntegratedImageLayerPanel - getBackgroundGamma() devuelve: " + backgroundGamma); // COMENTADO PARA RENDIMIENTO
         return backgroundGamma;
     }
     
     public float getBackgroundSharpness() {
-        io.Log.log("DEBUG: IntegratedImageLayerPanel - getBackgroundSharpness() devuelve: " + backgroundSharpness);
+        // io.Log.log("DEBUG: IntegratedImageLayerPanel - getBackgroundSharpness() devuelve: " + backgroundSharpness); // COMENTADO PARA RENDIMIENTO
         return backgroundSharpness;
     }
 
@@ -1267,7 +1732,10 @@ public class IntegratedImageLayerPanel extends JPanel {
             int stepSize = model.getStepSize().intValue();
             
             // Calcular nuevo valor basado en la dirección de la rueda
-            int delta = e.getWheelRotation() * stepSize * -1; // Invertir para que sea más intuitivo
+            int multiplier = 1;
+            if (e.isShiftDown()) multiplier = 10; // mover más rápido con Shift
+            if (e.isControlDown()) multiplier = 100; // muy rápido con Ctrl
+            int delta = e.getWheelRotation() * stepSize * -1 * multiplier; // Invertir para que sea más intuitivo
             int newValue = currentValue + delta;
             
             // Verificar que esté dentro de los límites
@@ -1326,6 +1794,165 @@ public class IntegratedImageLayerPanel extends JPanel {
             }
             
             return this;
+        }
+    }
+    
+    /**
+     * TransferHandler personalizado para permitir drag and drop de capas
+     * Permite reordenar las capas arrastrándolas en la lista
+     */
+    private class LayerTransferHandler extends TransferHandler {
+        private static final String LAYER_INDEX_FLAVOR = "application/x-layer-index";
+        private DataFlavor layerIndexFlavor;
+        
+        public LayerTransferHandler() {
+            try {
+                layerIndexFlavor = new DataFlavor(LAYER_INDEX_FLAVOR);
+            } catch (ClassNotFoundException e) {
+                io.Log.log("ERROR: No se pudo crear DataFlavor para capas: " + e.getMessage());
+                layerIndexFlavor = DataFlavor.stringFlavor; // Fallback
+            }
+        }
+        
+        @Override
+        public boolean canImport(TransferSupport support) {
+            // Verificar que es drop y que soporta nuestro flavor o string
+            return support.isDrop() && 
+                   (support.isDataFlavorSupported(layerIndexFlavor) || 
+                    support.isDataFlavorSupported(DataFlavor.stringFlavor));
+        }
+        
+        @Override
+        public boolean importData(TransferSupport support) {
+            if (!canImport(support)) {
+                return false;
+            }
+            
+            try {
+                // Obtener el índice de origen
+                int sourceIndex = -1;
+                
+                if (support.isDataFlavorSupported(layerIndexFlavor)) {
+                    String indexStr = (String) support.getTransferable().getTransferData(layerIndexFlavor);
+                    sourceIndex = Integer.parseInt(indexStr);
+                } else if (support.isDataFlavorSupported(DataFlavor.stringFlavor)) {
+                    String indexStr = (String) support.getTransferable().getTransferData(DataFlavor.stringFlavor);
+                    try {
+                        sourceIndex = Integer.parseInt(indexStr);
+                    } catch (NumberFormatException e) {
+                        // Si no es un número, buscar por nombre de capa
+                        String layerName = indexStr;
+                        for (int i = 0; i < layerManager.getLayers().size(); i++) {
+                            if (layerManager.getLayers().get(i).getName().equals(layerName)) {
+                                sourceIndex = i;
+                                break;
+                            }
+                        }
+                    }
+                }
+                
+                if (sourceIndex < 0 || sourceIndex >= layerManager.getLayers().size()) {
+                    return false;
+                }
+                
+                // Obtener el índice de destino
+                JList.DropLocation dropLocation = (JList.DropLocation) support.getDropLocation();
+                int targetIndex = dropLocation.getIndex();
+                
+                // Ajustar targetIndex si estamos insertando
+                if (dropLocation.isInsert()) {
+                    // Para inserts, el índice ya está correcto
+                } else {
+                    // Para reemplazos, usar el índice tal como está
+                }
+                
+                io.Log.log("DEBUG: DnD - sourceIndex=" + sourceIndex + ", targetIndex=" + targetIndex);
+                
+                // Verificar que los índices son válidos y diferentes
+                if (targetIndex >= 0 && sourceIndex != targetIndex) {
+                    
+                    // Obtener la capa a mover
+                    Layer sourceLayer = layerManager.getLayers().get(sourceIndex);
+                    
+                    // Calcular cuántos pasos mover
+                    boolean success = false;
+                    
+                    if (sourceIndex < targetIndex) {
+                        // Mover hacia abajo - ajustar targetIndex si es un insert
+                        int steps = targetIndex - sourceIndex;
+                        if (dropLocation.isInsert() && targetIndex > sourceIndex) {
+                            steps--; // Ajuste para insert
+                        }
+                        
+                        for (int i = 0; i < steps; i++) {
+                            if (!layerManager.moveLayerDown(sourceLayer)) {
+                                break;
+                            }
+                        }
+                        success = true;
+                    } else {
+                        // Mover hacia arriba
+                        int steps = sourceIndex - targetIndex;
+                        
+                        for (int i = 0; i < steps; i++) {
+                            if (!layerManager.moveLayerUp(sourceLayer)) {
+                                break;
+                            }
+                        }
+                        success = true;
+                    }
+                    
+                    if (success) {
+                        io.Log.log("DEBUG: DnD - Movimiento exitoso");
+                        
+                        // Actualizar la UI
+                        updateUI();
+                        
+                        // Seleccionar la capa en su nueva posición
+                        int newIndex = layerManager.getLayers().indexOf(sourceLayer);
+                        if (newIndex >= 0) {
+                            layerList.setSelectedIndex(newIndex);
+                        }
+                        
+                        // Notificar cambios
+                        notifyLayersChanged();
+                        
+                        return true;
+                    }
+                }
+                
+            } catch (Exception e) {
+                io.Log.log("ERROR: Error durante drag and drop: " + e.getMessage());
+                e.printStackTrace();
+            }
+            
+            return false;
+        }
+        
+        @Override
+        public int getSourceActions(JComponent c) {
+            return MOVE;
+        }
+        
+        @Override
+        protected Transferable createTransferable(JComponent c) {
+            @SuppressWarnings("unchecked")
+            JList<Layer> list = (JList<Layer>) c;
+            Layer selectedLayer = list.getSelectedValue();
+            
+            if (selectedLayer != null) {
+                int sourceIndex = layerManager.getLayers().indexOf(selectedLayer);
+                io.Log.log("DEBUG: DnD - Creando transferable para índice: " + sourceIndex);
+                return new StringSelection(String.valueOf(sourceIndex));
+            }
+            
+            return null;
+        }
+        
+        @Override
+        protected void exportDone(JComponent source, Transferable data, int action) {
+            // No necesitamos hacer nada aquí ya que el movimiento se hace en importData
+            io.Log.log("DEBUG: DnD - Export done con action: " + action);
         }
     }
 }
