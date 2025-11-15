@@ -15,6 +15,9 @@ import java.util.Map;
 import java.util.TreeMap;
 import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
+import javax.swing.SwingUtilities;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
 
 /**
  * Controlador para las herramientas de edición del mosaico.
@@ -29,6 +32,7 @@ public class StudEditController implements ModelHandler<BrickGraphicsState> {
     private boolean hasChanges; // Bandera para saber si hay cambios no guardados
     private ModificationManager modificationManager; // Gestor de modificaciones manuales
     private BrushSize brushSize = BrushSize.SMALL; // Tamaño del pincel
+    private boolean forcePaintMode = false; // NUEVO: Modo de pintado forzado para proteger píxeles
     
     public StudEditController(ColorController colorController, BrickedView brickedView) {
         this.activeTool = EditTool.DEFAULT;
@@ -100,6 +104,23 @@ public class StudEditController implements ModelHandler<BrickGraphicsState> {
     }
     
     /**
+     * NUEVO: Establece el modo de pintado forzado
+     * Cuando está activo, el pintado se registra incluso si el color es igual al existente
+     * Esto protege los píxeles de las transformaciones de imagen (brillo, contraste, etc.)
+     */
+    public void setForcePaintMode(boolean forceMode) {
+        this.forcePaintMode = forceMode;
+        io.Log.log("DEBUG: StudEditController - Modo pintado forzado: " + (forceMode ? "ACTIVADO" : "DESACTIVADO"));
+    }
+    
+    /**
+     * NUEVO: Obtiene el estado del modo de pintado forzado
+     */
+    public boolean isForcePaintMode() {
+        return forcePaintMode;
+    }
+    
+    /**
      * Establece el color seleccionado para la herramienta pincel.
      * @param color el color a usar
      */
@@ -140,7 +161,11 @@ public class StudEditController implements ModelHandler<BrickGraphicsState> {
         
         switch (activeTool) {
             case BRUSH:
-                return applyBrushWithSize(grid, x, y);
+                if (brushSize == BrushSize.SMALL) {
+                    return applyBrush(grid, x, y, forcePaintMode); // Usar estado del checkbox
+                } else {
+                    return applyBrushWithSize(grid, x, y, forcePaintMode); // Usar estado del checkbox
+                }
             case EYEDROPPER:
                 return applyEyedropper(grid, x, y);
             case RESET:
@@ -151,25 +176,47 @@ public class StudEditController implements ModelHandler<BrickGraphicsState> {
     }
     
     /**
-     * Aplica la herramienta pincel.
+     * Aplica la herramienta pincel con opción de modo forzado.
+     * @param forceMode Si es true, fuerza el pintado incluso si el color es igual (protege de transformaciones)
      */
-    private boolean applyBrush(LEGOColorGrid grid, int x, int y) {
+    private boolean applyBrush(LEGOColorGrid grid, int x, int y, boolean forceMode) {
         if (selectedColor == null) {
             return false;
         }
         
         LEGOColor currentColor = grid.getColorAt(x, y);
-        if (currentColor != selectedColor) {
+        
+        if (forceMode) {
+            // MODO FORZADO: Siempre pintar y registrar modificación (proteger de transformaciones)
             boolean success = grid.setColorAt(x, y, selectedColor);
             if (success) {
-                // Registrar la modificación en el ModificationManager
-                modificationManager.recordModification(x, y, selectedColor, currentColor);
+                modificationManager.forceRecordModification(x, y, selectedColor);
                 hasChanges = true;
                 fireStateChanged();
+                io.Log.log("DEBUG: FORZADO pintado pincel en (" + x + "," + y + ") color=" + selectedColor.getName() + " (protegido)");
             }
             return success;
+        } else {
+            // MODO NORMAL: Solo pintar si el color es diferente
+            if (currentColor != selectedColor) {
+                boolean success = grid.setColorAt(x, y, selectedColor);
+                if (success) {
+                    modificationManager.recordModification(x, y, selectedColor, currentColor);
+                    hasChanges = true;
+                    fireStateChanged();
+                    io.Log.log("DEBUG: Pintado normal en (" + x + "," + y + ") color=" + selectedColor.getName());
+                }
+                return success;
+            }
         }
         return false;
+    }
+    
+    /**
+     * COMPATIBILIDAD: Mantener método original para código existente
+     */
+    private boolean applyBrush(LEGOColorGrid grid, int x, int y) {
+        return applyBrush(grid, x, y, forcePaintMode); // Usar estado del checkbox
     }
     
     /**
@@ -187,9 +234,10 @@ public class StudEditController implements ModelHandler<BrickGraphicsState> {
     }
     
     /**
-     * Aplica la herramienta pincel con el tamaño especificado.
+     * Aplica la herramienta pincel con tamaño específico.
+     * @param forceMode Si es true, fuerza el pintado incluso si el color es igual
      */
-    private boolean applyBrushWithSize(LEGOColorGrid grid, int x, int y) {
+    private boolean applyBrushWithSize(LEGOColorGrid grid, int x, int y, boolean forceMode) {
         if (selectedColor == null) {
             return false;
         }
@@ -218,13 +266,24 @@ public class StudEditController implements ModelHandler<BrickGraphicsState> {
         for (int targetY = startY; targetY <= endY; targetY++) {
             for (int targetX = startX; targetX <= endX; targetX++) {
                 LEGOColor currentColor = grid.getColorAt(targetX, targetY);
-                if (currentColor != null && currentColor != selectedColor) {
-                    boolean success = grid.setColorAt(targetX, targetY, selectedColor);
-                    if (success) {
-                        modificationManager.recordModification(targetX, targetY, selectedColor, currentColor);
-                        anyChange = true;
-                        io.Log.log("DEBUG: Pintado stud en (" + targetX + "," + targetY + ") con color " + selectedColor.getName());
-                            Log.log("DEBUG: Pintado stud en (" + targetX + "," + targetY + ") con color " + selectedColor.getName());
+                
+                if (currentColor != null) {
+                    if (forceMode) {
+                        // MODO FORZADO: Siempre pintar
+                        boolean success = grid.setColorAt(targetX, targetY, selectedColor);
+                        if (success) {
+                            modificationManager.forceRecordModification(targetX, targetY, selectedColor);
+                            io.Log.log("DEBUG: FORZADO pintado brush en (" + targetX + "," + targetY + ") con color " + selectedColor.getName() + " (protegido)");
+                            anyChange = true;
+                        }
+                    } else if (currentColor != selectedColor) {
+                        // MODO NORMAL: Solo pintar si el color es diferente
+                        boolean success = grid.setColorAt(targetX, targetY, selectedColor);
+                        if (success) {
+                            modificationManager.recordModification(targetX, targetY, selectedColor, currentColor);
+                            io.Log.log("DEBUG: Pintado normal brush en (" + targetX + "," + targetY + ") con color " + selectedColor.getName());
+                            anyChange = true;
+                        }
                     }
                 }
             }
@@ -432,7 +491,28 @@ public class StudEditController implements ModelHandler<BrickGraphicsState> {
                             modificationManager.restoreModifications(currentGrid);
                                 Log.log("DEBUG: StudEditController - COMPLETADO: Aplicadas modificaciones al grid después de cargar desde KMV");
                         } else {
-                                Log.log("DEBUG: StudEditController - Grid no disponible, las modificaciones se aplicarán cuando esté listo");
+                                Log.log("DEBUG: StudEditController - Grid no disponible, programando aplicación retrasada");
+                            // Usar un timer para intentar aplicar cuando el grid esté listo
+                            javax.swing.Timer retryTimer = new javax.swing.Timer(200, new ActionListener() {
+                                private int attempts = 0;
+                                @Override
+                                public void actionPerformed(ActionEvent e) {
+                                    attempts++;
+                                    LEGOColorGrid grid = brickedView.getColorGrid();
+                                    if (grid != null) {
+                                        Log.log("DEBUG: StudEditController - Grid disponible en intento " + attempts + ", aplicando modificaciones");
+                                        modificationManager.applyAllModificationsToGrid(grid);
+                                        ((javax.swing.Timer) e.getSource()).stop();
+                                        // Forzar repaint para mostrar los cambios
+                                        SwingUtilities.invokeLater(() -> brickedView.repaint());
+                                        Log.log("DEBUG: StudEditController - COMPLETADO: Modificaciones aplicadas con delay y repaint forzado");
+                                    } else if (attempts >= 25) { // 5 segundos máximo
+                                        Log.log("WARNING: StudEditController - Timeout esperando grid, abandoning");
+                                        ((javax.swing.Timer) e.getSource()).stop();
+                                    }
+                                }
+                            });
+                            retryTimer.start();
                         }
                     } else {
                             Log.log("DEBUG: StudEditController - BrickedView no disponible, las modificaciones se aplicarán cuando esté listo");

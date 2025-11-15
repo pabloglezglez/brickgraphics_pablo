@@ -4,6 +4,8 @@ import javax.swing.*;
 import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
 import java.awt.*;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
 
 import ui.*;
 import colors.LEGOColor;
@@ -56,7 +58,48 @@ public class Ribbon extends JToolBar {
 		
 		add(new JButton(new EyedropperToolAction(studEditController)));
 		add(new JButton(new ResetToolAction(studEditController)));
+		
 		add(new JButton(new GlobalResetAction(studEditController, mw.getBrickedView())));
+		
+		// Force Paint Mode Toggle
+		final JToggleButton forcePaintButton = new JToggleButton("Force Paint");
+		forcePaintButton.setToolTipText("Toggle Force Paint mode - paint over same color pixels");
+		
+		// Configurar colores para estados activo/inactivo
+		Color activeColor = new Color(255, 100, 100);     // Rojo claro
+		Color inactiveColor = new Color(240, 240, 240);   // Gris claro
+		Color activeTextColor = Color.WHITE;
+		Color inactiveTextColor = Color.BLACK;
+		
+		// Estado inicial (inactivo)
+		forcePaintButton.setBackground(inactiveColor);
+		forcePaintButton.setForeground(inactiveTextColor);
+		forcePaintButton.setOpaque(true);
+		
+		forcePaintButton.addActionListener(new ActionListener() {
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				boolean enabled = forcePaintButton.isSelected();
+				studEditController.setForcePaintMode(enabled);
+				
+				// Cambiar apariencia visual según el estado
+				if (enabled) {
+					forcePaintButton.setText("🎯 FORCE ACTIVE");
+					forcePaintButton.setBackground(activeColor);
+					forcePaintButton.setForeground(activeTextColor);
+					forcePaintButton.setToolTipText("Force Paint ACTIVE - Click to disable");
+				} else {
+					forcePaintButton.setText("Force Paint");
+					forcePaintButton.setBackground(inactiveColor);
+					forcePaintButton.setForeground(inactiveTextColor);
+					forcePaintButton.setToolTipText("Force Paint mode - Click to enable painting over same colors");
+				}
+				forcePaintButton.repaint();
+			}
+		});
+		add(forcePaintButton);
+		
+		addSeparator();
 		
 		// Add magnifier buttons:
 		final MagnifierController magnifierController = mc.getMagnifierController();

@@ -1204,14 +1204,8 @@ public class LayerManager implements ModelHandler<BrickGraphicsState> {
             this.layersEnabled = layersEnabled != null ? layersEnabled.booleanValue() : false;
             io.Log.log("DEBUG: LayerManager.handleModelChange - Flag layersEnabled cargado: " + this.layersEnabled);
             
-            // IMPORTANTE: Guardar modificaciones actuales antes de limpiar las capas
-            // Esto evita que se pierdan las modificaciones del pincel cuando se recarga el modelo
-            try {
-                autosaveArtifacts();
-                io.Log.log("DEBUG: LayerManager.handleModelChange - Guardado automático antes de recargar capas");
-            } catch (Exception ex) {
-                io.Log.log("WARN: LayerManager.handleModelChange - Error en guardado automático: " + ex.getMessage());
-            }
+            // NOTA: El guardado automático se hace en MainController.loadMosaicFile ANTES de cambiar el archivo
+            // para evitar guardar en la carpeta incorrecta
             
             // Limpiar capas existentes SIEMPRE al cargar un nuevo archivo KMV
             // Esto resuelve el problema de que las capas del archivo anterior se mantengan
@@ -1219,12 +1213,45 @@ public class LayerManager implements ModelHandler<BrickGraphicsState> {
             clearLayers();
             io.Log.log("DEBUG: LayerManager.handleModelChange - Capas limpiadas (" + layersBeforeClear + " -> " + layers.size() + ") para cargar nuevo archivo KMV");
             
+            // CRUCIAL: Solo limpiar modificaciones del archivo anterior si no hay modificaciones nuevas que cargar
+            // Esto permite que StudEditController cargue las modificaciones del nuevo archivo sin que se pierdan
+            if (modificationManager != null) {
+                Object newModificationsData = model.get(BrickGraphicsState.ManualModifications);
+                if (newModificationsData == null || (newModificationsData instanceof String && ((String)newModificationsData).isEmpty())) {
+                    // No hay modificaciones nuevas que cargar, seguro limpiar
+                    int modificationsBeforeClear = modificationManager.getModifications().size();
+                    modificationManager.clearModifications();
+                    io.Log.log("DEBUG: LayerManager.handleModelChange - Modificaciones limpiadas (" + modificationsBeforeClear + " -> " + modificationManager.getModifications().size() + ") para nuevo archivo KMV (sin modificaciones nuevas)");
+                } else {
+                    // Hay modificaciones nuevas que cargar, NO limpiar para que StudEditController pueda cargarlas
+                    io.Log.log("DEBUG: LayerManager.handleModelChange - NO limpiando modificaciones porque hay datos de modificaciones para cargar: " + (newModificationsData instanceof String ? ((String)newModificationsData).length() + " caracteres" : "datos presentes"));
+                }
+            } else {
+                io.Log.log("WARN: LayerManager.handleModelChange - ModificationManager es null, no se pueden limpiar modificaciones");
+            }
+            
+            // CRÍTICO: Forzar actualización inmediata de UI después de limpiar para evitar mostrar capas del archivo anterior
+            if (layerPanel != null) {
+                try {
+                    SwingUtilities.invokeLater(() -> {
+                        layerPanel.refreshLayerList();
+                        io.Log.log("DEBUG: LayerManager.handleModelChange - UI forzada a actualizar INMEDIATAMENTE después de limpiar capas");
+                    });
+                    // Dar un momento para que se procese la actualización
+                    Thread.sleep(50);
+                } catch (Exception ex) {
+                    io.Log.log("WARN: LayerManager.handleModelChange - Error al forzar actualización inmediata de UI: " + ex.getMessage());
+                }
+            }
+            
             if (layersEnabled != null && layersEnabled) {
                 // Intentar cargar desde layers.json si existe
                 File companionDir = getCompanionDir();
+                io.Log.log("DEBUG: LayerManager.handleModelChange - Buscando capas en carpeta: " + (companionDir != null ? companionDir.getAbsolutePath() : "null"));
                 File jsonFile = new File(companionDir, "layers.json");
                 boolean loadedFromJson = false;
                 if (jsonFile.exists()) {
+                    io.Log.log("DEBUG: LayerManager.handleModelChange - Archivo layers.json encontrado: " + jsonFile.getAbsolutePath());
                     try {
                         loadedFromJson = loadFromLayersJson(jsonFile);
                         io.Log.log("DEBUG: LayerManager.handleModelChange - Cargado desde layers.json: " + loadedFromJson);

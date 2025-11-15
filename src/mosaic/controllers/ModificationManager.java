@@ -49,6 +49,17 @@ public class ModificationManager {
     }
     
     /**
+     * NUEVO: Fuerza el registro de una modificación manual incluso si el color es igual al existente.
+     * Esto es útil para "proteger" píxeles de las transformaciones de imagen aplicando pintado manual.
+     */
+    public void forceRecordModification(int x, int y, LEGOColor newColor) {
+        String key = x + "," + y;
+        // SIEMPRE registrar la modificación, sin importar el color original
+        modifications.put(key, newColor);
+        io.Log.log("DEBUG: ModificationManager - FORZADA modificación en (" + x + "," + y + ") -> " + newColor.toString() + " (protegido de transformaciones)");
+    }
+    
+    /**
      * Hace backup del grid actual antes de que se regenere.
      */
     public void backupGrid(LEGOColorGrid grid) {

@@ -71,6 +71,9 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 	private ModificationManager modificationManager;
 	private LEGOColorGrid lastValidGrid;
 	
+	// Variable para recordar el modo forzado durante arrastre
+	private boolean dragForcePaintMode = false;
+	
 	// UI:
 	public static final String MAGNIFIER = "MAGNIFIER", MOSAIC = "MOSAIC";	
 	private MagnifierCanvas magnifierCanvas;
@@ -254,15 +257,24 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 	 * @param clickX coordenada X del click (usado para actualizar cursor)
 	 * @param clickY coordenada Y del click (usado para actualizar cursor)
 	 */
-	private void handleMosaicClick(int clickX, int clickY) {
+	private void handleMosaicClick(int clickX, int clickY, boolean ctrlPressed) {
 		if (studEditController.getActiveTool() == EditTool.DEFAULT) {
 			return; // No hacer nada si está en modo navegación
+		}
+
+		// Activar modo forzado temporalmente si Ctrl está presionado
+		boolean originalForceMode = studEditController.isForcePaintMode();
+		if (ctrlPressed && studEditController.getActiveTool() == EditTool.BRUSH) {
+			studEditController.setForcePaintMode(true);
+			io.Log.log("ACTIVADO: Modo pintado forzado por Ctrl+click");
 		}
 
 		// Intentar primero pintar sobre la capa seleccionada (overlay) si procede
 		if (studEditController.getActiveTool() == EditTool.BRUSH && attemptOverlayPaint(clickX, clickY)) {
 			// Se realizó pintura de overlay; no modificar studs
 			io.Log.log("DEBUG: attemptOverlayPaint -> SUCCESS en click");
+			// Restaurar modo forzado original
+			studEditController.setForcePaintMode(originalForceMode);
 			repaint();
 			return;
 		}
@@ -295,6 +307,12 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 				// Actualizar la vista
 				repaint();
 			}
+		}
+		
+		// Restaurar el modo forzado original después de aplicar la herramienta
+		if (ctrlPressed && studEditController.getActiveTool() == EditTool.BRUSH) {
+			studEditController.setForcePaintMode(originalForceMode);
+			io.Log.log("RESTAURADO: Modo pintado forzado original");
 		}
 	}
 	
@@ -645,7 +663,18 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 		if (hoveredX >= 0 && hoveredY >= 0 && showHoverCursor) {
 			// Solo pintar si nos movimos a un stud diferente
 			if (hoveredX != lastDraggedX || hoveredY != lastDraggedY) {
+				// Aplicar modo forzado si el arrastre se inició con BRUSH+Ctrl
+				boolean originalForceMode = studEditController.isForcePaintMode();
+				if (activeTool == EditTool.BRUSH && dragForcePaintMode) {
+					studEditController.setForcePaintMode(true);
+				}
+				
 				boolean changed = studEditController.applyToolAt(colorGrid, hoveredX, hoveredY);
+				
+				// Restaurar modo original
+				if (activeTool == EditTool.BRUSH && dragForcePaintMode) {
+					studEditController.setForcePaintMode(originalForceMode);
+				}
 				
 				if (changed) {
 					// NO invalidar el pipeline para preservar las modificaciones manuales
@@ -949,7 +978,7 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 						}
 					} else {
 						// Click izquierdo normal para herramientas de edición
-						handleMosaicClick(e.getX(), e.getY());
+						handleMosaicClick(e.getX(), e.getY(), false);
 					}
 				}
 				
@@ -963,21 +992,37 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 						
 						// Decisión basada en herramienta activa y modificadores
 						EditTool activeTool = studEditController.getActiveTool();
-						if ((activeTool == EditTool.BRUSH || activeTool == EditTool.RESET) && !e.isControlDown()) {
-							// Herramientas de edición (pincel/reset) SIN Ctrl - activar edición
+						if (activeTool == EditTool.BRUSH) {
+							// Herramienta BRUSH - siempre permite edición (con o sin Ctrl para modo forzado)
 							isDragging = true;
 							lastDraggedX = -1;
 							lastDraggedY = -1;
-							handleMosaicClick(e.getX(), e.getY());
-							Log.log("Herramienta activada: " + activeTool);
+							
+							// DEBUG: Verificar todas las teclas modificadoras
+							boolean ctrlDown = e.isControlDown();
+							boolean metaDown = e.isMetaDown(); 
+							boolean shiftDown = e.isShiftDown();
+							boolean altDown = e.isAltDown();
+							Log.log("DEBUG KEYS: Ctrl=" + ctrlDown + " Meta=" + metaDown + " Shift=" + shiftDown + " Alt=" + altDown);
+							
+							dragForcePaintMode = ctrlDown || metaDown; // Probar tanto Ctrl como Meta/Command
+							handleMosaicClick(e.getX(), e.getY(), dragForcePaintMode);
+							Log.log("Brush activado - Ctrl=" + ctrlDown + " Meta=" + metaDown + " Force=" + dragForcePaintMode);
+						} else if (activeTool == EditTool.RESET && !e.isControlDown()) {
+							// Herramienta RESET SIN Ctrl - activar edición
+							isDragging = true;
+							lastDraggedX = -1;
+							lastDraggedY = -1;
+							handleMosaicClick(e.getX(), e.getY(), false);
+							Log.log("Reset activado sin Ctrl");
 						} else if (e.isControlDown() || isZoomMode) {
-							// Ctrl presionado O modo zoom - activar selección de zoom
+							// Ctrl presionado con herramientas NO-BRUSH O modo zoom - activar selección de zoom
 							zoomSelectionStart = new Point(e.getX(), e.getY());
 							mosaicZoomController.startSelection(zoomSelectionStart);
 							Log.log("Selección de zoom iniciada");
 						} else {
 							// Click normal para otras herramientas
-							handleMosaicClick(e.getX(), e.getY());
+							handleMosaicClick(e.getX(), e.getY(), false);
 						}
 					} else if (SwingUtilities.isMiddleMouseButton(e) || (SwingUtilities.isLeftMouseButton(e) && e.isShiftDown())) {
 						// Botón central o Shift+Click izquierdo para paneo
@@ -1226,34 +1271,115 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 				// Restaurar transformación para elementos de UI
 				g2.translate(viewport.x, viewport.y);
 				g2.scale(1.0/scaleX, 1.0/scaleY);
-			} else {
-				// Sin zoom, dibujar normalmente
-				toBricksTransform.drawAll(g2, shownImageSize);
-				
-				// NUEVO: Renderizar overlay de pintura (escalado a tamaño mostrado)
-				// if (paintOverlay != null && paintOverlay.isEnabled()) {
-				// 	// Escalar overlay de tamaño del mosaico a tamaño mostrado
-				// 	Graphics2D overlayG2 = (Graphics2D) g2.create();
-				// 	double scaleX = (double) shownImageSize.width / mosaicImageSize.width;
-				// 	double scaleY = (double) shownImageSize.height / mosaicImageSize.height;
-				// 	overlayG2.scale(scaleX, scaleY);
-				// 	paintOverlay.render(overlayG2, 0.8f);
-				// 	overlayG2.dispose();
-				// }
-			}
+		} else {
+			// Sin zoom, dibujar normalmente
+			toBricksTransform.drawAll(g2, shownImageSize);
 			
-			// Ayuda visual: dibujar bounding box de la capa seleccionada para depurar pintura overlay
+			// NUEVO: Renderizar modificaciones manuales SIN transformaciones de imagen (escalado)
+			Graphics2D manualG2 = (Graphics2D) g2.create();
+			double scaleX = (double) shownImageSize.width / mosaicImageSize.width;
+			double scaleY = (double) shownImageSize.height / mosaicImageSize.height;
+			manualG2.scale(scaleX, scaleY);
+			renderManualPaintingOverTransforms(manualG2, mosaicImageSize);
+			manualG2.dispose();
+		}			// Ayuda visual: dibujar bounding box de la capa seleccionada para depurar pintura overlay
 			// DESHABILITADO: Causa confusión visual con cuadrado amarillo fantasma
 			// drawSelectedLayerBounds(g2);
 
 			// Dibujar cursor de edición si está activo (siempre en coordenadas de pantalla)
 			drawEditCursor(g2);
 			
-			// Dibujar selección de zoom si está activa
-			drawZoomSelection(g2);
+		// Dibujar selección de zoom si está activa
+		drawZoomSelection(g2);
+	}
+	
+	/**
+	 * Renderiza las modificaciones manuales de pintado SIN aplicar transformaciones de imagen
+	 * para mantenerlas independientes de los parámetros de brillo, contraste, etc.
+	 */
+	private void renderManualPaintingOverTransforms(Graphics2D g2, Dimension mosaicSize) {
+		// Solo procesar si tenemos ModificationManager y modificaciones
+		if (modificationManager == null || mainController == null) {
+			return;
 		}
-
-		/**
+		
+		// Verificar si hay un grid de colores disponible
+		LEGOColorGrid colorGrid = null;
+		if (mainController.getLayerManager() != null) {
+			// Intentar obtener el grid desde el LayerManager
+			try {
+				// Usar reflection para acceder al colorGrid si es necesario
+				java.lang.reflect.Method getColorGridMethod = mainController.getLayerManager().getClass().getMethod("getColorGrid");
+				colorGrid = (LEGOColorGrid) getColorGridMethod.invoke(mainController.getLayerManager());
+			} catch (Exception e) {
+				// Si no podemos obtener el grid, no renderizar modificaciones manuales
+				return;
+			}
+		}
+		
+		if (colorGrid == null) {
+			return;
+		}
+		
+		// Obtener modificaciones manuales
+		Map<String, LEGOColor> modifications = modificationManager.getModifications();
+		if (modifications.isEmpty()) {
+			return;
+		}
+		
+		// Calcular tamaño de cada pixel/stud
+		int gridWidth = colorGrid.getWidth();
+		int gridHeight = colorGrid.getHeight();
+		
+		if (gridWidth <= 0 || gridHeight <= 0) {
+			return;
+		}
+		
+		float pixelWidth = (float) mosaicSize.width / gridWidth;
+		float pixelHeight = (float) mosaicSize.height / gridHeight;
+		
+		// Renderizar cada modificación manual
+		for (Map.Entry<String, LEGOColor> entry : modifications.entrySet()) {
+			String coord = entry.getKey();
+			LEGOColor color = entry.getValue();
+			
+			// Parsear coordenadas "x,y"
+			String[] parts = coord.split(",");
+			if (parts.length != 2) continue;
+			
+			try {
+				int x = Integer.parseInt(parts[0]);
+				int y = Integer.parseInt(parts[1]);
+				
+				// Verificar límites
+				if (x < 0 || x >= gridWidth || y < 0 || y >= gridHeight) {
+					continue;
+				}
+				
+				// Calcular posición en pantalla
+				float screenX = x * pixelWidth;
+				float screenY = y * pixelHeight;
+				
+				// Configurar color SIN transformaciones
+				Color javaColor = color.getRGB();
+				g2.setColor(javaColor);
+				
+				// Dibujar rectángulo representando el stud modificado
+				g2.fillRect(
+					Math.round(screenX), 
+					Math.round(screenY), 
+					Math.max(1, Math.round(pixelWidth)),
+					Math.max(1, Math.round(pixelHeight))
+				);
+				
+			} catch (NumberFormatException e) {
+				// Ignorar coordenadas mal formateadas
+				continue;
+			}
+		}
+		
+		io.Log.log("DEBUG: renderManualPaintingOverTransforms - Renderizadas " + modifications.size() + " modificaciones manuales");
+	}		/**
 		 * Dibuja un rectángulo alrededor del área visible (post-escala y centrado) de la capa seleccionada.
 		 */
 		private void drawSelectedLayerBounds(Graphics2D g2) {

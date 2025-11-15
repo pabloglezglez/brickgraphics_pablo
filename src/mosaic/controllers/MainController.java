@@ -293,6 +293,16 @@ public class MainController implements ModelHandler<BrickGraphicsState> {
 	}
 	
 	public void loadMosaicFile(File file) throws IOException {
+		// CRÍTICO: Guardar modificaciones del archivo ANTERIOR antes de cambiar al nuevo
+		if(layerManager != null && mosaicFile != null) {
+			try {
+				layerManager.autosaveArtifacts();
+				io.Log.log("DEBUG: MainController.loadMosaicFile - Guardadas modificaciones del archivo anterior: " + mosaicFile.getAbsolutePath());
+			} catch (Exception ex) {
+				io.Log.log("WARN: MainController.loadMosaicFile - Error guardando modificaciones anteriores: " + ex.getMessage());
+			}
+		}
+		
 		// Establecer primero el archivo del mosaico para que los ModelHandlers (LayerManager)
 		// puedan usar la ruta correcta al cargar las referencias relativas de capas.
 		mosaicFile = file;

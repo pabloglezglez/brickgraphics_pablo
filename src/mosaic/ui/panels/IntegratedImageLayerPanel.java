@@ -1323,7 +1323,7 @@ public class IntegratedImageLayerPanel extends JPanel {
             io.Log.log("DEBUG: updateLayerPosition - INICIADO para capa: " + selected.getName());
             
             // PRESERVAR MODIFICACIONES DEL USUARIO ANTES DEL MOVIMIENTO
-            java.util.List<mosaic.controllers.ModificationManager.Modification> baseModifications = null;
+            java.util.Map<String, colors.LEGOColor> baseModifications = null;
             if (layerManager.getModificationManager() != null) {
                 baseModifications = layerManager.getModificationManager().getAllModifications();
                 io.Log.log("DEBUG: updateLayerPosition - preserving " + baseModifications.size() + " base grid modifications");
@@ -1354,9 +1354,8 @@ public class IntegratedImageLayerPanel extends JPanel {
                         });
                     }
                 } else {
-                    // Camino fallback: usar el método saveAndReloadMosaicModifications del LayerManager
-                    io.Log.log("DEBUG: updateLayerPosition - ColorGrid null, usando camino fallback");
-                    layerManager.saveAndReloadMosaicModifications();
+                    // Camino fallback: los métodos privados no están disponibles
+                    io.Log.log("DEBUG: updateLayerPosition - ColorGrid null, no se pueden restaurar modificaciones");
                 }
             }
             
