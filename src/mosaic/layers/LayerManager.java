@@ -13,6 +13,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.io.File;
 import javax.imageio.ImageIO;
+import javax.swing.SwingUtilities;
 import java.io.IOException;
 import io.Model;
 import io.ModelHandler;
@@ -33,6 +34,7 @@ public class LayerManager implements ModelHandler<BrickGraphicsState> {
     private mosaic.controllers.ModificationManager modificationManager; // Para preservar modificaciones del sistema base
     private colors.LEGOColorGrid colorGrid; // Para aplicar modificaciones visuales
     private mosaic.ui.BrickedView brickedView; // Para actualizar la vista después de cambios
+    private mosaic.ui.panels.IntegratedImageLayerPanel layerPanel; // Panel de UI para actualizar la lista de capas
     
     /**
      * Constructor del gestor de capas
@@ -87,6 +89,14 @@ public class LayerManager implements ModelHandler<BrickGraphicsState> {
     public void setBrickedView(mosaic.ui.BrickedView brickedView) {
         this.brickedView = brickedView;
         io.Log.log("DEBUG: LayerManager - BrickedView establecido: " + (brickedView != null));
+    }
+    
+    /**
+     * Establece el panel de UI para actualizar la lista de capas
+     */
+    public void setLayerPanel(mosaic.ui.panels.IntegratedImageLayerPanel layerPanel) {
+        this.layerPanel = layerPanel;
+        io.Log.log("DEBUG: LayerManager - LayerPanel establecido: " + (layerPanel != null));
     }
 
     /**
@@ -964,17 +974,32 @@ public class LayerManager implements ModelHandler<BrickGraphicsState> {
     }
     
     /**
-     * Limpia todas las capas de la lista
+     * Limpia todas las capas de la lista y actualiza la UI
      */
     public void clearLayers() {
         boolean hadLayers = !layers.isEmpty();
+        int previousCount = layers.size();
         layers.clear();
         selectedLayer = null;
         
+        io.Log.log("DEBUG: LayerManager.clearLayers - Limpiadas " + previousCount + " capas");
+        
         // Si había capas y ahora no quedan, notificar para restaurar imagen original
         if (hadLayers && onAllLayersRemovedCallback != null) {
-            io.Log.log("DEBUG: LayerManager - Todas las capas eliminadas, restaurando imagen original");
+            io.Log.log("DEBUG: LayerManager.clearLayers - Restaurando imagen original tras limpiar capas");
             onAllLayersRemovedCallback.run();
+        }
+        
+        // Forzar actualización de UI inmediatamente después de limpiar
+        if (layerPanel != null) {
+            try {
+                SwingUtilities.invokeLater(() -> {
+                    layerPanel.refreshLayerList();
+                    io.Log.log("DEBUG: LayerManager.clearLayers - UI actualizada tras limpiar capas");
+                });
+            } catch (Exception ex) {
+                io.Log.log("WARN: LayerManager.clearLayers - Error al actualizar UI: " + ex.getMessage());
+            }
         }
     }
     
@@ -1188,8 +1213,11 @@ public class LayerManager implements ModelHandler<BrickGraphicsState> {
                 io.Log.log("WARN: LayerManager.handleModelChange - Error en guardado automático: " + ex.getMessage());
             }
             
-            // Limpiar capas existentes
+            // Limpiar capas existentes SIEMPRE al cargar un nuevo archivo KMV
+            // Esto resuelve el problema de que las capas del archivo anterior se mantengan
+            int layersBeforeClear = layers.size();
             clearLayers();
+            io.Log.log("DEBUG: LayerManager.handleModelChange - Capas limpiadas (" + layersBeforeClear + " -> " + layers.size() + ") para cargar nuevo archivo KMV");
             
             if (layersEnabled != null && layersEnabled) {
                 // Intentar cargar desde layers.json si existe
@@ -1257,14 +1285,26 @@ public class LayerManager implements ModelHandler<BrickGraphicsState> {
             clearLayers();
         }
         
-        // Notificar cambios
+        // Notificar cambios y forzar actualización de UI
         notifyLayersChanged();
+        
+        // Forzar actualización de la interfaz de usuario
+        if (layerPanel != null) {
+            try {
+                SwingUtilities.invokeLater(() -> {
+                    layerPanel.refreshLayerList();
+                    io.Log.log("DEBUG: LayerManager.handleModelChange - UI actualizada tras carga de capas");
+                });
+            } catch (Exception ex) {
+                io.Log.log("WARN: LayerManager.handleModelChange - Error al actualizar UI: " + ex.getMessage());
+            }
+        }
 
         // Asegurar una capa seleccionada coherente tras la carga
         if (!layers.isEmpty() && selectedLayer == null) {
             setSelectedLayer(layers.get(layers.size() - 1)); // seleccionar la superior
         }
-        io.Log.log("DEBUG: LayerManager.handleModelChange - Capas cargadas: " + layers.size());
+        io.Log.log("DEBUG: LayerManager.handleModelChange - PROCESO COMPLETO - Capas finales: " + layers.size() + " (archivo: " + (mosaicFile != null ? mosaicFile.getName() : "null") + ")");
     }
 
     /**
