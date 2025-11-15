@@ -432,6 +432,12 @@ public class MainController implements ModelHandler<BrickGraphicsState> {
 	 */
 	public void setLayerPanel(IntegratedImageLayerPanel panel) {
 		this.layerPanel = panel;
+		
+		// Conectar el layerPanel al LayerManager para permitir actualizaciones de UI
+		if (layerManager != null && panel != null) {
+			layerManager.setLayerPanel(panel);
+			io.Log.log("DEBUG: MainController.setLayerPanel - LayerPanel conectado al LayerManager");
+		}
 	}
 	
 	@Override
