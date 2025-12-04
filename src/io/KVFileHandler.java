@@ -73,6 +73,10 @@ public class KVFileHandler<S extends ModelState> {
 		}
 		for(String key : keyToSMap.keySet()) {
 			Log.log("KVFile read, but the value was not found for key: " + key);
+			S missingState = keyToSMap.get(key);
+			if (missingState != null) {
+				mapWithDefaults.put(missingState, missingState.getDefaultValue());
+			}
 		}
 	}
 	
