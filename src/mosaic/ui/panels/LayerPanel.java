@@ -102,31 +102,31 @@ public class LayerPanel extends JPanel {
         });
         
         // Información de la capa
-        layerInfoLabel = new JLabel("No hay capas");
+        layerInfoLabel = new JLabel("No layers");
         layerInfoLabel.setFont(layerInfoLabel.getFont().deriveFont(Font.ITALIC));
         
         // Botones
-        addLayerButton = new JButton("Añadir");
-        addLayerButton.setToolTipText("Cargar imagen como nueva capa");
+        addLayerButton = new JButton("Add");
+        addLayerButton.setToolTipText("Load image as new layer");
         
-        removeLayerButton = new JButton("Eliminar");
-        removeLayerButton.setToolTipText("Eliminar capa seleccionada");
+        removeLayerButton = new JButton("Delete");
+        removeLayerButton.setToolTipText("Delete selected layer");
         removeLayerButton.setEnabled(false);
         
-        duplicateButton = new JButton("Duplicar");
-        duplicateButton.setToolTipText("Duplicar capa seleccionada");
+        duplicateButton = new JButton("Duplicate");
+        duplicateButton.setToolTipText("Duplicate selected layer");
         duplicateButton.setEnabled(false);
         
         moveUpButton = new JButton("↑");
-        moveUpButton.setToolTipText("Mover capa hacia arriba");
+        moveUpButton.setToolTipText("Move layer up");
         moveUpButton.setEnabled(false);
         
         moveDownButton = new JButton("↓");
-        moveDownButton.setToolTipText("Mover capa hacia abajo");
+        moveDownButton.setToolTipText("Move layer down");
         moveDownButton.setEnabled(false);
         
-        enableLayersCheckBox = new JCheckBox("Habilitar capas", true);
-        enableLayersCheckBox.setToolTipText("Activar/desactivar todas las capas");
+        enableLayersCheckBox = new JCheckBox("Enable layers", true);
+        enableLayersCheckBox.setToolTipText("Enable or disable all layers");
     }
     
     /**
@@ -134,7 +134,7 @@ public class LayerPanel extends JPanel {
      */
     private void setupLayout() {
         setLayout(new BorderLayout());
-        setBorder(new TitledBorder("Capas"));
+        setBorder(new TitledBorder("Layers"));
         
         // Panel superior - Control general
         JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
@@ -171,7 +171,7 @@ public class LayerPanel extends JPanel {
         
         // Opacidad
         gbc.gridx = 0; gbc.gridy = 1; gbc.gridwidth = 1;
-        bottomPanel.add(new JLabel("Opacidad:"), gbc);
+        bottomPanel.add(new JLabel("Opacity:"), gbc);
         gbc.gridx = 1; gbc.fill = GridBagConstraints.HORIZONTAL;
         bottomPanel.add(opacitySlider, gbc);
         
@@ -181,7 +181,7 @@ public class LayerPanel extends JPanel {
         
         // Modo de mezcla
         gbc.gridx = 0; gbc.gridy = 3;
-        bottomPanel.add(new JLabel("Modo:"), gbc);
+        bottomPanel.add(new JLabel("Mode:"), gbc);
         gbc.gridx = 1; gbc.fill = GridBagConstraints.HORIZONTAL;
         bottomPanel.add(blendModeCombo, gbc);
         
@@ -262,8 +262,8 @@ public class LayerPanel extends JPanel {
         }
         
         fileChooser.setFileFilter(new javax.swing.filechooser.FileNameExtensionFilter(
-            "Archivos de imagen", "png", "jpg", "jpeg", "gif", "bmp"));
-        fileChooser.setDialogTitle("Seleccionar imagen para capa");
+            "Image files", "png", "jpg", "jpeg", "gif", "bmp"));
+        fileChooser.setDialogTitle("Select image for layer");
         
         if (fileChooser.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
             try {
@@ -276,13 +276,13 @@ public class LayerPanel extends JPanel {
                 notifyLayersChanged();
                 
                 JOptionPane.showMessageDialog(this, 
-                    "Capa añadida: " + layer.getName(),
-                    "Capa añadida", 
+                    "Layer added: " + layer.getName(),
+                    "Layer added", 
                     JOptionPane.INFORMATION_MESSAGE);
                 
             } catch (IOException ex) {
                 JOptionPane.showMessageDialog(this, 
-                    "Error al cargar la imagen:\n" + ex.getMessage(),
+                    "Error loading image:\n" + ex.getMessage(),
                     "Error", 
                     JOptionPane.ERROR_MESSAGE);
             }
@@ -296,8 +296,8 @@ public class LayerPanel extends JPanel {
         Layer selected = layerList.getSelectedValue();
         if (selected != null) {
             int confirm = JOptionPane.showConfirmDialog(this,
-                "¿Eliminar la capa '" + selected.getName() + "'?",
-                "Confirmar eliminación",
+                "Delete layer '" + selected.getName() + "'?",
+                "Confirm deletion",
                 JOptionPane.YES_NO_OPTION);
             
             if (confirm == JOptionPane.YES_OPTION) {
@@ -352,7 +352,7 @@ public class LayerPanel extends JPanel {
         Layer selected = layerList.getSelectedValue();
         if (selected != null) {
             String newName = JOptionPane.showInputDialog(this,
-                "Nuevo nombre para la capa:",
+                "New name for the layer:",
                 selected.getName());
             
             if (newName != null && !newName.trim().isEmpty()) {
@@ -477,7 +477,7 @@ public class LayerPanel extends JPanel {
             layerInfoLabel.setText(String.format("%dx%d px", 
                 selected.getWidth(), selected.getHeight()));
         } else {
-            layerInfoLabel.setText("No hay capa seleccionada");
+            layerInfoLabel.setText("No layer selected");
         }
     }
     

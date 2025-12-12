@@ -98,6 +98,22 @@ public class Ribbon extends JToolBar {
 			}
 		});
 		add(forcePaintButton);
+
+		// Toggle manual painting visibility
+		final JCheckBox showManualPaintToggle = new JCheckBox("Show manual paint");
+		showManualPaintToggle.setSelected(studEditController.isManualPaintingVisible());
+		showManualPaintToggle.setToolTipText("Show or hide manual painting applied to the mosaic");
+		showManualPaintToggle.addActionListener(e -> {
+			boolean selected = showManualPaintToggle.isSelected();
+			studEditController.setManualPaintingVisible(selected);
+		});
+		studEditController.addChangeListener(e -> {
+			boolean visible = studEditController.isManualPaintingVisible();
+			if (showManualPaintToggle.isSelected() != visible) {
+				showManualPaintToggle.setSelected(visible);
+			}
+		});
+		add(showManualPaintToggle);
 		
 		addSeparator();
 		

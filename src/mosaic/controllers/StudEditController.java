@@ -33,6 +33,7 @@ public class StudEditController implements ModelHandler<BrickGraphicsState> {
     private ModificationManager modificationManager; // Gestor de modificaciones manuales
     private BrushSize brushSize = BrushSize.SMALL; // Tamaño del pincel
     private boolean forcePaintMode = false; // NUEVO: Modo de pintado forzado para proteger píxeles
+    private boolean manualPaintingVisible = true; // Estado mostrado/oculto del pintado manual
     
     public StudEditController(ColorController colorController, BrickedView brickedView) {
         this.activeTool = EditTool.DEFAULT;
@@ -62,6 +63,7 @@ public class StudEditController implements ModelHandler<BrickGraphicsState> {
         this.brickedView = brickedView;
         if (brickedView != null) {
             brickedView.setModificationManager(this.modificationManager);
+            setManualPaintingVisible(manualPaintingVisible);
         }
     }
     
@@ -119,6 +121,31 @@ public class StudEditController implements ModelHandler<BrickGraphicsState> {
     public boolean isForcePaintMode() {
         return forcePaintMode;
     }
+
+    /**
+     * Permite mostrar u ocultar temporalmente el pintado manual aplicado sobre el grid.
+     */
+    public void setManualPaintingVisible(boolean visible) {
+        boolean changed = this.manualPaintingVisible != visible;
+        this.manualPaintingVisible = visible;
+
+        LEGOColorGrid grid = (brickedView != null) ? brickedView.getColorGrid() : null;
+        modificationManager.setModificationsVisible(visible, grid);
+        if (brickedView != null) {
+            brickedView.repaint();
+        }
+
+        if (changed) {
+            fireStateChanged();
+        }
+    }
+
+    /**
+     * Retorna si el pintado manual está visible actualmente.
+     */
+    public boolean isManualPaintingVisible() {
+        return manualPaintingVisible;
+    }
     
     /**
      * Establece el color seleccionado para la herramienta pincel.
@@ -148,6 +175,10 @@ public class StudEditController implements ModelHandler<BrickGraphicsState> {
         if (grid == null) {
             io.Log.log("ERROR: Grid es null en applyToolAt");
             return false;
+        }
+        
+        if ((activeTool == EditTool.BRUSH || activeTool == EditTool.RESET) && (!manualPaintingVisible || !modificationManager.areModificationsVisible())) {
+            ensureManualPaintingVisible();
         }
         
             Log.log("DEBUG: Aplicando herramienta " + activeTool + " con pincel " + brushSize + " en (" + x + "," + y + ")");
@@ -190,7 +221,7 @@ public class StudEditController implements ModelHandler<BrickGraphicsState> {
             // MODO FORZADO: Siempre pintar y registrar modificación (proteger de transformaciones)
             boolean success = grid.setColorAt(x, y, selectedColor);
             if (success) {
-                modificationManager.forceRecordModification(x, y, selectedColor);
+                modificationManager.forceRecordModification(x, y, selectedColor, currentColor);
                 hasChanges = true;
                 fireStateChanged();
                 io.Log.log("DEBUG: FORZADO pintado pincel en (" + x + "," + y + ") color=" + selectedColor.getName() + " (protegido)");
@@ -272,7 +303,7 @@ public class StudEditController implements ModelHandler<BrickGraphicsState> {
                         // MODO FORZADO: Siempre pintar
                         boolean success = grid.setColorAt(targetX, targetY, selectedColor);
                         if (success) {
-                            modificationManager.forceRecordModification(targetX, targetY, selectedColor);
+                            modificationManager.forceRecordModification(targetX, targetY, selectedColor, currentColor);
                             io.Log.log("DEBUG: FORZADO pintado brush en (" + targetX + "," + targetY + ") con color " + selectedColor.getName() + " (protegido)");
                             anyChange = true;
                         }
@@ -433,10 +464,19 @@ public class StudEditController implements ModelHandler<BrickGraphicsState> {
         
         model.set(BrickGraphicsState.ManualModifications, serializedModifications);
             Log.log("DEBUG: StudEditController - Guardadas " + modificationsForSave.size() + " modificaciones manuales");
+
+        model.set(BrickGraphicsState.ManualPaintingVisible, manualPaintingVisible);
     }
 
     @Override
     public void handleModelChange(Model<BrickGraphicsState> model) {
+        boolean savedVisibility = true;
+        Object visibilityValue = model.get(BrickGraphicsState.ManualPaintingVisible);
+        if (visibilityValue instanceof Boolean) {
+            savedVisibility = (Boolean) visibilityValue;
+        }
+        setManualPaintingVisible(savedVisibility);
+
         // Cargar las modificaciones manuales desde el modelo
         Object savedData = model.get(BrickGraphicsState.ManualModifications);
         if (savedData != null) {
@@ -488,8 +528,12 @@ public class StudEditController implements ModelHandler<BrickGraphicsState> {
                         LEGOColorGrid currentGrid = brickedView.getColorGrid();
                         if (currentGrid != null) {
                                 Log.log("DEBUG: StudEditController - Aplicando " + savedModifications.size() + " modificaciones al grid");
-                            modificationManager.restoreModifications(currentGrid);
+                            if (modificationManager.areModificationsVisible()) {
+                                modificationManager.restoreModifications(currentGrid);
                                 Log.log("DEBUG: StudEditController - COMPLETADO: Aplicadas modificaciones al grid después de cargar desde KMV");
+                            } else {
+                                Log.log("DEBUG: StudEditController - Pintado oculto, se omite aplicación inmediata de modificaciones");
+                            }
                         } else {
                                 Log.log("DEBUG: StudEditController - Grid no disponible, programando aplicación retrasada");
                             // Usar un timer para intentar aplicar cuando el grid esté listo
@@ -501,7 +545,9 @@ public class StudEditController implements ModelHandler<BrickGraphicsState> {
                                     LEGOColorGrid grid = brickedView.getColorGrid();
                                     if (grid != null) {
                                         Log.log("DEBUG: StudEditController - Grid disponible en intento " + attempts + ", aplicando modificaciones");
-                                        modificationManager.applyAllModificationsToGrid(grid);
+                                        if (modificationManager.areModificationsVisible()) {
+                                            modificationManager.applyAllModificationsToGrid(grid);
+                                        }
                                         ((javax.swing.Timer) e.getSource()).stop();
                                         // Forzar repaint para mostrar los cambios
                                         SwingUtilities.invokeLater(() -> brickedView.repaint());
@@ -522,6 +568,12 @@ public class StudEditController implements ModelHandler<BrickGraphicsState> {
                 Log.log("ERROR: StudEditController - Error al cargar modificaciones: " + e.getMessage());
                 Log.log(e);
             }
+        }
+    }
+
+    private void ensureManualPaintingVisible() {
+        if (!manualPaintingVisible || !modificationManager.areModificationsVisible()) {
+            setManualPaintingVisible(true);
         }
     }
 }

@@ -46,6 +46,7 @@ public enum BrickGraphicsState implements ModelState {
 	PrintMagnifierSizePercentage(50),
 	PrintDisplayTextRight("to the right      "),
 	PrintDisplayTextDown("down"),
+	PrintAutoReuseConfiguration(true),
 	
 	// Magnifier:
 	MagnifierShowLegend(false),
@@ -86,11 +87,17 @@ public enum BrickGraphicsState implements ModelState {
 	
 	// Manual modifications (serialized as String):
 	ManualModifications(""),
+	ManualPaintingVisible(true),
 	
 	// Layer system:
 	LayersEnabled(false),
 	LayerData(""),
 	OriginalImageFile(new DataFile()), // Imagen original sin capas aplicadas
+	BackgroundBrightness(1.0f),
+	BackgroundContrast(1.0f),
+	BackgroundSaturation(1.0f),
+	BackgroundGamma(1.0f),
+	BackgroundSharpness(1.0f),
 	
 	// Export:
 	ExportOptimize(true);

@@ -16,6 +16,8 @@ public class ModificationManager {
     // Mapa que guarda las modificaciones: coordenada -> color modificado
     private Map<String, LEGOColor> modifications = new HashMap<>();
     private Map<String, LEGOColor> backupModifications = new HashMap<>(); // Backup para operaciones críticas
+    private Map<String, LEGOColor> originalColors = new HashMap<>(); // Color original antes del pintado manual
+    private boolean modificationsVisible = true;
     private LEGOColorGrid originalGrid = null;
     private ColorController colorController; // Referencia para convertir IDs a colores
     
@@ -40,8 +42,13 @@ public class ModificationManager {
         if (originalColor != null && originalColor.equals(newColor)) {
             // Si volvemos al color original, eliminamos la modificación
             modifications.remove(key);
+            originalColors.remove(key);
             io.Log.log("DEBUG: ModificationManager - Removida modificación en (" + x + "," + y + ")");
         } else {
+            if (originalColor != null) {
+                // Guardar el color base previo para poder restaurarlo al ocultar el pintado
+                originalColors.put(key, originalColor);
+            }
             // Registramos la nueva modificación
             modifications.put(key, newColor);
             io.Log.log("DEBUG: ModificationManager - Registrada modificación en (" + x + "," + y + ") -> " + newColor.toString());
@@ -52,11 +59,18 @@ public class ModificationManager {
      * NUEVO: Fuerza el registro de una modificación manual incluso si el color es igual al existente.
      * Esto es útil para "proteger" píxeles de las transformaciones de imagen aplicando pintado manual.
      */
-    public void forceRecordModification(int x, int y, LEGOColor newColor) {
+    public void forceRecordModification(int x, int y, LEGOColor newColor, LEGOColor originalColor) {
         String key = x + "," + y;
+        if (originalColor != null) {
+            originalColors.put(key, originalColor);
+        }
         // SIEMPRE registrar la modificación, sin importar el color original
         modifications.put(key, newColor);
         io.Log.log("DEBUG: ModificationManager - FORZADA modificación en (" + x + "," + y + ") -> " + newColor.toString() + " (protegido de transformaciones)");
+    }
+
+    public void forceRecordModification(int x, int y, LEGOColor newColor) {
+        forceRecordModification(x, y, newColor, null);
     }
     
     /**
@@ -85,6 +99,10 @@ public class ModificationManager {
             LEGOColor color = entry.getValue();
             
             if (x >= 0 && x < newGrid.getWidth() && y >= 0 && y < newGrid.getHeight()) {
+                LEGOColor previousColor = newGrid.getColorAt(x, y);
+                if (previousColor != null) {
+                    originalColors.put(entry.getKey(), previousColor);
+                }
                 if (newGrid.setColorAt(x, y, color)) {
                     restored++;
                 }
@@ -113,6 +131,8 @@ public class ModificationManager {
      */
     public void clearModifications() {
         modifications.clear();
+        originalColors.clear();
+        modificationsVisible = true;
     }
     
     /**
@@ -136,6 +156,10 @@ public class ModificationManager {
                     
                     // Verificar límites del grid
                     if (x >= 0 && y >= 0 && x < colorGrid.getWidth() && y < colorGrid.getHeight()) {
+                        LEGOColor previousColor = colorGrid.getColorAt(x, y);
+                        if (previousColor != null) {
+                            originalColors.put(entry.getKey(), previousColor);
+                        }
                         colorGrid.setColorAt(x, y, color);
                         applied++;
                     }
@@ -169,6 +193,7 @@ public class ModificationManager {
         if (modificationsCopy != null) {
             modifications.clear();
             modifications.putAll(modificationsCopy);
+            originalColors.clear();
             io.Log.log("DEBUG: ModificationManager - Restored " + modifications.size() + " modifications from copy");
         }
     }
@@ -221,6 +246,7 @@ public class ModificationManager {
      */
     public void loadModificationsFromSave(Map<String, Integer> saveMap) {
         modifications.clear();
+        originalColors.clear();
         if (colorController == null || saveMap == null || saveMap.isEmpty()) {
             return;
         }
@@ -288,6 +314,7 @@ public class ModificationManager {
         // Restaurar las modificaciones desde el backup
         modifications.clear();
         modifications.putAll(backupModifications);
+        originalColors.clear();
         
         // Aplicar las modificaciones al grid actual si existe
         if (originalGrid != null) {
@@ -295,6 +322,66 @@ public class ModificationManager {
         }
         
         io.Log.log("DEBUG: ModificationManager - Restauradas " + modifications.size() + " modificaciones desde backup");
+    }
+    
+    /**
+     * Indica si el pintado manual está visible actualmente.
+     */
+    public boolean areModificationsVisible() {
+        return modificationsVisible;
+    }
+
+    /**
+     * Activa o desactiva el pintado manual sobre el grid indicado.
+     */
+    public void setModificationsVisible(boolean visible, LEGOColorGrid grid) {
+        if (this.modificationsVisible == visible) {
+            return;
+        }
+        this.modificationsVisible = visible;
+
+        LEGOColorGrid targetGrid = grid != null ? grid : originalGrid;
+        if (targetGrid == null) {
+            io.Log.log("WARN: ModificationManager - No hay grid disponible al cambiar visibilidad de pintado manual");
+            return;
+        }
+
+        this.originalGrid = targetGrid;
+
+        if (visible) {
+            applyAllModificationsToGrid(targetGrid);
+            io.Log.log("DEBUG: ModificationManager - Pintado manual ACTIVADO");
+        } else {
+            revertModificationsOnGrid(targetGrid);
+            io.Log.log("DEBUG: ModificationManager - Pintado manual OCULTO");
+        }
+    }
+
+    private void revertModificationsOnGrid(LEGOColorGrid grid) {
+        if (grid == null || originalColors.isEmpty()) {
+            return;
+        }
+
+        int reverted = 0;
+        for (Map.Entry<String, LEGOColor> entry : originalColors.entrySet()) {
+            String[] coords = entry.getKey().split(",");
+            if (coords.length != 2) {
+                continue;
+            }
+            try {
+                int x = Integer.parseInt(coords[0]);
+                int y = Integer.parseInt(coords[1]);
+
+                if (x >= 0 && x < grid.getWidth() && y >= 0 && y < grid.getHeight()) {
+                    if (grid.setColorAt(x, y, entry.getValue())) {
+                        reverted++;
+                    }
+                }
+            } catch (NumberFormatException ignore) {
+                // Coordenadas corruptas
+            }
+        }
+        io.Log.log("DEBUG: ModificationManager - Restaurados " + reverted + " studs originales al ocultar pintado");
     }
     
     /**

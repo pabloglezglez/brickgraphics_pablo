@@ -14,12 +14,12 @@ public class CustomColorIDAction extends JMenuItem {
     private ColorController colorController;
     
     public CustomColorIDAction(ColorController colorController) {
-        super("Números Personalizados...");
+        super("Custom Color Numbers...");
         this.colorController = colorController;
         
         setMnemonic('P');
         setDisplayedMnemonicIndex(8);
-        setToolTipText("Asignar números específicos a los colores");
+        setToolTipText("Assign specific numbers to colors");
         
         addActionListener(new ActionListener() {
             @Override

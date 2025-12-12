@@ -62,7 +62,6 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 	private Dimension shownImageSize;
 	// Gestor de capas para pintura por-overlay
 	private LayerManager layerManager;
-	// Sistema de overlay global de pintura
 	// private PaintOverlay paintOverlay;
 	// Throttle para logs del bounding box
 	private long lastBoundsLogTs = 0L;
@@ -358,7 +357,7 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 				lastValidGrid = null;
 			} else if (grid != null && lastValidGrid == null) {
 				// Grid se restauró - aplicar modificaciones preservadas
-				if (modificationManager != null) {
+				if (modificationManager != null && modificationManager.areModificationsVisible()) {
 					modificationManager.restoreModifications(grid);
 				}
 				lastValidGrid = grid;
@@ -1300,6 +1299,10 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 	private void renderManualPaintingOverTransforms(Graphics2D g2, Dimension mosaicSize) {
 		// Solo procesar si tenemos ModificationManager y modificaciones
 		if (modificationManager == null || mainController == null) {
+			return;
+		}
+
+		if (!modificationManager.areModificationsVisible()) {
 			return;
 		}
 		

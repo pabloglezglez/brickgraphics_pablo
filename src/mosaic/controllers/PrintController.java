@@ -43,6 +43,7 @@ public class PrintController implements Printable, ModelHandler<BrickGraphicsSta
 	private Dimension lastMosaicSize;
 	// Model state:
 	private boolean coverPageShow, coverPageShowFileName, coverPageShowLegend, showLegend, showPageNumber;
+	private boolean autoReusePrintConfig;
 	private float fontSizeMM;
 	private int magnifierSizePercentage;
 	private String rightCountDisplayText, downCountDisplayText;
@@ -123,94 +124,108 @@ public class PrintController implements Printable, ModelHandler<BrickGraphicsSta
         boolean dialogResult = false;
         
         // If we have a successful print configuration, offer options to user
-        if(hasSuccessfulPrintConfig && lastUsedPrintService != null) {
-        	Log.log("Previous print configuration found, asking user for preference.");
-        	
-        	String[] options = {
-        		"Usar Configuración Anterior", 
-        		"Configurar Nueva Impresión", 
-        		"Mostrar Diálogo Completo",
-        		"Cancelar"
-        	};
-        	
-        	int choice = JOptionPane.showOptionDialog(mw,
-        		"¿Cómo quieres imprimir?\n\n" +
-        		"• Usar Configuración Anterior: " + lastUsedPrintService.getName() + "\n" +
-        		"• Configurar Nueva Impresión: Elegir impresora o PDF desde cero\n" +
-        		"• Mostrar Diálogo Completo: Ver todas las opciones",
-        		"Opciones de Impresión",
-        		JOptionPane.YES_NO_CANCEL_OPTION,
-        		JOptionPane.QUESTION_MESSAGE,
-        		null,
-        		options,
-        		options[0]);
-        		
-        	switch(choice) {
-        		case 0: // Usar configuración anterior
-        			try {
-        				printerJob.setPrintService(lastUsedPrintService);
-        				pageFormat = savedPageFormat;
-        				printerJob.setPrintable(PrintController.this, pageFormat);
-        				dialogResult = true;
-        				Log.log("Using previous print configuration: " + lastUsedPrintService.getName());
-        			} catch(Exception e) {
-        				Log.log("Failed to reuse print config: " + e.getMessage());
-        				dialogResult = showPrintDialogSafely();
-        			}
-        			break;
-        			
-        		case 1: // Configurar Nueva Impresión
-        			// Clear saved configuration and restart print system cleanly
-        			Log.log("User requested fresh print configuration.");
-        			hasSuccessfulPrintConfig = false;
-        			lastUsedPrintService = null;
-        			savedPageFormat = null;
-        			
-        			// Create completely fresh PrinterJob
-        			try {
-        				// Force garbage collection to clear macOS print state
-        				System.gc();
-        				Thread.sleep(100);
-        				
-        				// Create brand new PrinterJob
-        				printerJob = PrinterJob.getPrinterJob();
-        				pageFormat = printerJob.defaultPage();
-        				printerJob.setPrintable(PrintController.this, pageFormat);
-        				
-        				// Show dialog with fresh state
-        				dialogResult = showPrintDialogSafely();
-        				Log.log("Fresh print dialog shown, result: " + dialogResult);
-        				
-        				// If first attempt fails (common in macOS), try once more
-        				if(!dialogResult) {
-        					Log.log("First attempt failed, trying second attempt after brief pause...");
-        					Thread.sleep(200);
-        					dialogResult = showPrintDialogSafely();
-        					Log.log("Second attempt result: " + dialogResult);
-        				}
-        			} catch(Exception e) {
-        				Log.log("Error creating fresh print configuration: " + e.getMessage());
-        				JOptionPane.showMessageDialog(mw,
-        					"Error al configurar nueva impresión.\n\n" +
-        					"Intenta reiniciar la aplicación.",
-        					"Error",
-        					JOptionPane.WARNING_MESSAGE);
-        				return;
-        			}
-        			break;
-        			
-        		case 2: // Mostrar diálogo completo
-        			dialogResult = showPrintDialogSafely();
-        			break;
-        			
-        		default: // Cancelar
-        			Log.log("User cancelled printing.");
-        			return;
-        	}
-        } else {
-        	// First time or no saved config, show dialog
-        	dialogResult = showPrintDialogSafely();
-        }
+		if(hasSuccessfulPrintConfig && lastUsedPrintService != null) {
+			if(autoReusePrintConfig) {
+				Log.log("Reusing previous print configuration automatically (system dialog will still show).");
+				try {
+					printerJob.setPrintService(lastUsedPrintService);
+					pageFormat = savedPageFormat;
+					printerJob.setPrintable(PrintController.this, pageFormat);
+					// Still show system dialog so user can confirm/change printer settings
+					dialogResult = showPrintDialogSafely();
+				} catch(Exception e) {
+					Log.log("Failed to auto-reuse print config: " + e.getMessage());
+					dialogResult = showPrintDialogSafely();
+				}
+			} else {
+				Log.log("Previous print configuration found, asking user for preference.");
+				
+				String[] options = {
+					"Usar Configuración Anterior", 
+					"Configurar Nueva Impresión", 
+					"Mostrar Diálogo Completo",
+					"Cancelar"
+				};
+				
+				int choice = JOptionPane.showOptionDialog(mw,
+					"¿Cómo quieres imprimir?\n\n" +
+					"• Usar Configuración Anterior: " + lastUsedPrintService.getName() + "\n" +
+					"• Configurar Nueva Impresión: Elegir impresora o PDF desde cero\n" +
+					"• Mostrar Diálogo Completo: Ver todas las opciones",
+					"Opciones de Impresión",
+					JOptionPane.YES_NO_CANCEL_OPTION,
+					JOptionPane.QUESTION_MESSAGE,
+					null,
+					options,
+					options[0]);
+					
+				switch(choice) {
+					case 0: // Usar configuración anterior
+						try {
+							printerJob.setPrintService(lastUsedPrintService);
+							pageFormat = savedPageFormat;
+							printerJob.setPrintable(PrintController.this, pageFormat);
+							dialogResult = true;
+							Log.log("Using previous print configuration: " + lastUsedPrintService.getName());
+						} catch(Exception e) {
+							Log.log("Failed to reuse print config: " + e.getMessage());
+							dialogResult = showPrintDialogSafely();
+						}
+						break;
+						
+					case 1: // Configurar Nueva Impresión
+						// Clear saved configuration and restart print system cleanly
+						Log.log("User requested fresh print configuration.");
+						hasSuccessfulPrintConfig = false;
+						lastUsedPrintService = null;
+						savedPageFormat = null;
+						
+						// Create completely fresh PrinterJob
+						try {
+							// Force garbage collection to clear macOS print state
+							System.gc();
+							Thread.sleep(100);
+							
+							// Create brand new PrinterJob
+							printerJob = PrinterJob.getPrinterJob();
+							pageFormat = printerJob.defaultPage();
+							printerJob.setPrintable(PrintController.this, pageFormat);
+							
+							// Show dialog with fresh state
+							dialogResult = showPrintDialogSafely();
+							Log.log("Fresh print dialog shown, result: " + dialogResult);
+							
+							// If first attempt fails (common in macOS), try once more
+							if(!dialogResult) {
+								Log.log("First attempt failed, trying second attempt after brief pause...");
+								Thread.sleep(200);
+								dialogResult = showPrintDialogSafely();
+								Log.log("Second attempt result: " + dialogResult);
+							}
+						} catch(Exception e) {
+							Log.log("Error creating fresh print configuration: " + e.getMessage());
+							JOptionPane.showMessageDialog(mw,
+								"Error al configurar nueva impresión.\n\n" +
+								"Intenta reiniciar la aplicación.",
+								"Error",
+								JOptionPane.WARNING_MESSAGE);
+							return;
+						}
+						break;
+						
+					case 2: // Mostrar diálogo completo
+						dialogResult = showPrintDialogSafely();
+						break;
+						
+					default: // Cancelar
+						Log.log("User cancelled printing.");
+						return;
+				}
+			}
+		} else {
+			// First time or no saved config, show dialog
+			dialogResult = showPrintDialogSafely();
+		}
         
         Log.log("Print dialog result: " + dialogResult);
         
@@ -320,6 +335,7 @@ public class PrintController implements Printable, ModelHandler<BrickGraphicsSta
 		showPosition = ShowPosition.values()[(Integer)model.get(BrickGraphicsState.PrintShowPositionIndex)];
 		showLegend = (Boolean)model.get(BrickGraphicsState.PrintShowLegend);
 		showPageNumber = (Boolean)model.get(BrickGraphicsState.PrintShowPageNumber);
+		autoReusePrintConfig = (Boolean)model.get(BrickGraphicsState.PrintAutoReuseConfiguration);
 		magnifiersPerPage = (Dimension)model.get(BrickGraphicsState.PrintMagnifiersPerPage);
 		fontSizeMM = (Float)model.get(BrickGraphicsState.PrintFontSize);
 		magnifierSizePercentage = (Integer)model.get(BrickGraphicsState.PrintMagnifierSizePercentage);
@@ -377,6 +393,10 @@ public class PrintController implements Printable, ModelHandler<BrickGraphicsSta
 		showPageNumber = b;
 		notifyListeners(new ChangeEvent(caller));
 	}
+	public void setAutoReusePrintConfig(boolean value, Object caller) {
+		autoReusePrintConfig = value;
+		notifyListeners(new ChangeEvent(caller));
+	}
 	public void setCoverPagePictureType(CoverPagePictureType c, Object caller) {
 		coverPagePictureType = c;
 		notifyListeners(new ChangeEvent(caller));
@@ -431,6 +451,9 @@ public class PrintController implements Printable, ModelHandler<BrickGraphicsSta
 	}
 	public ShowPosition getShowPosition() {
 		return showPosition;
+	}
+	public boolean isAutoReusePrintConfig() {
+		return autoReusePrintConfig;
 	}
 	public Dimension getMagnifiersPerPage() {
 		return magnifiersPerPage;		
@@ -1120,6 +1143,7 @@ public class PrintController implements Printable, ModelHandler<BrickGraphicsSta
 		model.set(BrickGraphicsState.PrintMagnifierSizePercentage, magnifierSizePercentage);
 		model.set(BrickGraphicsState.PrintDisplayTextDown, downCountDisplayText);
 		model.set(BrickGraphicsState.PrintDisplayTextRight, rightCountDisplayText);		
+		model.set(BrickGraphicsState.PrintAutoReuseConfiguration, autoReusePrintConfig);
 	}
 
 	@Override

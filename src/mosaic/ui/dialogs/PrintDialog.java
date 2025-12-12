@@ -33,7 +33,7 @@ public class PrintDialog extends JDialog implements ChangeListener {
 					   tfMagnifierSizeHeight, tfFontSize, tfMagnifierSizePercentage,
 					   tfRightCountDisplayText, tfDownCountDisplayText;
 	private JCheckBox cbCoverPageShow, cbCoverPageShowFileName, cbCoverPageShowLegend, 
-					  cbShowLegend, cbShowPageNumber;
+					  cbShowLegend, cbShowPageNumber, cbAutoReusePrintConfig;
 	private JRadioButton[] rbCoverPagePictureType, rbShowPosition;
 	private JComboBox<ColorController.ShownID> cColorNumber;
 	private JComboBox<String> cColorName;
@@ -382,6 +382,18 @@ public class PrintDialog extends JDialog implements ChangeListener {
 		JPanel pShowPageNumber = new JPanel(new FlowLayout(FlowLayout.LEFT));
 		pShowPageNumber.add(cbShowPageNumber);
 		midBottomLeftPanel.add(pShowPageNumber);
+		// Auto reuse print config:
+		cbAutoReusePrintConfig = new JCheckBox("Remember printer and skip extra dialog");
+		cbAutoReusePrintConfig.setAlignmentX(Component.LEFT_ALIGNMENT);
+		cbAutoReusePrintConfig.addActionListener(new ActionListener() {
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				pc.setAutoReusePrintConfig(cbAutoReusePrintConfig.isSelected(), PrintDialog.this);
+			}
+		});
+		JPanel pAutoReuse = new JPanel(new FlowLayout(FlowLayout.LEFT));
+		pAutoReuse.add(cbAutoReusePrintConfig);
+		midBottomLeftPanel.add(pAutoReuse);
 		
 		// Position display buttons:
 		JPanel bottomButtonGroupPanel = new JPanel();
@@ -484,6 +496,7 @@ public class PrintDialog extends JDialog implements ChangeListener {
 		}		
 		cbShowLegend.setSelected(pc.getShowLegend());
 		cbShowPageNumber.setSelected(pc.getShowPageNumber());
+		cbAutoReusePrintConfig.setSelected(pc.isAutoReusePrintConfig());
 		rbShowPosition[pc.getShowPosition().ordinal()].setSelected(true);
 		tfRightCountDisplayText.setText(pc.getRightCountDisplayText());
 		tfDownCountDisplayText.setText(pc.getDownCountDisplayText());

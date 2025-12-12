@@ -35,6 +35,11 @@ public class LayerManager implements ModelHandler<BrickGraphicsState> {
     private colors.LEGOColorGrid colorGrid; // Para aplicar modificaciones visuales
     private mosaic.ui.BrickedView brickedView; // Para actualizar la vista después de cambios
     private mosaic.ui.panels.IntegratedImageLayerPanel layerPanel; // Panel de UI para actualizar la lista de capas
+    private float backgroundBrightness = 1.0f;
+    private float backgroundContrast = 1.0f;
+    private float backgroundSaturation = 1.0f;
+    private float backgroundGamma = 1.0f;
+    private float backgroundSharpness = 1.0f;
     
     /**
      * Constructor del gestor de capas
@@ -97,6 +102,14 @@ public class LayerManager implements ModelHandler<BrickGraphicsState> {
     public void setLayerPanel(mosaic.ui.panels.IntegratedImageLayerPanel layerPanel) {
         this.layerPanel = layerPanel;
         io.Log.log("DEBUG: LayerManager - LayerPanel establecido: " + (layerPanel != null));
+    }
+
+    public void updateBackgroundAdjustmentCache(float brightness, float contrast, float saturation, float gamma, float sharpness) {
+        this.backgroundBrightness = brightness;
+        this.backgroundContrast = contrast;
+        this.backgroundSaturation = saturation;
+        this.backgroundGamma = gamma;
+        this.backgroundSharpness = sharpness;
     }
 
     /**
@@ -323,28 +336,33 @@ public class LayerManager implements ModelHandler<BrickGraphicsState> {
             }
             
             // Restore base grid modifications with visual application
-            if (baseModifications != null && modificationManager != null && colorGrid != null) {
-                modificationManager.restoreModificationsFromCopyAndApply(baseModifications, colorGrid);
-                io.Log.log("DEBUG: moveLayerUp - restored and applied " + baseModifications.size() + " base grid modifications");
-                
-                // CRÍTICO: Forzar repaint para actualizar viewport tras aplicar modificaciones directamente
-                if (brickedView != null) {
-                    javax.swing.SwingUtilities.invokeLater(() -> {
-                        brickedView.repaint();
-                        io.Log.log("DEBUG: moveLayerUp - Forzado repaint() del BrickedView (camino directo)");
-                    });
-                }
-            } else if (baseModifications != null && modificationManager != null) {
-                // Fallback: solo restaurar sin aplicación visual
-                modificationManager.restoreModificationsFromCopy(baseModifications);
-                io.Log.log("DEBUG: moveLayerUp - restored " + baseModifications.size() + " base grid modifications (sin aplicación visual)");
-                
-                // NUEVA SOLUCIÓN: Guardar y recargar desde JSON para aplicar visualmente
-                try {
-                    saveAndReloadMosaicModifications();
-                    io.Log.log("DEBUG: moveLayerUp - aplicadas modificaciones vía JSON reload");
-                } catch (Exception ex) {
-                    io.Log.log("WARN: moveLayerUp - fallo JSON reload: " + ex.getMessage());
+            if (baseModifications != null && modificationManager != null) {
+                if (modificationManager.areModificationsVisible()) {
+                    if (colorGrid != null) {
+                        modificationManager.restoreModificationsFromCopyAndApply(baseModifications, colorGrid);
+                        io.Log.log("DEBUG: moveLayerUp - restored and applied " + baseModifications.size() + " base grid modifications");
+						
+                        // CRÍTICO: Forzar repaint para actualizar viewport tras aplicar modificaciones directamente
+                        if (brickedView != null) {
+                            javax.swing.SwingUtilities.invokeLater(() -> {
+                                brickedView.repaint();
+                                io.Log.log("DEBUG: moveLayerUp - Forzado repaint() del BrickedView (camino directo)");
+                            });
+                        }
+                    } else {
+                        // Fallback: solo restaurar sin aplicación visual y reintentar vía JSON
+                        modificationManager.restoreModificationsFromCopy(baseModifications);
+                        io.Log.log("DEBUG: moveLayerUp - restored " + baseModifications.size() + " base grid modifications (sin aplicación visual)");
+                        try {
+                            saveAndReloadMosaicModifications();
+                            io.Log.log("DEBUG: moveLayerUp - aplicadas modificaciones vía JSON reload");
+                        } catch (Exception ex) {
+                            io.Log.log("WARN: moveLayerUp - fallo JSON reload: " + ex.getMessage());
+                        }
+                    }
+                } else {
+                    modificationManager.restoreModificationsFromCopy(baseModifications);
+                    io.Log.log("DEBUG: moveLayerUp - Pintado manual oculto, se restauran " + baseModifications.size() + " modificaciones sin aplicarlas");
                 }
             }
             
@@ -433,28 +451,32 @@ public class LayerManager implements ModelHandler<BrickGraphicsState> {
             }
             
             // Restore base grid modifications with visual application
-            if (baseModifications != null && modificationManager != null && colorGrid != null) {
-                modificationManager.restoreModificationsFromCopyAndApply(baseModifications, colorGrid);
-                io.Log.log("DEBUG: moveLayerDown - restored and applied " + baseModifications.size() + " base grid modifications");
-                
-                // CRÍTICO: Forzar repaint para actualizar viewport tras aplicar modificaciones directamente
-                if (brickedView != null) {
-                    javax.swing.SwingUtilities.invokeLater(() -> {
-                        brickedView.repaint();
-                        io.Log.log("DEBUG: moveLayerDown - Forzado repaint() del BrickedView (camino directo)");
-                    });
-                }
-            } else if (baseModifications != null && modificationManager != null) {
-                // Fallback: solo restaurar sin aplicación visual
-                modificationManager.restoreModificationsFromCopy(baseModifications);
-                io.Log.log("DEBUG: moveLayerDown - restored " + baseModifications.size() + " base grid modifications (sin aplicación visual)");
-                
-                // NUEVA SOLUCIÓN: Guardar y recargar desde JSON para aplicar visualmente
-                try {
-                    saveAndReloadMosaicModifications();
-                    io.Log.log("DEBUG: moveLayerDown - aplicadas modificaciones vía JSON reload");
-                } catch (Exception ex) {
-                    io.Log.log("WARN: moveLayerDown - fallo JSON reload: " + ex.getMessage());
+            if (baseModifications != null && modificationManager != null) {
+                if (modificationManager.areModificationsVisible()) {
+                    if (colorGrid != null) {
+                        modificationManager.restoreModificationsFromCopyAndApply(baseModifications, colorGrid);
+                        io.Log.log("DEBUG: moveLayerDown - restored and applied " + baseModifications.size() + " base grid modifications");
+						
+                        // CRÍTICO: Forzar repaint para actualizar viewport tras aplicar modificaciones directamente
+                        if (brickedView != null) {
+                            javax.swing.SwingUtilities.invokeLater(() -> {
+                                brickedView.repaint();
+                                io.Log.log("DEBUG: moveLayerDown - Forzado repaint() del BrickedView (camino directo)");
+                            });
+                        }
+                    } else {
+                        modificationManager.restoreModificationsFromCopy(baseModifications);
+                        io.Log.log("DEBUG: moveLayerDown - restored " + baseModifications.size() + " base grid modifications (sin aplicación visual)");
+                        try {
+                            saveAndReloadMosaicModifications();
+                            io.Log.log("DEBUG: moveLayerDown - aplicadas modificaciones vía JSON reload");
+                        } catch (Exception ex) {
+                            io.Log.log("WARN: moveLayerDown - fallo JSON reload: " + ex.getMessage());
+                        }
+                    }
+                } else {
+                    modificationManager.restoreModificationsFromCopy(baseModifications);
+                    io.Log.log("DEBUG: moveLayerDown - Pintado manual oculto, se restauran " + baseModifications.size() + " modificaciones sin aplicarlas");
                 }
             }
             
@@ -1016,6 +1038,19 @@ public class LayerManager implements ModelHandler<BrickGraphicsState> {
      */
     @Override
     public void save(Model<BrickGraphicsState> model) {
+        float bgBrightnessForSave = (layerPanel != null) ? layerPanel.getBackgroundBrightness() : backgroundBrightness;
+        float bgContrastForSave = (layerPanel != null) ? layerPanel.getBackgroundContrast() : backgroundContrast;
+        float bgSaturationForSave = (layerPanel != null) ? layerPanel.getBackgroundSaturation() : backgroundSaturation;
+        float bgGammaForSave = (layerPanel != null) ? layerPanel.getBackgroundGamma() : backgroundGamma;
+        float bgSharpnessForSave = (layerPanel != null) ? layerPanel.getBackgroundSharpness() : backgroundSharpness;
+
+        // Mantener cacheado el último estado conocido incluso si la UI no está disponible
+        backgroundBrightness = bgBrightnessForSave;
+        backgroundContrast = bgContrastForSave;
+        backgroundSaturation = bgSaturationForSave;
+        backgroundGamma = bgGammaForSave;
+        backgroundSharpness = bgSharpnessForSave;
+
         try {
             // Verificar si el sistema de capas está habilitado
             model.set(BrickGraphicsState.LayersEnabled, !layers.isEmpty());
@@ -1182,6 +1217,12 @@ public class LayerManager implements ModelHandler<BrickGraphicsState> {
             // En caso de error, limpiar los datos
             model.set(BrickGraphicsState.LayersEnabled, false);
             model.set(BrickGraphicsState.LayerData, "");
+        } finally {
+            model.set(BrickGraphicsState.BackgroundBrightness, bgBrightnessForSave);
+            model.set(BrickGraphicsState.BackgroundContrast, bgContrastForSave);
+            model.set(BrickGraphicsState.BackgroundSaturation, bgSaturationForSave);
+            model.set(BrickGraphicsState.BackgroundGamma, bgGammaForSave);
+            model.set(BrickGraphicsState.BackgroundSharpness, bgSharpnessForSave);
         }
     }
     
@@ -1203,6 +1244,17 @@ public class LayerManager implements ModelHandler<BrickGraphicsState> {
             // Sincronizar el flag interno (si no lo hacemos, aunque carguemos capas no se renderizan)
             this.layersEnabled = layersEnabled != null ? layersEnabled.booleanValue() : false;
             io.Log.log("DEBUG: LayerManager.handleModelChange - Flag layersEnabled cargado: " + this.layersEnabled);
+
+            backgroundBrightness = getFloatState(model, BrickGraphicsState.BackgroundBrightness, 1.0f);
+            backgroundContrast = getFloatState(model, BrickGraphicsState.BackgroundContrast, 1.0f);
+            backgroundSaturation = getFloatState(model, BrickGraphicsState.BackgroundSaturation, 1.0f);
+            backgroundGamma = getFloatState(model, BrickGraphicsState.BackgroundGamma, 1.0f);
+            backgroundSharpness = getFloatState(model, BrickGraphicsState.BackgroundSharpness, 1.0f);
+
+            if (layerPanel != null) {
+                layerPanel.applyBackgroundAdjustments(backgroundBrightness, backgroundContrast,
+                        backgroundSaturation, backgroundGamma, backgroundSharpness);
+            }
             
             // NOTA: El guardado automático se hace en MainController.loadMosaicFile ANTES de cambiar el archivo
             // para evitar guardar en la carpeta incorrecta
@@ -1697,6 +1749,17 @@ public class LayerManager implements ModelHandler<BrickGraphicsState> {
         return !layers.isEmpty();
     }
 
+    private float getFloatState(Model<BrickGraphicsState> model, BrickGraphicsState state, float defaultValue) {
+        if (model == null) {
+            return defaultValue;
+        }
+        Object value = model.get(state);
+        if (value instanceof Number) {
+            return ((Number) value).floatValue();
+        }
+        return defaultValue;
+    }
+
     private File resolveRelativeFile(String ref) {
         if (ref == null || ref.isEmpty()) return null;
         if (ref.startsWith("REL:")) {
@@ -1989,6 +2052,11 @@ public class LayerManager implements ModelHandler<BrickGraphicsState> {
         }
         
         io.Log.log("DEBUG: saveAndReloadMosaicModifications - Obtenidas " + baseModifications.size() + " modificaciones");
+		
+        if (!modificationManager.areModificationsVisible()) {
+            io.Log.log("DEBUG: saveAndReloadMosaicModifications - Pintado manual oculto, no se reaplican modificaciones visualmente");
+            return;
+        }
         
         // 2. Obtener ColorGrid del BrickedView directamente si está disponible
         colors.LEGOColorGrid currentColorGrid = null;

@@ -45,7 +45,7 @@ public class CustomColorIDDialog extends JDialog {
     }
     
     public CustomColorIDDialog(Frame parent, ColorController colorController) {
-        super(parent, "Números Personalizados de Colores", true);
+        super(parent, "Custom Color Numbers", true);
         this.colorController = colorController;
         this.manager = new CustomColorIDManager(colorController);
         
@@ -65,9 +65,9 @@ public class CustomColorIDDialog extends JDialog {
         colorList.setCellRenderer(new ColorListCellRenderer());
         
         numberField = new JTextField(10);
-        assignButton = new JButton("Asignar Número");
-        removeButton = new JButton("Quitar Personalización");
-        clearAllButton = new JButton("Limpiar Todo");
+        assignButton = new JButton("Assign Number");
+        removeButton = new JButton("Remove Customization");
+        clearAllButton = new JButton("Clear All");
         
         // Estado inicial de botones
         updateButtonStates();
@@ -78,27 +78,27 @@ public class CustomColorIDDialog extends JDialog {
         
         // Panel principal con lista de colores
         JPanel mainPanel = new JPanel(new BorderLayout());
-        mainPanel.setBorder(BorderFactory.createTitledBorder("Colores Disponibles"));
+        mainPanel.setBorder(BorderFactory.createTitledBorder("Available Colors"));
         
         JScrollPane scrollPane = new JScrollPane(colorList);
         mainPanel.add(scrollPane, BorderLayout.CENTER);
         
         // Panel de información
         JPanel infoPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        infoPanel.add(new JLabel("💡 Los números personalizados tienen prioridad sobre automáticos"));
+        infoPanel.add(new JLabel("💡 Custom numbers have priority over automatic ones"));
         mainPanel.add(infoPanel, BorderLayout.SOUTH);
         
         add(mainPanel, BorderLayout.CENTER);
         
         // Panel de control
         JPanel controlPanel = new JPanel(new GridBagLayout());
-        controlPanel.setBorder(BorderFactory.createTitledBorder("Asignar Número Personalizado"));
+        controlPanel.setBorder(BorderFactory.createTitledBorder("Assign Custom Number"));
         
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = new Insets(5, 5, 5, 5);
         
         gbc.gridx = 0; gbc.gridy = 0;
-        controlPanel.add(new JLabel("Número:"), gbc);
+        controlPanel.add(new JLabel("Number:"), gbc);
         
         gbc.gridx = 1; gbc.gridy = 0;
         controlPanel.add(numberField, gbc);
@@ -116,8 +116,8 @@ public class CustomColorIDDialog extends JDialog {
         
         // Panel de botones
         JPanel buttonPanel = new JPanel(new FlowLayout());
-        JButton refreshButton = new JButton("Actualizar");
-        JButton closeButton = new JButton("Cerrar");
+        JButton refreshButton = new JButton("Refresh");
+        JButton closeButton = new JButton("Close");
         
         refreshButton.addActionListener(e -> refreshColorList());
         closeButton.addActionListener(e -> dispose());
@@ -186,7 +186,7 @@ public class CustomColorIDDialog extends JDialog {
         }
         
         if (listModel.isEmpty()) {
-            listModel.addElement(new ColorEntry(null, "No hay colores disponibles", "", null));
+            listModel.addElement(new ColorEntry(null, "No colors available", "", null));
         }
     }
     
@@ -224,7 +224,7 @@ public class CustomColorIDDialog extends JDialog {
             String text = numberField.getText().trim();
             if (text.isEmpty()) {
                 JOptionPane.showMessageDialog(this, 
-                    "Por favor, introduce un número.", 
+                    "Please enter a number.", 
                     "Error", JOptionPane.ERROR_MESSAGE);
                 return;
             }
@@ -232,7 +232,7 @@ public class CustomColorIDDialog extends JDialog {
             int customNumber = Integer.parseInt(text);
             if (customNumber <= 0) {
                 JOptionPane.showMessageDialog(this, 
-                    "El número debe ser mayor que 0.", 
+                    "The number must be greater than 0.", 
                     "Error", JOptionPane.ERROR_MESSAGE);
                 return;
             }
@@ -240,14 +240,14 @@ public class CustomColorIDDialog extends JDialog {
             colorController.setCustomColorID(selected.color, customNumber);
             
             JOptionPane.showMessageDialog(this, 
-                String.format("✅ Número %d asignado al color '%s'", customNumber, selected.colorName),
-                "Éxito", JOptionPane.INFORMATION_MESSAGE);
+                String.format("✅ Number %d assigned to color '%s'", customNumber, selected.colorName),
+                "Success", JOptionPane.INFORMATION_MESSAGE);
             
             refreshColorList();
             
         } catch (NumberFormatException e) {
             JOptionPane.showMessageDialog(this, 
-                "Por favor, introduce un número válido.", 
+                "Please enter a valid number.", 
                 "Error", JOptionPane.ERROR_MESSAGE);
         }
     }
@@ -259,28 +259,28 @@ public class CustomColorIDDialog extends JDialog {
         }
         
         int result = JOptionPane.showConfirmDialog(this,
-            String.format("¿Eliminar el número personalizado del color '%s'?", selected.colorName),
-            "Confirmar", JOptionPane.YES_NO_OPTION);
+            String.format("Remove the custom number from color '%s'?", selected.colorName),
+            "Confirm", JOptionPane.YES_NO_OPTION);
         
         if (result == JOptionPane.YES_OPTION) {
             colorController.removeCustomColorID(selected.color);
             JOptionPane.showMessageDialog(this, 
-                String.format("✅ Número personalizado eliminado del color '%s'", selected.colorName),
-                "Éxito", JOptionPane.INFORMATION_MESSAGE);
+                String.format("✅ Custom number removed from color '%s'", selected.colorName),
+                "Success", JOptionPane.INFORMATION_MESSAGE);
             refreshColorList();
         }
     }
     
     private void clearAllCustomNumbers() {
         int result = JOptionPane.showConfirmDialog(this,
-            "¿Eliminar TODOS los números personalizados?\nEsto restaurará la numeración automática.",
-            "Confirmar", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
+            "Remove ALL custom numbers?\nThis will restore automatic numbering.",
+            "Confirm", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
         
         if (result == JOptionPane.YES_OPTION) {
             colorController.clearAllCustomColorIDs();
             JOptionPane.showMessageDialog(this, 
-                "✅ Todos los números personalizados han sido eliminados",
-                "Éxito", JOptionPane.INFORMATION_MESSAGE);
+                "✅ All custom numbers have been removed",
+                "Success", JOptionPane.INFORMATION_MESSAGE);
             refreshColorList();
         }
     }
