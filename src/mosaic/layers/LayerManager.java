@@ -40,6 +40,8 @@ public class LayerManager implements ModelHandler<BrickGraphicsState> {
     private float backgroundSaturation = 1.0f;
     private float backgroundGamma = 1.0f;
     private float backgroundSharpness = 1.0f;
+    private int baseCanvasWidth = -1;
+    private int baseCanvasHeight = -1;
     
     /**
      * Constructor del gestor de capas
@@ -165,56 +167,14 @@ public class LayerManager implements ModelHandler<BrickGraphicsState> {
             image = argbImage;
         }
         
+        Point initialPosition = resolveInitialPosition(position, image);
         String layerName = generateLayerName(imageFile.getName());
-        Layer layer = new Layer(layerName, image, position, filePath);
+        Layer layer = new Layer(layerName, image, initialPosition, filePath);
         
         addLayer(layer);
         setSelectedLayer(layer);
         
         return layer;
-    }
-    
-    /**
-     * NUEVO: Crea una capa de pintado vacía especialmente diseñada para pintar píxeles directamente
-     */
-    public Layer createPaintLayer(String name, Point position) {
-        io.Log.log("DEBUG: LayerManager - Creando capa de pintado: " + name);
-        
-        // Crear una imagen transparente pequeña que será expandida dinámicamente al pintar
-        BufferedImage emptyImage = new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB);
-        // La imagen permanece completamente transparente
-        
-        // Crear la capa con un nombre específico para identificarla como capa de pintado
-        String paintLayerName = name + " (Pintado)";
-        Layer paintLayer = new Layer(paintLayerName, emptyImage, position, null); // Sin archivo fuente
-        
-        // Configurar la capa como una capa de pintado especial
-        // paintLayer.setPaintLayer(true); // REMOVIDO: Sistema de paint layer no utilizado
-        
-        // CORREGIDO: Insertar la capa de pintado inmediatamente después de la capa seleccionada
-        // en lugar de añadirla siempre al final
-        if (selectedLayer != null) {
-            int selectedIndex = layers.indexOf(selectedLayer);
-            if (selectedIndex >= 0) {
-                // Insertar después de la capa seleccionada (índice mayor = más arriba)
-                layers.add(selectedIndex + 1, paintLayer);
-                io.Log.log("DEBUG: LayerManager - Capa de pintado insertada en posición " + (selectedIndex + 1) + " (después de '" + selectedLayer.getName() + "')");
-            } else {
-                // Fallback: añadir al final si no se encuentra la capa seleccionada
-                layers.add(paintLayer);
-                io.Log.log("DEBUG: LayerManager - Capa de pintado añadida al final (fallback)");
-            }
-        } else {
-            // Sin capa seleccionada, añadir al final
-            layers.add(paintLayer);
-            io.Log.log("DEBUG: LayerManager - Capa de pintado añadida al final (sin selección)");
-        }
-        
-        setSelectedLayer(paintLayer);
-        
-        io.Log.log("DEBUG: LayerManager - Capa de pintado creada exitosamente: " + paintLayerName);
-        
-        return paintLayer;
     }
     
     /**
@@ -823,14 +783,13 @@ public class LayerManager implements ModelHandler<BrickGraphicsState> {
      * @return Una nueva imagen con las capas aplicadas, o la imagen original si no hay capas
      */
     public BufferedImage applyLayersToImage(BufferedImage baseImage) {
+        if (baseImage != null) {
+            updateBaseCanvasSize(baseImage.getWidth(), baseImage.getHeight());
+        }
+
         if (!layersEnabled || layers.isEmpty() || baseImage == null) {
             return baseImage;
         }
-
-        // Antes de renderizar, recentrar automáticamente capas totalmente fuera del canvas
-        try {
-            ensureLayersWithinCanvas(baseImage.getWidth(), baseImage.getHeight(), true);
-        } catch (Exception ignore) { /* no bloquear render por esto */ }
 
         BufferedImage result = new BufferedImage(
             baseImage.getWidth(), 
@@ -2007,6 +1966,36 @@ public class LayerManager implements ModelHandler<BrickGraphicsState> {
         }
         
         return entries.toArray(new String[0]);
+    }
+
+    private void updateBaseCanvasSize(int width, int height) {
+        if (width <= 0 || height <= 0) {
+            return;
+        }
+        baseCanvasWidth = width;
+        baseCanvasHeight = height;
+    }
+
+    public int getBaseCanvasWidth() {
+        return baseCanvasWidth;
+    }
+
+    public int getBaseCanvasHeight() {
+        return baseCanvasHeight;
+    }
+
+    private Point resolveInitialPosition(Point requestedPosition, BufferedImage layerImage) {
+        if (requestedPosition != null) {
+            return new Point(requestedPosition);
+        }
+
+        if (layerImage != null && baseCanvasWidth > 0 && baseCanvasHeight > 0) {
+            int centeredX = (baseCanvasWidth - layerImage.getWidth()) / 2;
+            int centeredY = (baseCanvasHeight - layerImage.getHeight()) / 2;
+            return new Point(centeredX, centeredY);
+        }
+
+        return new Point(0, 0);
     }
     
     /**

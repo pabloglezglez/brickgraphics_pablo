@@ -904,7 +904,7 @@ public class BrickedView extends JPanel implements ChangeListener, PipelineMosai
 					ModificationManager modMgr = mainController.getLayerManager().getModificationManager();
 					LEGOColorGrid colorGrid = getColorGrid();
 					
-					if (colorGrid != null && modMgr.hasModifications()) {
+					if (colorGrid != null && modMgr.hasModifications() && modMgr.areModificationsVisible()) {
 						Map<String, LEGOColor> modifications = modMgr.getAllModifications();
 						int restored = 0;
 						

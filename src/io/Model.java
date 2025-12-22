@@ -52,6 +52,13 @@ public class Model<S extends ModelState> {
 			}
 		}
 	}
+
+	public void resetToDefaults() {
+		stateValueMap.clear();
+		for(S state : modelStateClass.getEnumConstants()) {
+			stateValueMap.put(state, state.getDefaultValue());
+		}
+	}
 	
 	public void loadFrom(BufferedReader br) throws IOException {
 		serializer.readFile(br, stateValueMap);

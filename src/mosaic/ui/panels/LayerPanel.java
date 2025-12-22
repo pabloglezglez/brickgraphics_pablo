@@ -268,9 +268,7 @@ public class LayerPanel extends JPanel {
         if (fileChooser.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
             try {
                 File file = fileChooser.getSelectedFile();
-                Point position = new Point(0, 0); // Posición inicial
-                
-                Layer layer = layerManager.addLayerFromFile(file.getAbsolutePath(), position);
+                Layer layer = layerManager.addLayerFromFile(file.getAbsolutePath(), null);
                 updateLayerList();
                 layerList.setSelectedValue(layer, true);
                 notifyLayersChanged();

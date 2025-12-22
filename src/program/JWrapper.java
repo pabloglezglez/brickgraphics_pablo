@@ -55,7 +55,7 @@ public class JWrapper {
 			myJwVersion = "(not running inside JWrapper)";
 		}
 		JOptionPane.showMessageDialog(null, "App "+message+","+myJwVersion+","+JWSystem.getAppBundleVersion());//*/		
-		MainController.main(null);
+		MainController.main(args);
 	}
 
 	/**

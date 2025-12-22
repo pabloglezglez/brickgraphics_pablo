@@ -52,6 +52,7 @@ public class Ribbon extends JToolBar {
 		
 		// Add color preview panel
 		add(createColorPreviewPanel(studEditController));
+		add(new JButton(new SelectBrushColorAction(mw, studEditController, mc.getColorController())));
 		
 		// Add brush size selector
 		add(new BrushSizeSelector(studEditController));

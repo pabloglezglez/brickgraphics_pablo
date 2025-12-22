@@ -11,6 +11,7 @@ import javax.swing.*;
 import javax.swing.border.*;
 import javax.swing.event.*;
 
+import colors.LEGOColorGrid;
 import mosaic.layers.Layer;
 import mosaic.layers.LayerManager;
 import mosaic.ui.menu.ImagePreparingToolBar;
@@ -38,7 +39,6 @@ public class IntegratedImageLayerPanel extends JPanel {
     private JPanel topPanel;
     private JPanel layerButtonsPanel;
     private JButton addLayerButton;
-    private JButton addPaintLayerButton;  // NUEVO: Botón para crear capa de pintado
     private JButton removeLayerButton;
     private JButton duplicateButton;
     private JButton moveUpButton;
@@ -166,8 +166,6 @@ public class IntegratedImageLayerPanel extends JPanel {
         // Botones de gestión de capas con texto más corto
         addLayerButton = new JButton("+");
         addLayerButton.setToolTipText("Add new layer from image (Ctrl+N)");
-        addPaintLayerButton = new JButton("🎨");  // NUEVO: Botón para capa de pintado
-        addPaintLayerButton.setToolTipText("Create new empty paint layer");
         removeLayerButton = new JButton("✕");
         removeLayerButton.setToolTipText("Delete selected layer (Del/Backspace)");
         duplicateButton = new JButton("⧉");
@@ -180,7 +178,6 @@ public class IntegratedImageLayerPanel extends JPanel {
         // Configurar tamaño uniforme para los botones
         Dimension buttonSize = new Dimension(32, 28);
         addLayerButton.setPreferredSize(buttonSize);
-        addPaintLayerButton.setPreferredSize(buttonSize);  // NUEVO
         removeLayerButton.setPreferredSize(buttonSize);
         duplicateButton.setPreferredSize(buttonSize);
         moveUpButton.setPreferredSize(buttonSize);
@@ -189,7 +186,6 @@ public class IntegratedImageLayerPanel extends JPanel {
         // Configurar font para mejor visibilidad
         Font buttonFont = new Font(Font.SANS_SERIF, Font.BOLD, 14);
         addLayerButton.setFont(buttonFont);
-        addPaintLayerButton.setFont(buttonFont);  // NUEVO
         removeLayerButton.setFont(buttonFont);
         duplicateButton.setFont(buttonFont);
         moveUpButton.setFont(buttonFont);
@@ -270,16 +266,14 @@ public class IntegratedImageLayerPanel extends JPanel {
         // scaleSpinner ya está configurado en su inicialización
         
         // Botón reset para ajustes
-        resetAdjustmentsButton = new JButton("Reset Adjustments");
-        resetAdjustmentsButton.setToolTipText("Reset all layer adjustments to default values");
+        resetAdjustmentsButton = new JButton("Restablecer ajustes");
+        resetAdjustmentsButton.setToolTipText("Restaurar todos los ajustes de la capa a sus valores por defecto");
         
-        // Spinners de posición
-    // Ampliar rango de movimiento de las capas para permitir desplazamientos grandes
-    positionXSpinner = new JSpinner(new SpinnerNumberModel(0, -99999, 99999, 5)); // CAMBIADO: step de 1 a 5 píxeles
-        positionXSpinner = new JSpinner(new SpinnerNumberModel(0, -99999, 99999, 5)); // CAMBIADO: step de 1 a 5 píxeles
-        positionYSpinner = new JSpinner(new SpinnerNumberModel(0, -99999, 99999, 5)); // CAMBIADO: step de 1 a 5 píxeles
-        positionXSpinner.setToolTipText("Layer X position (5 pixels per step - use Shift x10 or Ctrl x100)");
-        positionYSpinner.setToolTipText("Layer Y position (5 pixels per step - use Shift x10 or Ctrl x100)");
+        // Spinners de posición (rango amplio para permitir desplazamientos grandes)
+        positionXSpinner = new JSpinner(new SpinnerNumberModel(0, -99999, 99999, 1)); // Paso constante: 1 mosaico
+        positionXSpinner.setToolTipText("Layer X position (1 mosaic unit per step - use Shift x10 or Ctrl x100)");
+        positionYSpinner = new JSpinner(new SpinnerNumberModel(0, -99999, 99999, 1)); // Paso constante: 1 mosaico
+        positionYSpinner.setToolTipText("Layer Y position (1 mosaic unit per step - use Shift x10 or Ctrl x100)");
     }
     
     /**
@@ -325,8 +319,6 @@ public class IntegratedImageLayerPanel extends JPanel {
     
     // Grupo de botones de capa
     mainBar.add(addLayerButton);
-    mainBar.add(Box.createHorizontalStrut(2));
-    mainBar.add(addPaintLayerButton);  // Botón de capa de pintado
     mainBar.add(Box.createHorizontalStrut(2));
     mainBar.add(removeLayerButton);
     mainBar.add(Box.createHorizontalStrut(2));
@@ -856,20 +848,20 @@ public class IntegratedImageLayerPanel extends JPanel {
         
         // Panel de transformaciones de imagen
         JPanel imageTransformsPanel = new JPanel(new GridBagLayout());
-        imageTransformsPanel.setBorder(new TitledBorder("Image Adjustments"));
+        imageTransformsPanel.setBorder(new TitledBorder("Ajustes de imagen"));
         
         GridBagConstraints igbc = new GridBagConstraints();
         igbc.insets = new Insets(2, 5, 2, 5);
         igbc.anchor = GridBagConstraints.WEST;
         
         // Añadir controles de transformación
-        addImageTransformControl(imageTransformsPanel, "Opacity:", opacitySlider, opacityLabel, igbc, 0);
-        addImageTransformControl(imageTransformsPanel, "Brightness:", brightnessSlider, brightnessSpinner, igbc, 1); // CAMBIADO: brightnessLabel -> brightnessSpinner
-        addImageTransformControl(imageTransformsPanel, "Contrast:", contrastSlider, contrastSpinner, igbc, 2); // CAMBIADO: contrastLabel -> contrastSpinner
-        addImageTransformControl(imageTransformsPanel, "Saturation:", saturationSlider, saturationSpinner, igbc, 3); // CAMBIADO: saturationLabel -> saturationSpinner
+        addImageTransformControl(imageTransformsPanel, "Opacidad:", opacitySlider, opacityLabel, igbc, 0);
+        addImageTransformControl(imageTransformsPanel, "Brillo:", brightnessSlider, brightnessSpinner, igbc, 1); // CAMBIADO: brightnessLabel -> brightnessSpinner
+        addImageTransformControl(imageTransformsPanel, "Contraste:", contrastSlider, contrastSpinner, igbc, 2); // CAMBIADO: contrastLabel -> contrastSpinner
+        addImageTransformControl(imageTransformsPanel, "Saturación:", saturationSlider, saturationSpinner, igbc, 3); // CAMBIADO: saturationLabel -> saturationSpinner
         addImageTransformControl(imageTransformsPanel, "Gamma:", gammaSlider, gammaSpinner, igbc, 4); // CAMBIADO: gammaLabel -> gammaSpinner
-        addImageTransformControl(imageTransformsPanel, "Sharpness:", sharpnessSlider, sharpnessSpinner, igbc, 5); // CAMBIADO: sharpnessLabel -> sharpnessSpinner
-        addImageTransformControl(imageTransformsPanel, "Scale:", scaleSlider, scaleSpinner, igbc, 6); // CAMBIADO: scaleField -> scaleSpinner
+        addImageTransformControl(imageTransformsPanel, "Nitidez:", sharpnessSlider, sharpnessSpinner, igbc, 5); // CAMBIADO: sharpnessLabel -> sharpnessSpinner
+        addImageTransformControl(imageTransformsPanel, "Escala:", scaleSlider, scaleSpinner, igbc, 6); // CAMBIADO: scaleField -> scaleSpinner
         
         // Fila para botón reset
         igbc.gridx = 0; igbc.gridy = 7; igbc.gridwidth = 2; igbc.fill = GridBagConstraints.HORIZONTAL;
@@ -910,7 +902,6 @@ public class IntegratedImageLayerPanel extends JPanel {
         
         // Botones
         addLayerButton.addActionListener(e -> addLayer());
-        addPaintLayerButton.addActionListener(e -> addPaintLayer());  // NUEVO
         removeLayerButton.addActionListener(e -> removeSelectedLayer());
         duplicateButton.addActionListener(e -> duplicateSelectedLayer());
         
@@ -1076,7 +1067,12 @@ public class IntegratedImageLayerPanel extends JPanel {
             int multiplier = 1;
             if (e.isShiftDown()) multiplier = 10; // mover más rápido con Shift
             if (e.isControlDown()) multiplier = 100; // muy rápido con Ctrl
-            int delta = e.getWheelRotation() * stepSize * -1 * multiplier; // Invertir para que sea más intuitivo
+
+            int rotation = e.getWheelRotation();
+            if (rotation > 0) rotation = 1;
+            else if (rotation < 0) rotation = -1;
+
+            int delta = rotation * stepSize * -1 * multiplier; // Invertir para que sea más intuitivo
             int newValue = currentValue + delta;
             
             // Verificar que esté dentro de los límites
@@ -1241,7 +1237,7 @@ public class IntegratedImageLayerPanel extends JPanel {
             try {
                 Layer layer = layerManager.addLayerFromFile(
                     selectedFile.getAbsolutePath(), 
-                    new Point(0, 0)
+                    null
                 );
                 io.Log.log("DEBUG: IntegratedImageLayerPanel - Capa creada: " + layer.getName());
                 layerManager.setSelectedLayer(layer);
@@ -1254,49 +1250,6 @@ public class IntegratedImageLayerPanel extends JPanel {
                 io.Log.log("DEBUG: IntegratedImageLayerPanel - Error: " + ex.getMessage());
                 JOptionPane.showMessageDialog(this, 
                     "Error loading image: " + ex.getMessage(), 
-                    "Error", JOptionPane.ERROR_MESSAGE);
-            }
-        }
-    }
-    
-    /**
-     * NUEVO: Crea una capa de pintado vacía para pintar píxeles directamente
-     */
-    private void addPaintLayer() {
-        io.Log.log("DEBUG: IntegratedImageLayerPanel - Iniciando addPaintLayer()");
-        
-        // Solicitar nombre para la capa de pintado
-        String layerName = JOptionPane.showInputDialog(this,
-            "Name for the new paint layer:",
-            "New Paint Layer",
-            JOptionPane.QUESTION_MESSAGE);
-        
-        if (layerName != null && !layerName.trim().isEmpty()) {
-            try {
-                // Crear una capa de pintado especial sin imagen base
-                Layer paintLayer = layerManager.createPaintLayer(layerName.trim(), new Point(0, 0));
-                io.Log.log("DEBUG: IntegratedImageLayerPanel - Capa de pintado creada: " + paintLayer.getName());
-                
-                layerManager.setSelectedLayer(paintLayer);
-                io.Log.log("DEBUG: IntegratedImageLayerPanel - Capa de pintado seleccionada");
-                
-                updateUI();
-                io.Log.log("DEBUG: IntegratedImageLayerPanel - UI actualizada");
-                
-                notifyLayersChanged();
-                io.Log.log("DEBUG: IntegratedImageLayerPanel - Notificación enviada");
-                
-                // Opcional: Mostrar mensaje informativo
-                JOptionPane.showMessageDialog(this,
-                    "Paint layer '" + layerName + "' created.\n" +
-                    "Select the brush tool and paint directly on the mosaic.",
-                    "Layer Created",
-                    JOptionPane.INFORMATION_MESSAGE);
-                    
-            } catch (Exception ex) {
-                io.Log.log("DEBUG: IntegratedImageLayerPanel - Error creando capa de pintado: " + ex.getMessage());
-                JOptionPane.showMessageDialog(this,
-                    "Error creating paint layer: " + ex.getMessage(),
                     "Error", JOptionPane.ERROR_MESSAGE);
             }
         }
@@ -1369,8 +1322,7 @@ public class IntegratedImageLayerPanel extends JPanel {
     }
     
     /**
-     * Actualiza la posición de la capa seleccionada
-     * NUEVO: Convierte desde coordenadas de pantalla a coordenadas de mosaico
+     * Actualiza la posición de la capa seleccionada usando coordenadas directas del mosaico
      */
     private void updateLayerPosition() {
         if (updatingControls) return;
@@ -1386,14 +1338,12 @@ public class IntegratedImageLayerPanel extends JPanel {
                 io.Log.log("DEBUG: updateLayerPosition - preserving " + baseModifications.size() + " base grid modifications");
             }
             
-            // Obtener valores de spinner (coordenadas de pantalla)
-            int screenX = (Integer) positionXSpinner.getValue();
-            int screenY = (Integer) positionYSpinner.getValue();
-            
-            // Convertir a coordenadas de mosaico usando el zoom actual
-            Point mosaicPosition = screenToMosaicCoordinates(screenX, screenY);
-            
-            selected.setPosition(mosaicPosition);
+            // Obtener valores de spinner en unidades de mosaico (studs)
+            int mosaicUnitsX = (Integer) positionXSpinner.getValue();
+            int mosaicUnitsY = (Integer) positionYSpinner.getValue();
+
+            Point pixelPosition = convertMosaicUnitsToPixelPosition(mosaicUnitsX, mosaicUnitsY);
+            selected.setPosition(pixelPosition);
             
             // RESTAURAR MODIFICACIONES DESPUÉS DEL CAMBIO
             if (baseModifications != null && layerManager.getModificationManager() != null) {
@@ -1612,11 +1562,10 @@ public class IntegratedImageLayerPanel extends JPanel {
                 visibilityCheckBox.setSelected(selected.isVisible());
                 blendModeCombo.setSelectedItem(selected.getBlendMode());
                 
-                // NUEVO: Actualizar valores de posición convertidos a coordenadas de pantalla
-                Point mosaicPos = selected.getPosition();
-                Point screenPos = mosaicToScreenCoordinates(mosaicPos.x, mosaicPos.y);
-                positionXSpinner.setValue(screenPos.x);
-                positionYSpinner.setValue(screenPos.y);
+                // Coord. en unidades del mosaico (studs) para la UI
+                Point mosaicUnits = convertPixelPositionToMosaicUnits(selected.getPosition());
+                positionXSpinner.setValue(mosaicUnits.x);
+                positionYSpinner.setValue(mosaicUnits.y);
                 
                 // Actualizar controles de transformación de imagen (convertir 0.0-2.0 a rango -100..100)
                 brightnessSlider.setValue((int) (selected.getBrightness() * 100 - 100)); // 0.0-2.0 -> -100..100
@@ -1792,7 +1741,12 @@ public class IntegratedImageLayerPanel extends JPanel {
             int multiplier = 1;
             if (e.isShiftDown()) multiplier = 10; // mover más rápido con Shift
             if (e.isControlDown()) multiplier = 100; // muy rápido con Ctrl
-            int delta = e.getWheelRotation() * stepSize * -1 * multiplier; // Invertir para que sea más intuitivo
+
+            int rotation = e.getWheelRotation();
+            if (rotation > 0) rotation = 1;
+            else if (rotation < 0) rotation = -1;
+
+            int delta = rotation * stepSize * -1 * multiplier; // Invertir para que sea más intuitivo
             int newValue = currentValue + delta;
             
             // Verificar que esté dentro de los límites
@@ -1812,6 +1766,122 @@ public class IntegratedImageLayerPanel extends JPanel {
             // Consumir el evento para evitar que se propague
             e.consume();
         });
+    }
+
+    private Point convertMosaicUnitsToPixelPosition(int mosaicUnitsX, int mosaicUnitsY) {
+        double pxPerUnitX = getPixelsPerMosaicUnitX();
+        double pxPerUnitY = getPixelsPerMosaicUnitY();
+        int pixelX = (int) Math.round(mosaicUnitsX * pxPerUnitX);
+        int pixelY = (int) Math.round(mosaicUnitsY * pxPerUnitY);
+        return new Point(pixelX, pixelY);
+    }
+
+    private Point convertPixelPositionToMosaicUnits(Point pixelPoint) {
+        if (pixelPoint == null) {
+            return new Point(0, 0);
+        }
+        double pxPerUnitX = getPixelsPerMosaicUnitX();
+        double pxPerUnitY = getPixelsPerMosaicUnitY();
+        int mosaicX = pxPerUnitX != 0 ? (int) Math.round(pixelPoint.x / pxPerUnitX) : pixelPoint.x;
+        int mosaicY = pxPerUnitY != 0 ? (int) Math.round(pixelPoint.y / pxPerUnitY) : pixelPoint.y;
+        return new Point(mosaicX, mosaicY);
+    }
+
+    private static final double MIN_VALID_PIXELS_PER_UNIT = 1.0;
+    private double lastLoggedPixelsPerUnitX = Double.NaN;
+    private double lastLoggedPixelsPerUnitY = Double.NaN;
+    private String lastPixelsPerUnitSourceX = "";
+    private String lastPixelsPerUnitSourceY = "";
+
+    private double getPixelsPerMosaicUnitX() {
+        return getPixelsPerMosaicUnit(true);
+    }
+
+    private double getPixelsPerMosaicUnitY() {
+        return getPixelsPerMosaicUnit(false);
+    }
+
+    private double getPixelsPerMosaicUnit(boolean horizontal) {
+        LEGOColorGrid grid = layerManager != null ? layerManager.getColorGrid() : null;
+        if (grid == null && brickedView != null) {
+            grid = brickedView.getColorGrid();
+        }
+
+        int gridSize = 0;
+        if (grid != null) {
+            gridSize = horizontal ? grid.getWidth() : grid.getHeight();
+        }
+
+        if (gridSize <= 0) {
+            maybeLogPixelsPerUnit(1.0, horizontal, -1, 0, "Default");
+            return 1.0;
+        }
+
+        double ratio = Double.NaN;
+        String source = "";
+        int axisSize = -1;
+
+        if (layerManager != null) {
+            int baseSize = horizontal ? layerManager.getBaseCanvasWidth() : layerManager.getBaseCanvasHeight();
+            if (baseSize > 0) {
+                double candidate = (double) baseSize / gridSize;
+                if (isPixelsPerUnitValid(candidate)) {
+                    ratio = candidate;
+                    source = "BaseCanvas";
+                    axisSize = baseSize;
+                }
+            }
+        }
+
+        if (!isPixelsPerUnitValid(ratio) && brickedView != null) {
+            Dimension mosaicSize = brickedView.getBrickedSize();
+            if (mosaicSize != null) {
+                int mosaicAxisSize = horizontal ? mosaicSize.width : mosaicSize.height;
+                if (mosaicAxisSize > 0) {
+                    double candidate = (double) mosaicAxisSize / gridSize;
+                    if (isPixelsPerUnitValid(candidate)) {
+                        ratio = candidate;
+                        source = "BrickedView";
+                        axisSize = mosaicAxisSize;
+                    }
+                }
+            }
+        }
+
+        if (!isPixelsPerUnitValid(ratio)) {
+            int fallbackBase = layerManager != null
+                    ? (horizontal ? layerManager.getBaseCanvasWidth() : layerManager.getBaseCanvasHeight())
+                    : -1;
+            double fallback = fallbackBase > 0 ? (double) fallbackBase / gridSize : MIN_VALID_PIXELS_PER_UNIT;
+            ratio = Math.max(MIN_VALID_PIXELS_PER_UNIT, fallback);
+            source = source.isEmpty() ? "FallbackClamp" : source + "(Clamp)";
+            axisSize = fallbackBase;
+        }
+
+        maybeLogPixelsPerUnit(ratio, horizontal, axisSize, gridSize, source);
+        return ratio;
+    }
+
+    private boolean isPixelsPerUnitValid(double ratio) {
+        return !Double.isNaN(ratio) && ratio >= MIN_VALID_PIXELS_PER_UNIT;
+    }
+
+    private void maybeLogPixelsPerUnit(double ratio, boolean horizontal, int axisSize, int gridSize, String source) {
+        double lastRatio = horizontal ? lastLoggedPixelsPerUnitX : lastLoggedPixelsPerUnitY;
+        String lastSource = horizontal ? lastPixelsPerUnitSourceX : lastPixelsPerUnitSourceY;
+        if (Double.isNaN(lastRatio) || Math.abs(lastRatio - ratio) > 1e-3 || !source.equals(lastSource)) {
+            String axis = horizontal ? "X" : "Y";
+            io.Log.log(String.format(
+                    "DEBUG: PixelsPerMosaicUnit%s = %.4f (grid=%d, axisSize=%d, source=%s)",
+                    axis, ratio, gridSize, axisSize, source));
+            if (horizontal) {
+                lastLoggedPixelsPerUnitX = ratio;
+                lastPixelsPerUnitSourceX = source;
+            } else {
+                lastLoggedPixelsPerUnitY = ratio;
+                lastPixelsPerUnitSourceY = source;
+            }
+        }
     }
     
     /**

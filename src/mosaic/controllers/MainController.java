@@ -75,6 +75,7 @@ public class MainController implements ModelHandler<BrickGraphicsState> {
 		long startTime = System.currentTimeMillis();
 		Log.log("Initiating components");
 		model = new Model<BrickGraphicsState>(STATE_FILE_NAME, BrickGraphicsState.class);
+		clearPersistedImageState();
 		
 		RenderingProgressBar renderingProgressBar = new RenderingProgressBar();
 		pipeline = new Pipeline(renderingProgressBar);
@@ -144,6 +145,10 @@ public class MainController implements ModelHandler<BrickGraphicsState> {
 		// Establecer la leyenda en MainWindow
 		mw.setLegend(legend);
 		
+		saveDialog = new SaveDialog(mw);
+		printDialog = new PrintDialog(mw, printController, colorController, magnifierController, pipeline);
+		toBricksTypeFilterDialog = new ToBricksTypeFilterDialog(toBricksController, mw);
+		
 		listeners.add(mw);
 		toBricksController.initiateUI(mw);
 		optionsController.initiateOptionsDialog(mw);
@@ -160,21 +165,24 @@ public class MainController implements ModelHandler<BrickGraphicsState> {
 		}
 		
 		if(!imageDataFile.isValid()) {
-			try {
-				MosaicIO.load(this, new File(imageFileName));
-			}
-			catch (Exception e) {
-				Log.log(e);
+			boolean hasDefaultFile = imageFileName != null && !imageFileName.trim().isEmpty();
+			if(hasDefaultFile) {
+				try {
+					MosaicIO.load(this, new File(imageFileName));
+				}
+				catch (Exception e) {
+					Log.log(e);
+					Action openAction = MosaicIO.createOpenAction(this, mw);
+					openAction.actionPerformed(null);
+				}			
+			} else {
+				io.Log.log("DEBUG: MainController - No default file configured; prompting user to open one.");
 				Action openAction = MosaicIO.createOpenAction(this, mw);
 				openAction.actionPerformed(null);
-			}				
+			}
 		}
 		else
 			notifyListeners(model);
-		
-		saveDialog = new SaveDialog(mw);
-		printDialog = new PrintDialog(mw, printController, colorController, magnifierController, pipeline);
-		toBricksTypeFilterDialog = new ToBricksTypeFilterDialog(toBricksController, mw);
 		
 		pipeline.start();
 		Log.log("MainController initiated.");
@@ -236,6 +244,9 @@ public class MainController implements ModelHandler<BrickGraphicsState> {
 		
 		// Guardar la imagen original sin capas
 		originalImage = image;
+
+		// Reiniciar ajustes dependientes de imagen para cargas sueltas
+		resetStateForStandaloneImageLoad();
 		
 		// Aplicar capas y establecer en el pipeline
 		updateImageWithLayers();
@@ -435,6 +446,67 @@ public class MainController implements ModelHandler<BrickGraphicsState> {
 		return layerPanel;
 	}
 
+	private void clearPersistedImageState() {
+		model.set(BrickGraphicsState.ImageFileName, "");
+		model.set(BrickGraphicsState.ImageFile, new DataFile());
+		model.set(BrickGraphicsState.OriginalImageFile, new DataFile());
+	}
+
+	private void resetStateForStandaloneImageLoad() {
+		float defaultBrightness = getDefaultFloatState(BrickGraphicsState.BackgroundBrightness, 1.0f);
+		float defaultContrast = getDefaultFloatState(BrickGraphicsState.BackgroundContrast, 1.0f);
+		float defaultSaturation = getDefaultFloatState(BrickGraphicsState.BackgroundSaturation, 1.0f);
+		float defaultGamma = getDefaultFloatState(BrickGraphicsState.BackgroundGamma, 1.0f);
+		float defaultSharpness = getDefaultFloatState(BrickGraphicsState.BackgroundSharpness, 1.0f);
+
+		if (model != null) {
+			model.set(BrickGraphicsState.LayersEnabled, false);
+			model.set(BrickGraphicsState.LayerData, "");
+			model.set(BrickGraphicsState.BackgroundBrightness, defaultBrightness);
+			model.set(BrickGraphicsState.BackgroundContrast, defaultContrast);
+			model.set(BrickGraphicsState.BackgroundSaturation, defaultSaturation);
+			model.set(BrickGraphicsState.BackgroundGamma, defaultGamma);
+			model.set(BrickGraphicsState.BackgroundSharpness, defaultSharpness);
+			model.set(BrickGraphicsState.ManualModifications, "");
+		}
+
+		if (studEditController != null && studEditController.getModificationManager() != null) {
+			studEditController.getModificationManager().clearModifications();
+			studEditController.markChangesSaved();
+		}
+
+		if (layerPanel != null) {
+			layerPanel.applyBackgroundAdjustments(
+				defaultBrightness,
+				defaultContrast,
+				defaultSaturation,
+				defaultGamma,
+				defaultSharpness
+			);
+		}
+
+		if (layerManager != null) {
+			layerManager.setMosaicFile(null);
+			layerManager.setLayersEnabled(false);
+			layerManager.updateBackgroundAdjustmentCache(
+				defaultBrightness,
+				defaultContrast,
+				defaultSaturation,
+				defaultGamma,
+				defaultSharpness
+			);
+			layerManager.clearLayers();
+		}
+	}
+
+	private float getDefaultFloatState(BrickGraphicsState state, float fallback) {
+		Object defaultValue = state.getDefaultValue();
+		if (defaultValue instanceof Number) {
+			return ((Number) defaultValue).floatValue();
+		}
+		return fallback;
+	}
+
 	/**
 	 * Reemplaza el panel de capas integrado que usa el controlador.
 	 * Esto permite que la instancia creada por la UI (MainWindow) se comparta
@@ -473,7 +545,7 @@ public class MainController implements ModelHandler<BrickGraphicsState> {
 		} else if(imageDataFile.isValid()) {
 			// No hay imagen original guardada, usar imagen normal
 			loadRegularImage();
-		} else {
+		} else if(!restoreImageFromDisk()) {
 			Log.log("INVALID Image data file!");
 		}
 	}
@@ -491,6 +563,55 @@ public class MainController implements ModelHandler<BrickGraphicsState> {
 		} catch (IOException e) {
 			Log.log(e);
 		}
+	}
+
+	/**
+	 * Intenta restaurar la imagen desde el sistema de archivos cuando el KMV no incluye los bytes.
+	 */
+	private boolean restoreImageFromDisk() {
+		if (imageFileName == null || imageFileName.trim().isEmpty()) {
+			return false;
+		}
+
+		Set<File> candidates = new LinkedHashSet<File>();
+		File configured = new File(imageFileName);
+		if (configured.isAbsolute()) {
+			candidates.add(configured);
+		} else {
+			if (mosaicFile != null && mosaicFile.getParentFile() != null) {
+				candidates.add(new File(mosaicFile.getParentFile(), imageFileName));
+			}
+			if (mainImageDirectory != null) {
+				candidates.add(new File(mainImageDirectory, imageFileName));
+			}
+			candidates.add(configured);
+		}
+
+		for (File candidate : candidates) {
+			if (candidate == null || !candidate.exists()) {
+				continue;
+			}
+			try {
+				BufferedImage restored = MosaicIO.removeAlpha(ImageIO.read(candidate));
+				if (restored == null) {
+					continue;
+				}
+				originalImage = restored;
+				imageDataFile = new DataFile(candidate);
+				imageFileName = candidate.getCanonicalPath();
+				mainImageDirectory = candidate.getParentFile();
+				if (model != null) {
+					model.set(BrickGraphicsState.ImageFileName, imageFileName);
+					model.set(BrickGraphicsState.ImageFile, imageDataFile);
+				}
+				io.Log.log("DEBUG: MainController - Imagen restaurada desde archivo externo: " + candidate.getAbsolutePath());
+				updateImageWithLayers();
+				return true;
+			} catch (IOException ex) {
+				Log.log("WARN: MainController - Error cargando imagen desde " + candidate.getAbsolutePath() + ": " + ex.getMessage());
+			}
+		}
+		return false;
 	}
 
 	@Override
