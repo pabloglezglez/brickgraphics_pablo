@@ -21,8 +21,8 @@ public class SelectBrushColorAction extends AbstractAction {
     private final ColorController colorController;
 
     public SelectBrushColorAction(Component parent, StudEditController studEditController, ColorController colorController) {
-        super("Color manual");
-        putValue(Action.SHORT_DESCRIPTION, "Seleccionar color para el pincel aunque no exista en el mosaico");
+        super("Manual Color");
+        putValue(Action.SHORT_DESCRIPTION, "Pick a brush color even if it is not present in the mosaic");
         this.parent = parent;
         this.studEditController = studEditController;
         this.colorController = colorController;
@@ -32,9 +32,9 @@ public class SelectBrushColorAction extends AbstractAction {
     public void actionPerformed(ActionEvent e) {
         List<LEGOColor> availableColors = colorController.getColorsFromDisk();
         if (availableColors == null || availableColors.isEmpty()) {
-            JOptionPane.showMessageDialog(parent,
-                    "No hay colores disponibles para seleccionar.",
-                    "Colores no cargados",
+                JOptionPane.showMessageDialog(parent,
+                    "No colors are available for selection.",
+                    "Colors not loaded",
                     JOptionPane.WARNING_MESSAGE);
             return;
         }
@@ -45,7 +45,7 @@ public class SelectBrushColorAction extends AbstractAction {
         BrushColorPickerPanel pickerPanel = new BrushColorPickerPanel(sortedColors, studEditController.getSelectedColor());
         int result = JOptionPane.showConfirmDialog(parent,
                 pickerPanel,
-                "Seleccionar color del pincel",
+                "Select brush color",
                 JOptionPane.OK_CANCEL_OPTION,
                 JOptionPane.PLAIN_MESSAGE);
 
@@ -66,7 +66,7 @@ public class SelectBrushColorAction extends AbstractAction {
 
         BrushColorPickerPanel(List<LEGOColor> colors, LEGOColor initialSelection) {
             super(new BorderLayout(8, 8));
-            JLabel title = new JLabel("Selecciona un color LEGO disponible:");
+            JLabel title = new JLabel("Select an available LEGO color:");
             add(title, BorderLayout.NORTH);
 
             DefaultListModel<LEGOColor> model = new DefaultListModel<>();

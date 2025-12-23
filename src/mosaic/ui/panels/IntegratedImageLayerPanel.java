@@ -111,6 +111,7 @@ public class IntegratedImageLayerPanel extends JPanel {
     private boolean pendingBackgroundUpdate = false;
     private static final int DEBOUNCE_DELAY_MS = 10; // Reducido a 10ms para máxima respuesta
     private boolean updatingControls = false;
+    private final Color defaultPanelBackground = resolveDefaultPanelBackground();
     
     /**
      * Constructor del panel integrado
@@ -192,7 +193,7 @@ public class IntegratedImageLayerPanel extends JPanel {
         moveDownButton.setFont(buttonFont);
         
         enableLayersCheckBox = new JCheckBox("Layers", true);
-        enableLayersCheckBox.setToolTipText("Enable / Disable all layers");
+        enableLayersCheckBox.setToolTipText("Enable or disable all layers");
         
         // Información de capas
         layerInfoLabel = new JLabel("No layers");
@@ -203,6 +204,18 @@ public class IntegratedImageLayerPanel extends JPanel {
         
         visibilityCheckBox = new JCheckBox("Visible", true);
         blendModeCombo = new JComboBox<>(Layer.BlendMode.values());
+        blendModeCombo.setPrototypeDisplayValue(Layer.BlendMode.SOFT_LIGHT);
+        blendModeCombo.setRenderer(new DefaultListCellRenderer() {
+            @Override
+            public Component getListCellRendererComponent(JList<?> list, Object value, int index,
+                                                          boolean isSelected, boolean cellHasFocus) {
+                Component comp = super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
+                if (value instanceof Layer.BlendMode && comp instanceof JLabel label) {
+                    label.setText(getBlendModeDisplayName((Layer.BlendMode) value));
+                }
+                return comp;
+            }
+        });
         
         // Controles de transformaciones de imagen (rango -100 a 100, neutro en 0)
         brightnessSlider = createImageSlider("Brightness", -100, 100, 0);
@@ -266,8 +279,8 @@ public class IntegratedImageLayerPanel extends JPanel {
         // scaleSpinner ya está configurado en su inicialización
         
         // Botón reset para ajustes
-        resetAdjustmentsButton = new JButton("Restablecer ajustes");
-        resetAdjustmentsButton.setToolTipText("Restaurar todos los ajustes de la capa a sus valores por defecto");
+        resetAdjustmentsButton = new JButton("Reset adjustments");
+        resetAdjustmentsButton.setToolTipText("Reset all layer adjustments to their default values");
         
         // Spinners de posición (rango amplio para permitir desplazamientos grandes)
         positionXSpinner = new JSpinner(new SpinnerNumberModel(0, -99999, 99999, 1)); // Paso constante: 1 mosaico
@@ -293,17 +306,24 @@ public class IntegratedImageLayerPanel extends JPanel {
      */
     private void setupLayout() {
         setLayout(new BorderLayout());
-        setBorder(new TitledBorder("Layers and Image"));
+        setBorder(new TitledBorder("Layers & Image"));
+        setPreferredSize(new Dimension(320, 720));
+        setMinimumSize(new Dimension(300, 520));
+        setBackground(defaultPanelBackground);
         
     // Panel superior como JToolBar (dos barras apiladas)
     topPanel = new JPanel();
     topPanel.setLayout(new BoxLayout(topPanel, BoxLayout.Y_AXIS));
+    topPanel.setOpaque(true);
+    topPanel.setBackground(defaultPanelBackground);
 
     // Barra 1: controles principales
     JToolBar mainBar = new JToolBar();
     mainBar.setFloatable(false);
     mainBar.setRollover(true);
     mainBar.setBorder(BorderFactory.createEmptyBorder(4, 4, 4, 4));
+    mainBar.setOpaque(true);
+    mainBar.setBackground(defaultPanelBackground);
     
     // Configurar todos los componentes como no focusables
     enableLayersCheckBox.setFocusable(false);
@@ -329,6 +349,8 @@ public class IntegratedImageLayerPanel extends JPanel {
     orderBar.setFloatable(false);
     orderBar.setRollover(true);
     orderBar.setBorder(BorderFactory.createEmptyBorder(2, 4, 4, 4));
+    orderBar.setOpaque(true);
+    orderBar.setBackground(defaultPanelBackground);
     
     orderBar.add(new JLabel("Order: "));
     orderBar.add(moveUpButton);
@@ -344,6 +366,8 @@ public class IntegratedImageLayerPanel extends JPanel {
         
         // Panel central: lista de capas con scroll adecuado
         JPanel centerPanel = new JPanel(new BorderLayout());
+        centerPanel.setOpaque(true);
+        centerPanel.setBackground(defaultPanelBackground);
         centerPanel.setBorder(new TitledBorder("Layers"));
         
         JScrollPane layerScrollPane = new JScrollPane(layerList);
@@ -352,6 +376,8 @@ public class IntegratedImageLayerPanel extends JPanel {
         layerScrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
         layerScrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
         layerScrollPane.setBorder(BorderFactory.createLoweredBevelBorder());
+        layerScrollPane.getViewport().setBackground(Color.WHITE);
+        layerScrollPane.getViewport().setOpaque(true);
         centerPanel.add(layerScrollPane, BorderLayout.CENTER);
         
         // Ya no añadimos barra de botones abajo; todos van en el topPanel
@@ -364,17 +390,40 @@ public class IntegratedImageLayerPanel extends JPanel {
         
         // Organizar contenido en pestañas con márgenes reducidos
         JPanel layersContent = new JPanel(new BorderLayout());
+        layersContent.setOpaque(true);
+        layersContent.setBackground(defaultPanelBackground);
         layersContent.add(centerPanel, BorderLayout.CENTER);
         layersContent.add(layerPropertiesPanel, BorderLayout.SOUTH);
         layersContent.setBorder(BorderFactory.createEmptyBorder(2, 2, 2, 2));
         
         JTabbedPane tabbedPane = new JTabbedPane();
+        tabbedPane.setBorder(BorderFactory.createEmptyBorder(6, 6, 6, 6));
+        tabbedPane.setOpaque(true);
+        tabbedPane.setBackground(defaultPanelBackground);
         tabbedPane.addTab("Layers", layersContent);
-        tabbedPane.addTab("Image Controls", imageControlsPanel);
+        tabbedPane.setBackgroundAt(0, defaultPanelBackground);
+
+        JScrollPane imageControlsScroll = new JScrollPane(imageControlsPanel);
+        imageControlsScroll.setBorder(BorderFactory.createEmptyBorder());
+        imageControlsScroll.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
+        imageControlsScroll.getVerticalScrollBar().setUnitIncrement(12);
+        imageControlsScroll.getViewport().setOpaque(true);
+        imageControlsScroll.getViewport().setBackground(defaultPanelBackground);
+        imageControlsScroll.setOpaque(true);
+        imageControlsScroll.setBackground(defaultPanelBackground);
+        tabbedPane.addTab("Image Controls", imageControlsScroll);
+        tabbedPane.setBackgroundAt(1, defaultPanelBackground);
         
         // Layout principal - botón CLARAMENTE SEPARADO de las pestañas
-        add(topPanel, BorderLayout.NORTH);
+        JPanel topWrapper = new JPanel(new BorderLayout());
+        topWrapper.add(topPanel, BorderLayout.CENTER);
+        topWrapper.setBorder(BorderFactory.createEmptyBorder(0, 0, 4, 0));
+        topWrapper.setOpaque(true);
+        topWrapper.setBackground(defaultPanelBackground);
+        add(topWrapper, BorderLayout.NORTH);
         add(tabbedPane, BorderLayout.CENTER);
+        layerInfoLabel.setOpaque(true);
+        layerInfoLabel.setBackground(defaultPanelBackground);
         add(layerInfoLabel, BorderLayout.SOUTH);
         
         // Asegurar focus y habilitación para eventos de ratón
@@ -411,15 +460,22 @@ public class IntegratedImageLayerPanel extends JPanel {
      */
     private JPanel createImageControlsPanel() {
         JPanel mainPanel = new JPanel(new BorderLayout());
+        mainPanel.setOpaque(true);
+        mainPanel.setBackground(defaultPanelBackground);
         mainPanel.setBorder(BorderFactory.createEmptyBorder(2, 2, 2, 2)); // Reducir espaciado
         
         // === SECCIÓN SUPERIOR: CONTROLES GLOBALES (TOOLBAR ORIGINAL CON ICONOS) ===
         JPanel globalControlsPanel = new JPanel(new BorderLayout());
-        globalControlsPanel.setBorder(new TitledBorder("Global Controls (Main Image + Layers)"));
+        globalControlsPanel.setOpaque(true);
+        globalControlsPanel.setBackground(defaultPanelBackground);
+        globalControlsPanel.setBorder(new TitledBorder("Global controls (Main image + layers)"));
         
         // Toolbar existente de ImagePreparingView - ¡CON LOS ICONOS ÚTILES!
         if (imagePreparingView != null && imagePreparingView.getToolBar() != null) {
-            globalControlsPanel.add(imagePreparingView.getToolBar(), BorderLayout.CENTER);
+            ImagePreparingToolBar toolBar = imagePreparingView.getToolBar();
+            toolBar.setOpaque(true);
+            toolBar.setBackground(defaultPanelBackground);
+            globalControlsPanel.add(toolBar, BorderLayout.CENTER);
         } else {
             JLabel noToolbarLabel = new JLabel("Toolbar not available", JLabel.CENTER);
             globalControlsPanel.add(noToolbarLabel, BorderLayout.CENTER);
@@ -427,7 +483,9 @@ public class IntegratedImageLayerPanel extends JPanel {
         
         // === SECCIÓN INFERIOR: CONTROLES DE IMAGEN DE FONDO ===
         JPanel backgroundControlsPanel = new JPanel(new BorderLayout());
-        backgroundControlsPanel.setBorder(new TitledBorder("Background Image Controls (no layers)"));
+        backgroundControlsPanel.setOpaque(true);
+        backgroundControlsPanel.setBackground(defaultPanelBackground);
+        backgroundControlsPanel.setBorder(new TitledBorder("Background image controls (no layers)"));
         
         // Crear controles reales para imagen de fondo usando ImagePreparingView
         JPanel backgroundSlidersPanel = createBackgroundImageControls();
@@ -446,9 +504,13 @@ public class IntegratedImageLayerPanel extends JPanel {
     private JPanel createBackgroundImageControls() {
         JPanel panel = new JPanel();
         panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
+        panel.setOpaque(true);
+        panel.setBackground(defaultPanelBackground);
         
         // Crear controles para imagen de fondo con spinners
         JPanel slidersGrid = new JPanel(new GridBagLayout());
+        slidersGrid.setOpaque(true);
+        slidersGrid.setBackground(defaultPanelBackground);
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = new Insets(1, 2, 1, 2);
         gbc.anchor = GridBagConstraints.WEST;
@@ -489,7 +551,7 @@ public class IntegratedImageLayerPanel extends JPanel {
         // Botón reset compacto
         gbc.gridx = 0; gbc.gridy = 5; gbc.gridwidth = 4; 
         gbc.fill = GridBagConstraints.HORIZONTAL; gbc.insets = new Insets(3, 2, 1, 2);
-        JButton resetBgButton = new JButton("Reset Background Image");
+        JButton resetBgButton = new JButton("Reset background image");
         resetBgButton.setPreferredSize(new Dimension(150, 22));
         slidersGrid.add(resetBgButton, gbc);
         
@@ -809,16 +871,28 @@ public class IntegratedImageLayerPanel extends JPanel {
         valueLabel.setBorder(BorderFactory.createLoweredBevelBorder());
         panel.add(valueLabel, gbc);
     }
+
+    private Color resolveDefaultPanelBackground() {
+        Color bg = UIManager.getColor("Panel.background");
+        if (bg == null) {
+            bg = new Color(0xF0F0F0);
+        }
+        return bg;
+    }
     
     /**
      * Crea el panel de propiedades de capa seleccionada
      */
     private JPanel createLayerPropertiesPanel() {
         JPanel panel = new JPanel(new BorderLayout());
-        panel.setBorder(new TitledBorder("Propiedades de Capa"));
+        panel.setBorder(new TitledBorder("Layer Properties"));
+        panel.setOpaque(true);
+        panel.setBackground(defaultPanelBackground);
         
         // Panel de propiedades básicas
         JPanel basicProps = new JPanel(new GridBagLayout());
+        basicProps.setOpaque(true);
+        basicProps.setBackground(defaultPanelBackground);
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = new Insets(2, 5, 2, 5);
         gbc.anchor = GridBagConstraints.WEST;
@@ -827,7 +901,7 @@ public class IntegratedImageLayerPanel extends JPanel {
         gbc.gridx = 0; gbc.gridy = 0;
         basicProps.add(visibilityCheckBox, gbc);
         gbc.gridx = 1;
-        basicProps.add(new JLabel("Modo:"), gbc);
+        basicProps.add(new JLabel("Mode:"), gbc);
         gbc.gridx = 2; gbc.fill = GridBagConstraints.HORIZONTAL; gbc.weightx = 1.0;
         basicProps.add(blendModeCombo, gbc);
         
@@ -848,20 +922,22 @@ public class IntegratedImageLayerPanel extends JPanel {
         
         // Panel de transformaciones de imagen
         JPanel imageTransformsPanel = new JPanel(new GridBagLayout());
-        imageTransformsPanel.setBorder(new TitledBorder("Ajustes de imagen"));
+        imageTransformsPanel.setBorder(new TitledBorder("Image adjustments"));
+        imageTransformsPanel.setOpaque(true);
+        imageTransformsPanel.setBackground(defaultPanelBackground);
         
         GridBagConstraints igbc = new GridBagConstraints();
         igbc.insets = new Insets(2, 5, 2, 5);
         igbc.anchor = GridBagConstraints.WEST;
         
         // Añadir controles de transformación
-        addImageTransformControl(imageTransformsPanel, "Opacidad:", opacitySlider, opacityLabel, igbc, 0);
-        addImageTransformControl(imageTransformsPanel, "Brillo:", brightnessSlider, brightnessSpinner, igbc, 1); // CAMBIADO: brightnessLabel -> brightnessSpinner
-        addImageTransformControl(imageTransformsPanel, "Contraste:", contrastSlider, contrastSpinner, igbc, 2); // CAMBIADO: contrastLabel -> contrastSpinner
-        addImageTransformControl(imageTransformsPanel, "Saturación:", saturationSlider, saturationSpinner, igbc, 3); // CAMBIADO: saturationLabel -> saturationSpinner
+        addImageTransformControl(imageTransformsPanel, "Opacity:", opacitySlider, opacityLabel, igbc, 0);
+        addImageTransformControl(imageTransformsPanel, "Brightness:", brightnessSlider, brightnessSpinner, igbc, 1); // CAMBIADO: brightnessLabel -> brightnessSpinner
+        addImageTransformControl(imageTransformsPanel, "Contrast:", contrastSlider, contrastSpinner, igbc, 2); // CAMBIADO: contrastLabel -> contrastSpinner
+        addImageTransformControl(imageTransformsPanel, "Saturation:", saturationSlider, saturationSpinner, igbc, 3); // CAMBIADO: saturationLabel -> saturationSpinner
         addImageTransformControl(imageTransformsPanel, "Gamma:", gammaSlider, gammaSpinner, igbc, 4); // CAMBIADO: gammaLabel -> gammaSpinner
-        addImageTransformControl(imageTransformsPanel, "Nitidez:", sharpnessSlider, sharpnessSpinner, igbc, 5); // CAMBIADO: sharpnessLabel -> sharpnessSpinner
-        addImageTransformControl(imageTransformsPanel, "Escala:", scaleSlider, scaleSpinner, igbc, 6); // CAMBIADO: scaleField -> scaleSpinner
+        addImageTransformControl(imageTransformsPanel, "Sharpness:", sharpnessSlider, sharpnessSpinner, igbc, 5); // CAMBIADO: sharpnessLabel -> sharpnessSpinner
+        addImageTransformControl(imageTransformsPanel, "Scale:", scaleSlider, scaleSpinner, igbc, 6); // CAMBIADO: scaleField -> scaleSpinner
         
         // Fila para botón reset
         igbc.gridx = 0; igbc.gridy = 7; igbc.gridwidth = 2; igbc.fill = GridBagConstraints.HORIZONTAL;
@@ -1866,6 +1942,22 @@ public class IntegratedImageLayerPanel extends JPanel {
         return !Double.isNaN(ratio) && ratio >= MIN_VALID_PIXELS_PER_UNIT;
     }
 
+    /**
+     * Returns a human-friendly label for each blend mode so the combo box stays readable.
+     */
+    private String getBlendModeDisplayName(Layer.BlendMode mode) {
+        if (mode == null) {
+            return "Normal";
+        }
+        return switch (mode) {
+            case NORMAL -> "Normal";
+            case MULTIPLY -> "Multiply";
+            case OVERLAY -> "Overlay";
+            case SCREEN -> "Screen";
+            case SOFT_LIGHT -> "Soft Light";
+        };
+    }
+
     private void maybeLogPixelsPerUnit(double ratio, boolean horizontal, int axisSize, int gridSize, String source) {
         double lastRatio = horizontal ? lastLoggedPixelsPerUnitX : lastLoggedPixelsPerUnitY;
         String lastSource = horizontal ? lastPixelsPerUnitSourceX : lastPixelsPerUnitSourceY;
@@ -1898,7 +1990,7 @@ public class IntegratedImageLayerPanel extends JPanel {
                 String text = "📄 " + layer.getName(); // Emoji para hacer más visible
                 
                 if (!layer.isVisible()) {
-                    text += " (oculta)";
+                    text += " (hidden)";
                     setFont(getFont().deriveFont(Font.ITALIC));
                 } else {
                     setFont(getFont().deriveFont(Font.BOLD)); // Negrita para mayor visibilidad
@@ -1918,6 +2010,7 @@ public class IntegratedImageLayerPanel extends JPanel {
                     setBackground(Color.WHITE);
                     setForeground(Color.BLACK);
                 }
+                setOpaque(true);
             }
             
             return this;

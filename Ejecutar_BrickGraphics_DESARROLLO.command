@@ -22,5 +22,12 @@ echo "🚀 Ejecutando BrickGraphics desde código fuente..."
 echo "📁 Usando archivos compilados en: bin/"
 echo ""
 
+# Si no se pasan argumentos, abrir automáticamente el KMV por defecto
+DEFAULT_KMV="lddmc.kvm"
+if [ $# -eq 0 ] && [ -f "$DEFAULT_KMV" ]; then
+    echo "📄 Abriendo mosaico por defecto: $DEFAULT_KMV"
+    set -- "$DEFAULT_KMV"
+fi
+
 # Ejecutar desde código fuente compilado
-java -cp ".:bin" program.JWrapper
+java -cp ".:bin" program.JWrapper "$@"

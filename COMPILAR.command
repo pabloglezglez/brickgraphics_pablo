@@ -12,9 +12,10 @@ pkill -f java 2>/dev/null || true
 # Crear directorio bin si no existe
 mkdir -p bin
 
-# Compilar todo el proyecto
-echo "📦 Compilando código fuente..."
-if find src -name "*.java" -exec javac -cp "src:." -d bin {} + 2>/dev/null; then
+# Compilar todo el proyecto (bytecode compatible con Java 21)
+echo "📦 Compilando código fuente (target Java 21)..."
+JAVAC_FLAGS=(--release 21 -cp "src:." -d bin)
+if find src -name "*.java" -exec javac "${JAVAC_FLAGS[@]}" {} + 2>/dev/null; then
     echo "✅ Compilación exitosa"
     echo ""
     echo "🚀 Para ejecutar:"

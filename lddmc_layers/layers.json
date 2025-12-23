@@ -2,12 +2,7 @@
   "version": 1,
   "layersEnabled": true,
   "layers": [
-    {"name": "globo amarillo", "file": "REL:globo_amarillo.png", "fileHash": "58c51c578538725f509e597f5b625724", "visible": true, "x": 795, "y": 0, "opacity": 1.0, "brightness": 1.0, "contrast": 1.0, "saturation": 1.0, "gamma": 1.0, "sharpness": 1.0, "scale": 1.0 },
-    {"name": "globo verde", "file": "REL:globo_verde.png", "fileHash": "f3649fd792e073897701a99cfd916c0b", "visible": true, "x": 720, "y": 45, "opacity": 1.0, "brightness": 0.9, "contrast": 1.0, "saturation": 1.0, "gamma": 1.0, "sharpness": 1.0, "scale": 1.1 },
-    {"name": "globo rojo", "file": "REL:globo_rojo.png", "fileHash": "5458ca4101e5d8a226c25d0d7681b162", "visible": true, "x": 445, "y": 260, "opacity": 1.0, "brightness": 1.0, "contrast": 1.0, "saturation": 1.0, "gamma": 1.0, "sharpness": 1.0, "scale": 1.0 },
-    {"name": "tarta", "file": "REL:tarta.png", "fileHash": "02d6560318a52580b30a8b161621cd05", "visible": true, "x": 525, "y": 290, "opacity": 1.0, "brightness": 1.0, "contrast": 1.0, "saturation": 1.0, "gamma": 1.0, "sharpness": 1.0, "scale": 1.1 },
-    {"name": "minifigura", "file": "REL:minifigura.png", "fileHash": "ec875082a51b50b5a39725ec0596fde3", "visible": true, "x": 0, "y": 365, "opacity": 1.0, "brightness": 1.0, "contrast": 1.0, "saturation": 1.0, "gamma": 0.7, "sharpness": 1.0, "scale": 1.55 },
-    {"name": "velas", "file": "REL:velas.png", "fileHash": "b9e4ca59404f1d89c8e0b239651854e6", "visible": true, "x": 745, "y": 270, "opacity": 1.0, "brightness": 1.0, "contrast": 1.0, "saturation": 1.0, "gamma": 1.0, "sharpness": 1.0, "scale": 1.2 },
-    {"name": "letras", "file": "REL:letras.png", "fileHash": "1ca2072cdbd3af0e61bdc1f42189a290", "visible": true, "x": 30, "y": 10, "opacity": 1.0, "brightness": 1.0, "contrast": 1.0, "saturation": 1.0, "gamma": 0.6, "sharpness": 1.0, "scale": 1.04 }
+    {"name": "Micro bus_25_02_06", "file": "REL:Micro_bus_25_02_06.png", "fileHash": "b6b0c18b6bfa4106a07d53014fd5e4a9", "visible": true, "x": -155, "y": -174, "opacity": 1.0, "brightness": 1.0, "contrast": 1.0, "saturation": 1.0, "gamma": 1.0, "sharpness": 1.0, "scale": 1.0 },
+    {"name": "0_mural_Pazo_tiovivo", "file": "REL:0_mural_Pazo_tiovivo.png", "fileHash": "0b69a033f855c62137c1039595ef3c17", "visible": true, "x": -1238, "y": -799, "opacity": 1.0, "brightness": 1.0, "contrast": 1.0, "saturation": 1.0, "gamma": 1.0, "sharpness": 1.0, "scale": 0.1 }
   ]
 }

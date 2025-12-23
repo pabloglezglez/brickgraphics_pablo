@@ -75,7 +75,6 @@ public class MainController implements ModelHandler<BrickGraphicsState> {
 		long startTime = System.currentTimeMillis();
 		Log.log("Initiating components");
 		model = new Model<BrickGraphicsState>(STATE_FILE_NAME, BrickGraphicsState.class);
-		clearPersistedImageState();
 		
 		RenderingProgressBar renderingProgressBar = new RenderingProgressBar();
 		pipeline = new Pipeline(renderingProgressBar);
@@ -176,9 +175,22 @@ public class MainController implements ModelHandler<BrickGraphicsState> {
 					openAction.actionPerformed(null);
 				}			
 			} else {
-				io.Log.log("DEBUG: MainController - No default file configured; prompting user to open one.");
-				Action openAction = MosaicIO.createOpenAction(this, mw);
-				openAction.actionPerformed(null);
+				File defaultMosaic = new File(STATE_FILE_NAME);
+				if (defaultMosaic.exists()) {
+					try {
+						io.Log.log("INFO: MainController - Loading default mosaic file: " + defaultMosaic.getAbsolutePath());
+						MosaicIO.load(this, defaultMosaic);
+					}
+					catch (Exception e) {
+						Log.log(e);
+						Action openAction = MosaicIO.createOpenAction(this, mw);
+						openAction.actionPerformed(null);
+					}
+				} else {
+					io.Log.log("DEBUG: MainController - No default file configured; prompting user to open one.");
+					Action openAction = MosaicIO.createOpenAction(this, mw);
+					openAction.actionPerformed(null);
+				}
 			}
 		}
 		else
