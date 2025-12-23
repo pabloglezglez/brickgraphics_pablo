@@ -62,6 +62,17 @@ jar --create \
 
 # 4) Limpiar archivos temporales del paquete
 find "$DIST_DIR" -name ".DS_Store" -delete || true
+find "$DIST_DIR" -name "*.log" -delete || true
+
+# Quitar artefactos de pruebas que no deben distribuirse
+UNNEEDED_FILES=(
+  "bin/lddmc_isolation_test.kvm"
+  "bin/test_custom_ids.txt"
+)
+
+for file in "${UNNEEDED_FILES[@]}"; do
+  rm -f "$DIST_DIR/$file"
+done
 
 # 5) Comprimir en ZIP para facilitar envío
 pushd "$DIST_ROOT" >/dev/null
