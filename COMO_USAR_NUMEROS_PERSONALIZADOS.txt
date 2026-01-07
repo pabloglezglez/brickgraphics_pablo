@@ -1,56 +1,56 @@
 /**
- * GUÍA PARA USAR NÚMEROS PERSONALIZADOS DE COLORES
+ * GUIDE FOR USING CUSTOM COLOR NUMBERS
  * ================================================
  * 
- * Esta funcionalidad te permite asignar números específicos a los colores
- * en lugar de usar la numeración automática correlativa.
+ * This feature lets you assign specific numbers to colors instead of using
+ * the automatic sequential numbering.
  * 
- * CÓMO USAR:
+ * HOW TO USE:
  * 
- * 1. EJECUTAR LA APLICACIÓN:
- *    - Abre tu imagen y configura los colores como siempre
- *    - Los números se asignarán automáticamente (1, 2, 3, 4...)
+ * 1. RUN THE APPLICATION:
+ *    - Open your image and configure the colors as usual
+ *    - Numbers are automatically assigned (1, 2, 3, 4...)
  * 
- * 2. PERSONALIZAR NÚMEROS:
- *    - Abre la consola de Java/terminal donde ejecutaste la aplicación
- *    - Usa los métodos del CustomColorIDManager
+ * 2. CUSTOMIZE NUMBERS:
+ *    - Open the Java console/terminal where you launched the app
+ *    - Use the CustomColorIDManager methods
  * 
- * 3. EJEMPLOS DE COMANDOS:
+ * 3. COMMAND EXAMPLES:
  * 
- *    // Para ver los colores actuales y sus números:
+ *    // Show the current colors and their numbers:
  *    customManager.printCurrentColorAssignments();
  * 
- *    // Para asignar un número específico a un color:
- *    customManager.setCustomNumberByColorName("Turrón", 15);
- *    customManager.setCustomNumberByColorName("Rojo", 3);
- *    customManager.setCustomNumberByColorName("Azul", 7);
+ *    // Assign a specific number to a color:
+ *    customManager.setCustomNumberByColorName("Nougat", 15);
+ *    customManager.setCustomNumberByColorName("Red", 3);
+ *    customManager.setCustomNumberByColorName("Blue", 7);
  * 
- *    // Para eliminar un número personalizado:
+ *    // Remove a custom number:
  *    customManager.removeCustomNumberByColorName("Turrón");
  * 
- *    // Para eliminar todos los números personalizados:
+ *    // Remove every custom number:
  *    customManager.clearAllCustomNumbers();
  * 
- *    // Para usar números de ejemplo predefinidos:
+ *    // Use predefined sample numbers:
  *    customManager.setExampleCustomNumbers();
  * 
- * 4. RESULTADO:
- *    - Los círculos en la leyenda mostrarán tus números personalizados
- *    - Los números se mantendrán hasta que los cambies o reinicies la app
+ * 4. RESULT:
+ *    - Legend circles display your custom numbers
+ *    - Numbers persist until you change them or restart the app
  * 
- * NOTA IMPORTANTE:
- * - Los nombres de colores deben coincidir exactamente (no importan mayúsculas)
- * - Si asignas el mismo número a dos colores, se usará el último asignado
- * - Los números personalizados tienen prioridad sobre los automáticos
+ * IMPORTANT NOTE:
+ * - Color names must match exactly (case-insensitive)
+ * - If you assign the same number to two colors, the last assignment wins
+ * - Custom numbers override automatic numbers
  * 
- * EJEMPLO DE USO TÍPICO:
+ * TYPICAL USE EXAMPLE:
  * 
- * 1. Cargar imagen y configurar colores
- * 2. Ver qué colores tienes: printCurrentColorAssignments()
- * 3. Asignar números importantes:
- *    - setCustomNumberByColorName("Blanco", 1)
- *    - setCustomNumberByColorName("Negro", 2)  
- *    - setCustomNumberByColorName("Turrón", 15)
- * 4. Generar instrucciones de impresión
- * 5. ¡Los círculos mostrarán tus números personalizados!
+ * 1. Load the image and configure the colors
+ * 2. Inspect your colors: printCurrentColorAssignments()
+ * 3. Assign key numbers:
+ *    - setCustomNumberByColorName("White", 1)
+ *    - setCustomNumberByColorName("Black", 2)
+ *    - setCustomNumberByColorName("Nougat", 15)
+ * 4. Generate print instructions
+ * 5. The circles will display your custom numbers!
  */

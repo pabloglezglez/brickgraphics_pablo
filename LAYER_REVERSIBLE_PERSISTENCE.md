@@ -1,58 +1,58 @@
-# Sistema de Persistencia Reversible de Capas
+# Reversible Layer Persistence System
 
-## 🔄 **NUEVA FUNCIONALIDAD: GUARDADO REVERSIBLE**
+## 🔄 **NEW FEATURE: REVERSIBLE SAVES**
 
-### Problema Resuelto
+### Problem Solved
 
-**ANTES**: Cuando guardabas un proyecto con capas, las capas se "quemaban" en la imagen base. Al abrir y eliminar las capas, su influencia permanecía en el mosaico.
+**BEFORE:** Saving a project with layers burned the layers into the base image. Opening the project and deleting the layers still left their effect baked into the mosaic.
 
-**AHORA**: El sistema guarda la imagen original sin capas por separado, permitiendo restaurarla completamente cuando se eliminan todas las capas.
+**NOW:** The system stores the original image without layers separately so it can be fully restored when every layer is removed.
 
 ---
 
-## ⚙️ **Cómo Funciona**
+## ⚙️ **How It Works**
 
-### 1. **Guardado Automático de Imagen Original** 
+### 1. **Automatic Original Image Save**
 ```java
-// En MainController.save()
+// Inside MainController.save()
 if (originalImage != null) {
     DataFile originalImageDataFile = new DataFile(originalImage);
     model.set(BrickGraphicsState.OriginalImageFile, originalImageDataFile);
 }
 ```
 
-### 2. **Detección Automática de Eliminación de Capas**
+### 2. **Automatic Layer Removal Detection**
 ```java
-// En LayerManager
+// Inside LayerManager
 public boolean removeLayer(Layer layer) {
     if (layers.isEmpty() && onAllLayersRemovedCallback != null) {
-        onAllLayersRemovedCallback.run(); // Restaura imagen original
+        onAllLayersRemovedCallback.run(); // Restore original image
     }
 }
 ```
 
-### 3. **Restauración Automática**
+### 3. **Automatic Restoration**
 ```java
-// En MainController
+// Inside MainController
 layerManager.setOnAllLayersRemovedCallback(() -> {
-    updateImageWithLayers(); // Aplica capas vacías sobre imagen original
+    updateImageWithLayers(); // Apply empty layers over the original image
 });
 ```
 
 ---
 
-## 🎯 **Estados Persistentes en KMV**
+## 🎯 **Persistent KMV States**
 
-### Nuevos Estados Añadidos:
-- `OriginalImageFile`: Imagen base sin capas aplicadas
-- `LayersEnabled`: Si el sistema de capas está activo
-- `LayerData`: Configuración completa de todas las capas (JSON)
+### Newly Added Keys:
+- `OriginalImageFile`: Base image with no layers
+- `LayersEnabled`: Whether the layer system is active
+- `LayerData`: Full JSON configuration for every layer
 
-### Datos Guardados por Capa:
+### Data Stored Per Layer:
 ```json
 {
-  "name": "Nombre de la capa",
-  "file": "ruta/al/archivo.jpg", 
+  "name": "Layer name",
+  "file": "path/to/file.jpg",
   "visible": true,
   "x": 100,
   "y": 50,
@@ -68,77 +68,77 @@ layerManager.setOnAllLayersRemovedCallback(() -> {
 
 ---
 
-## 📋 **Flujo de Trabajo del Usuario**
+## 📋 **User Workflow**
 
-### Escenario de Uso:
+### Sample Scenario:
 
-1. **Cargar imagen base** → `imagen.jpg`
-2. **Añadir capas** → `logo.png`, `textura.jpg`
-3. **Ajustar capas** → Brillo, posición, escala
-4. **Guardar proyecto** → `proyecto.kmv`
-   - ✅ Imagen original guardada sin capas
-   - ✅ Capas y configuraciones guardadas
-   - ✅ Imagen resultante (con capas) guardada
+1. **Load base image** → `image.jpg`
+2. **Add layers** → `logo.png`, `texture.jpg`
+3. **Adjust layers** → brightness, position, scale
+4. **Save project** → `project.kmv`
+   - ✅ Original image stored without layers
+   - ✅ Layer definitions persisted
+   - ✅ Rendered image (with layers) stored
 
-5. **Cerrar y reabrir** → `proyecto.kmv`
-   - ✅ Imagen con capas aplicadas se muestra
-   - ✅ Capas individuales cargadas y editables
-   - ✅ Imagen original preservada en segundo plano
+5. **Close and reopen** → `project.kmv`
+   - ✅ Layered image reappears
+   - ✅ Individual layers remain editable
+   - ✅ Original image preserved in the background
 
-6. **Eliminar todas las capas**
-   - ✅ **AUTOMÁTICAMENTE** se restaura la imagen original
-   - ✅ No queda rastro de las capas eliminadas
-   - ✅ El mosaico vuelve exactamente al estado original
+6. **Remove every layer**
+   - ✅ **AUTOMATICALLY** restores the original image
+   - ✅ No trace of deleted layers remains
+   - ✅ Mosaic returns exactly to the pristine state
 
 ---
 
-## 🔧 **Implementación Técnica**
+## 🔧 **Technical Implementation**
 
-### Archivos Modificados:
+### Modified Files:
 
 #### **BrickGraphicsState.java**
 ```java
-// Nuevo estado para imagen original
-OriginalImageFile(new DataFile()), 
+// New state for the original image
+OriginalImageFile(new DataFile()),
 ```
 
 #### **MainController.java**
-- `save()`: Guarda imagen original en KMV
-- `handleModelChange()`: Carga imagen original si existe
-- Callback para restauración automática
+- `save()`: Persist the original image in the KMV file
+- `handleModelChange()`: Reload the original image when present
+- Callback wiring for automatic restoration
 
-#### **LayerManager.java**  
-- `removeLayer()`: Detecta cuando no quedan capas
-- `clearLayers()`: Detecta limpieza total de capas
-- Callback para notificar eliminación completa
-
----
-
-## ✅ **Beneficios del Sistema**
-
-### Para el Usuario:
-- **Tranquilidad Total**: Puedes experimentar con capas sin miedo
-- **Reversibilidad Completa**: Eliminar capas restaura exactamente la imagen original
-- **Flujo Natural**: Todo funciona automáticamente, sin pasos extra
-- **Persistencia Confiable**: Los proyectos se guardan y cargan perfectamente
-
-### Para el Desarrollo:
-- **Separación Clara**: Imagen original ≠ Imagen con capas aplicadas
-- **Sistema Robusto**: Manejo de errores y fallbacks
-- **Compatibilidad**: Funciona con archivos KMV existentes
-- **Escalabilidad**: Fácil añadir nuevas funcionalidades
+#### **LayerManager.java**
+- `removeLayer()`: Detects when the last layer disappears
+- `clearLayers()`: Detects full cleanup
+- Callback notifies when removal completes
 
 ---
 
-## 🎉 **Estado del Sistema**
+## ✅ **System Benefits**
 
-**✅ COMPLETAMENTE IMPLEMENTADO Y FUNCIONAL**
+### For Users:
+- **Complete peace of mind**: Experiment without risk
+- **Full reversibility**: Removing layers restores the original image
+- **Natural workflow**: Everything happens automatically
+- **Reliable persistence**: Projects save and load flawlessly
 
-- ✅ Persistencia de imagen original en KMV
-- ✅ Detección automática de eliminación de capas  
-- ✅ Restauración automática de imagen original
-- ✅ Compatible con archivos existentes
-- ✅ Reset inteligente que preserva posición y escala
-- ✅ Escalado desde el centro sin descentrado
+### For Development:
+- **Clear separation**: Original image ≠ Layered result
+- **Robust foundation**: Error handling and fallbacks
+- **Compatibility**: Works with existing KMV files
+- **Scalability**: Easy to extend later
 
-**¡El sistema de capas ahora es completamente reversible!**
+---
+
+## 🎉 **System Status**
+
+**✅ FULLY IMPLEMENTED AND OPERATIONAL**
+
+- ✅ Original image persistence in KMV
+- ✅ Automatic detection when layers are removed  
+- ✅ Automatic restoration of the original image
+- ✅ Backwards compatible with existing files
+- ✅ Smart reset preserving position and scale
+- ✅ Centered scaling without offset
+
+**The layer system is now completely reversible!**

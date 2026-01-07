@@ -14,14 +14,14 @@ javac -cp src -d bin src/mosaic/controllers/MainController.java
 
 java -cp bin mosaic.controllers.MainController
 
-En Windows, después de generar el paquete distribuible, se puede abrir la app con doble clic usando `BrickGraphics_Windows.bat`, que ejecuta `java -jar BrickGraphics.jar` y mantiene abierta la consola para mostrar errores.
+On Windows, after generating the distributable package, you can open the app with a double-click using `BrickGraphics_Windows.bat`. The script runs `java -jar BrickGraphics.jar` and keeps the console open to display any errors.
 
-## Crear un paquete distribuible
+## Create a distributable package
 
-Para generar una carpeta limpia y un ZIP listos para compartir, ejecuta:
+To create a clean folder and a ZIP ready to share, run:
 
 ```
 ./package_distribution.sh
 ```
 
-El script recompila el proyecto, copia los binarios y recursos necesarios dentro de `dist/BrickGraphics_<fecha>` y crea `dist/BrickGraphics_<fecha>.zip` para enviar a otros usuarios.
+The script recompiles the project, copies the required binaries and resources into `dist/BrickGraphics_<date>`, and generates `dist/BrickGraphics_<date>.zip` that you can send to other users.

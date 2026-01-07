@@ -1,78 +1,74 @@
-# Sistema de Capas - Resumen de Implementación
+# Layer System – Implementation Summary
 
-## Estado Actual ✅ COMPLETADO
+## Current State ✅ COMPLETED
 
-El sistema de capas ha sido completamente implementado con todas las funcionalidades solicitadas:
+The layer system is fully implemented with every requested capability:
 
-### 1. Visibilidad de Capas
-- ✅ **ARREGLADO**: Las capas aparecen correctamente en el viewport
-- ✅ Integración con `MainController.updateImageWithLayers()`
-- ✅ Sistema de callbacks para actualización en tiempo real
+### 1. Layer Visibility
+- ✅ **FIXED**: Layers render properly in the viewport
+- ✅ Integrated with `MainController.updateImageWithLayers()`
+- ✅ Callback system for real-time updates
 
-### 2. Controles de Capa
-- ✅ **Panel de Control Completo**: `IntegratedImageLayerPanel.java`
-- ✅ **Controles de Escala**: 10%-300% con slider
-- ✅ **Controles de Posición**: X/Y con spinners
-- ✅ **Transformaciones de Imagen**: Brillo, Contraste, Saturación, Gamma, Nitidez
-- ✅ **Botón Reset**: Resetea transformaciones pero preserva posición (como solicitado)
+### 2. Layer Controls
+- ✅ **Full control panel**: `IntegratedImageLayerPanel.java`
+- ✅ **Scale controls**: 10%–300% via slider
+- ✅ **Position controls**: X/Y spinners
+- ✅ **Image adjustments**: Brightness, Contrast, Saturation, Gamma, Sharpness
+- ✅ **Reset button**: Resets adjustments while preserving position (as requested)
 
-### 3. Interacción Avanzada
-- ✅ **Soporte Rueda del Ratón**: Funciona en spinners de posición X/Y
-- ✅ **Etiquetas Numéricas**: Muestran valores exactos como en controles generales de imagen
-- ✅ **Actualización en Tiempo Real**: Los valores se actualizan mientras se ajustan
+### 3. Advanced Interaction
+- ✅ **Mouse wheel support** on the X/Y spinners
+- ✅ **Numeric labels** mirror the main image controls
+- ✅ **Live updates** while adjusting values
 
-### 4. Persistencia (NUEVO)
-- ✅ **Guardado con KMV**: Las imágenes añadidas se guardan con el archivo KMV
-- ✅ **Estados de Persistencia**: `BrickGraphicsState.LayersEnabled` y `BrickGraphicsState.LayerData`
-- ✅ **Serialización JSON**: Sistema completo para guardar/cargar configuración de capas
-- ✅ **LayerManager como ModelHandler**: Integrado con el sistema de persistencia
+### 4. Persistence (NEW)
+- ✅ **KMV save support**: Added layers round-trip with the KMV file
+- ✅ **Persistence keys**: `BrickGraphicsState.LayersEnabled` and `BrickGraphicsState.LayerData`
+- ✅ **JSON serialization** stores and restores every layer configuration
+- ✅ **LayerManager as ModelHandler** fully wired into persistence
 
-## Archivos Modificados
+## Modified Files
 
-### Core del Sistema
-- `src/mosaic/layers/LayerManager.java` - Gestor principal + persistencia
-- `src/mosaic/ui/panels/IntegratedImageLayerPanel.java` - UI completa con controles
-- `src/mosaic/layers/Layer.java` - Modelo de datos de capa
-- `src/mosaic/controllers/MainController.java` - Integración y callbacks
+### System Core
+- `src/mosaic/layers/LayerManager.java` – main controller + persistence
+- `src/mosaic/ui/panels/IntegratedImageLayerPanel.java` – UI with controls
+- `src/mosaic/layers/Layer.java` – layer data model
+- `src/mosaic/controllers/MainController.java` – integration and callbacks
 
-### Persistencia
-- `src/mosaic/io/BrickGraphicsState.java` - Estados para KMV
-- `LayerManager` implementa `ModelHandler<BrickGraphicsState>`
+### Persistence
+- `src/mosaic/io/BrickGraphicsState.java` – KMV state keys
+- `LayerManager` implements `ModelHandler<BrickGraphicsState>`
 
-## Funcionalidades Clave
+## Key Features
 
-### Reset Inteligente
+### Smart Reset
 ```java
-// El reset NO afecta la posición (como solicitado)
+// Reset does NOT touch the position (per requirement)
 private void resetLayerAdjustments() {
-    // Preservar posición actual
     int currentX = (Integer) xSpinner.getValue();
     int currentY = (Integer) ySpinner.getValue();
-    
-    // Resetear solo transformaciones
+
     brightnessSlider.setValue(100);
     contrastSlider.setValue(100);
-    // ... otros controles
-    
-    // Mantener posición
+    // ... other controls
+
     xSpinner.setValue(currentX);
     ySpinner.setValue(currentY);
 }
 ```
 
-### Persistencia KMV
+### KMV Persistence
 ```java
-// Guardar capas en archivo KMV
+// Save layers into the KMV file
 public void save(Model<BrickGraphicsState> model) {
     model.set(BrickGraphicsState.LayersEnabled, !layers.isEmpty());
     if (!layers.isEmpty()) {
-        // Serializar todas las capas a JSON
         String jsonData = serializeLayersToJson();
         model.set(BrickGraphicsState.LayerData, jsonData);
     }
 }
 
-// Cargar capas desde archivo KMV
+// Load layers back
 public void handleModelChange(Model<BrickGraphicsState> model) {
     String layerData = model.get(BrickGraphicsState.LayerData);
     if (layerData != null && !layerData.isEmpty()) {
@@ -81,24 +77,24 @@ public void handleModelChange(Model<BrickGraphicsState> model) {
 }
 ```
 
-### Etiquetas Numéricas
+### Numeric Labels
 ```java
-// Mostrar valores exactos en tiempo real
+// Show precise values in real-time
 brightnessValueLabel.setText(String.format("%.0f", brightnessValue));
 contrastValueLabel.setText(String.format("%.2f", contrastValue));
 scaleValueLabel.setText(String.format("%.0f%%", scaleValue * 100));
 ```
 
-## Estado del Proyecto
+## Project Status
 
-🎉 **SISTEMA COMPLETAMENTE FUNCIONAL**
+🎉 **SYSTEM FULLY OPERATIONAL**
 
-Todas las solicitudes del usuario han sido implementadas:
-- [x] Capas visibles en viewport
-- [x] Controles completos de transformación
-- [x] Soporte rueda del ratón
-- [x] Etiquetas numéricas
-- [x] Reset que preserva posición
-- [x] Persistencia en archivos KMV
+Every promise delivered:
+- [x] Layers visible in the viewport
+- [x] Full transformation controls
+- [x] Mouse wheel support
+- [x] Numeric labels
+- [x] Reset preserves position
+- [x] KMV persistence
 
-El sistema de capas está listo para uso en producción.
+The layer system is production-ready.

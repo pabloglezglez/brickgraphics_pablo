@@ -1,33 +1,33 @@
 #!/bin/bash
-# Script para DESARROLLO - Ejecuta desde código fuente compilado
-# Usar este script cuando modifiques código fuente
+# DEVELOPMENT script - runs from compiled source code
+# Use this script whenever you change source code
 
 cd "$(dirname "$0")"
 
-# Verificar que existe el directorio bin
+# Ensure the bin directory exists
 if [ ! -d "bin" ]; then
-    echo "❌ Directorio 'bin' no encontrado. Ejecuta primero:"
+    echo "❌ Directory 'bin' not found. Run first:"
     echo "   javac -cp 'src' -d bin src/program/JWrapper.java"
     exit 1
 fi
 
-# Verificar que existe la clase principal
+# Ensure the main class exists
 if [ ! -f "bin/program/JWrapper.class" ]; then
-    echo "❌ Clase principal no compilada. Ejecuta:"
+    echo "❌ Main class not compiled. Run:"
     echo "   find src -name '*.java' -exec javac -cp 'src:.' -d bin {} +"
     exit 1
 fi
 
-echo "🚀 Ejecutando BrickGraphics desde código fuente..."
-echo "📁 Usando archivos compilados en: bin/"
+echo "🚀 Running BrickGraphics from source code..."
+echo "📁 Using compiled files in: bin/"
 echo ""
 
-# Si no se pasan argumentos, abrir automáticamente el KMV por defecto
+# Automatically open the default KMV if no arguments are provided
 DEFAULT_KMV="lddmc.kvm"
 if [ $# -eq 0 ] && [ -f "$DEFAULT_KMV" ]; then
-    echo "📄 Abriendo mosaico por defecto: $DEFAULT_KMV"
+    echo "📄 Opening default mosaic: $DEFAULT_KMV"
     set -- "$DEFAULT_KMV"
 fi
 
-# Ejecutar desde código fuente compilado
+# Launch compiled source code
 java -cp ".:bin" program.JWrapper "$@"
